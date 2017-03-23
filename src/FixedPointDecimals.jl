@@ -30,7 +30,7 @@ using Compat
 import Base: reinterpret, zero, one, abs, sign, ==, <, <=, +, -, /, *, div,
              rem, divrem, fld, mod, fldmod, fld1, mod1, fldmod1, isinteger,
              typemin, typemax, realmin, realmax, show, convert, promote_rule,
-             min, max, trunc, round, floor, ceil, eps, float
+             min, max, trunc, round, floor, ceil, eps, float, widemul
 
 """
     FixedDecimal{I <: Integer, f::Int}
@@ -58,6 +58,17 @@ abs{T, f}(x::FD{T, f}) = reinterpret(FD{T, f}, abs(x.i))
 
 +{T, f}(x::FD{T, f}, y::FD{T, f}) = reinterpret(FD{T, f}, x.i+y.i)
 -{T, f}(x::FD{T, f}, y::FD{T, f}) = reinterpret(FD{T, f}, x.i-y.i)
+
+# wide multiplication
+Base.@pure function widemul{T, f, U, g}(x::FD{T, f}, y::FD{U, g})
+    i = widemul(x.i, y.i)
+    reinterpret(FD{typeof(i), f + g}, i)
+end
+Base.@pure function widemul{T, f}(x::FD{T, f}, y::Integer)
+    i = widemul(x.i, y)
+    reinterpret(FD{typeof(i), f}, i)
+end
+Base.@pure widemul(x::Integer, y::FD) = widemul(y, x)
 
 function _round_to_even(quotient, remainder, powt)
     if powt == 1
@@ -99,7 +110,7 @@ end
 trunc{T, f}(x::FD{T, f}) = FD{T, f}(div(x.i, T(10)^f))
 floor{T, f}(x::FD{T, f}) = FD{T, f}(fld(x.i, T(10)^f))
 # TODO: round with number of digits; should be easy
-function round{T, f}(x::FD{T, f})
+function round{T, f}(x::FD{T, f}, ::RoundingMode{:Nearest}=RoundNearest)
     powt = T(10)^f
     quotient, remainder = fldmod(x.i, powt)
     FD{T, f}(_round_to_even(quotient, remainder, powt))
@@ -114,17 +125,35 @@ function ceil{T, f}(x::FD{T, f})
     end
 end
 
-for truncfn in [:trunc, :round, :floor, :ceil]
-    @eval $truncfn{TI}(::Type{TI}, x::FD)::TI = $truncfn(x)
+for truncfn in [:trunc, :floor, :ceil]
+    @eval $truncfn{TI <: Integer}(::Type{TI}, x::FD)::TI = $truncfn(x)
+
+    # round/trunc/ceil/flooring to FD; generic
+    # TODO. this is probably incorrect for floating point and we need to check
+    # overflow in other cases.
+    @eval function $truncfn{T, f}(::Type{FD{T, f}}, x::Real)
+        reinterpret(FD{T, f}, $truncfn(T, T(10)^f * x))
+    end
+end
+round{TI <: Integer}(::Type{TI}, x::FD,
+                     ::RoundingMode{:Nearest}=RoundNearest)::TI = round(x)
+function round{T, f}(::Type{FD{T, f}}, x::Real,
+                     ::RoundingMode{:Nearest}=RoundNearest)
+    reinterpret(FD{T, f}, round(T, T(10)^f * x))
+end
+
+# needed to avoid ambiguity
+function round{T, f}(::Type{FD{T, f}}, x::Rational,
+                     ::RoundingMode{:Nearest}=RoundNearest)
+    reinterpret(FD{T, f}, round(T, T(10)^f * x))
 end
 
 # conversions and promotions
 convert{T, f}(::Type{FD{T, f}}, x::Integer) =
     reinterpret(FD{T, f}, round(T, Base.widemul(T(x), T(10)^f)))
 
-# TODO. this is very, very incorrect.
-convert{T, f}(::Type{FD{T, f}}, x::AbstractFloat) =
-    reinterpret(FD{T, f}, round(T, T(10)^f * x))
+convert{T <: FD}(::Type{T}, x::AbstractFloat) = round(T, x)
+
 function convert{T, f}(::Type{FD{T, f}}, x::Rational)::FD{T, f}
     powt = T(10)^f
     num::T, den::T = numerator(x), denominator(x)
@@ -170,6 +199,11 @@ convert{TR<:Rational,T,f}(::Type{TR}, x::FD{T, f})::TR =
 promote_rule{T, f, TI <: Integer}(::Type{FD{T, f}}, ::Type{TI}) = FD{T, f}
 promote_rule{T, f, TF <: AbstractFloat}(::Type{FD{T, f}}, ::Type{TF}) = TF
 promote_rule{T, f, TR}(::Type{FD{T, f}}, ::Type{Rational{TR}}) = Rational{TR}
+
+# TODO: decide if these are the right semantics;
+# right now we pick the bigger int type and the bigger decimal point
+Base.@pure promote_rule{T, f, U, g}(::Type{FD{T, f}}, ::Type{FD{U, g}}) =
+    FD{promote_type(T, U), max(f, g)}
 
 # comparison
 =={T <: FD}(x::T, y::T) = x.i == y.i
