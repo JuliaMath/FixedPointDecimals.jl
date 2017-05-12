@@ -294,15 +294,27 @@ end
 
 # parsing
 function parse{T, f}(::Type{FD{T, f}}, str::AbstractString)
+    # parse exponent information
+    ex = findfirst(str, 'e')
+    if ex > 0
+        pow = parse(Int, str[(ex + 1):end])
+        ending = ex - 1
+    else
+        pow = 0
+        ending = length(str)
+    end
+
+    # Remove the decimal place from the string
     dp = findfirst(str, '.')
     if dp > 0
-        int_str = str[1:(dp - 1)] * str[(dp + 1):min(dp + f, end)]
+        int_str = str[1:(dp - 1)] * str[(dp + 1):min(dp + f, ending)]
         len = dp + f - 1
     else
-        int_str = str
-        len = length(str) + f
+        int_str = str[1:ending]
+        len = ending + f
     end
-    val = parse(T, rpad(int_str, len, '0'))
+
+    val = parse(T, rpad(int_str, len + pow, '0'))
     reinterpret(FD{T, f}, val)
 end
 

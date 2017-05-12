@@ -413,19 +413,35 @@ end
 end
 
 @testset "parse" begin
-    @test parse(FD2, "123") == reinterpret(FD2, 12300)
-    @test parse(FD2, ".123") == reinterpret(FD2, 12)
-    @test parse(FD2, "1.23") == reinterpret(FD2, 123)
-    @test parse(FD2, "12.3") == reinterpret(FD2, 1230)
-    @test parse(FD2, "123.") == reinterpret(FD2, 12300)
+    # Note: the underscore used in the reinterpreted integer is used to indicate the decimal
+    # place.
+    @test parse(FD2, "123") == reinterpret(FD2, 123_00)
+    @test parse(FD2, ".123") == reinterpret(FD2, 0_12)
+    @test parse(FD2, "1.23") == reinterpret(FD2, 1_23)
+    @test parse(FD2, "12.3") == reinterpret(FD2, 12_30)
+    @test parse(FD2, "123.") == reinterpret(FD2, 123_00)
 
-    @test parse(FD2, "-123") == reinterpret(FD2, -12300)
-    @test parse(FD2, "-.123") == reinterpret(FD2, -12)
-    @test parse(FD2, "-1.23") == reinterpret(FD2, -123)
-    @test parse(FD2, "-12.3") == reinterpret(FD2, -1230)
-    @test parse(FD2, "-123.") == reinterpret(FD2, -12300)
+    @test parse(FD2, "-123") == reinterpret(FD2, -123_00)
+    @test parse(FD2, "-.123") == reinterpret(FD2, -0_12)
+    @test parse(FD2, "-1.23") == reinterpret(FD2, -1_23)
+    @test parse(FD2, "-12.3") == reinterpret(FD2, -12_30)
+    @test parse(FD2, "-123.") == reinterpret(FD2, -123_00)
 
-    @test parse(FD2, "2.3") == reinterpret(FD2, 230)
+    @test parse(FD4, "12e0")   == reinterpret(FD4, 00012_0000)
+    @test parse(FD4, "12e3")   == reinterpret(FD4, 12000_0000)
+    @test parse(FD4, "12e-3")  == reinterpret(FD4, 00000_0120)
+    @test parse(FD4, "1.2e0")  == reinterpret(FD4, 00001_2000)
+    @test parse(FD4, "1.2e3")  == reinterpret(FD4, 01200_0000)
+    @test parse(FD4, "1.2e-3") == reinterpret(FD4, 00000_0012)
+
+    @test parse(FD4, "-12e0")   == reinterpret(FD4, -00012_0000)
+    @test parse(FD4, "-12e3")   == reinterpret(FD4, -12000_0000)
+    @test parse(FD4, "-12e-3")  == reinterpret(FD4, -00000_0120)
+    @test parse(FD4, "-1.2e0")  == reinterpret(FD4, -00001_2000)
+    @test parse(FD4, "-1.2e3")  == reinterpret(FD4, -01200_0000)
+    @test parse(FD4, "-1.2e-3") == reinterpret(FD4, -00000_0012)
+
+    @test parse(FD2, "2.3") == reinterpret(FD2, 2_30)
 end
 
 end  # global testset
