@@ -29,7 +29,7 @@ using Compat
 
 import Base: reinterpret, zero, one, abs, sign, ==, <, <=, +, -, /, *, div,
              rem, divrem, fld, mod, fldmod, fld1, mod1, fldmod1, isinteger,
-             typemin, typemax, realmin, realmax, print, show, string, convert,
+             typemin, typemax, realmin, realmax, print, show, string, convert, parse,
              promote_rule, min, max, trunc, round, floor, ceil, eps, float, widemul
 
 const IEEEFloat = Union{Float16, Float32, Float64}
@@ -290,6 +290,20 @@ function show{T, f}(io::IO, x::FD{T, f})
     if !iscompact
         print(io, ')')
     end
+end
+
+# parsing
+function parse{T, f}(::Type{FD{T, f}}, str::AbstractString)
+    dp = findfirst(str, '.')
+    if dp > 0
+        int_str = str[1:(dp - 1)] * str[(dp + 1):min(dp + f, end)]
+        len = dp + f - 1
+    else
+        int_str = str
+        len = length(str) + f
+    end
+    val = parse(T, rpad(int_str, len, '0'))
+    reinterpret(FD{T, f}, val)
 end
 
 end

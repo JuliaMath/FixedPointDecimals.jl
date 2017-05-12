@@ -412,4 +412,20 @@ end
     end
 end
 
+@testset "parse" begin
+    @test parse(FD2, "123") == reinterpret(FD2, 12300)
+    @test parse(FD2, ".123") == reinterpret(FD2, 12)
+    @test parse(FD2, "1.23") == reinterpret(FD2, 123)
+    @test parse(FD2, "12.3") == reinterpret(FD2, 1230)
+    @test parse(FD2, "123.") == reinterpret(FD2, 12300)
+
+    @test parse(FD2, "-123") == reinterpret(FD2, -12300)
+    @test parse(FD2, "-.123") == reinterpret(FD2, -12)
+    @test parse(FD2, "-1.23") == reinterpret(FD2, -123)
+    @test parse(FD2, "-12.3") == reinterpret(FD2, -1230)
+    @test parse(FD2, "-123.") == reinterpret(FD2, -12300)
+
+    @test parse(FD2, "2.3") == reinterpret(FD2, 230)
+end
+
 end  # global testset
