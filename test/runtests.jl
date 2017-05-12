@@ -424,6 +424,12 @@ end
     @test string(FD2(-0.01)) == "-0.01"
     @test string(FD2(0)) == "0.00"
     @test string(FixedDecimal{Int,0}(123.4)) == "123"
+
+    # Displaying a decimal could be incorrect when using a decimal place precision which is
+    # close to or at the limit the limit for our storage type. Int32 for example can only
+    # store up to 10 digits of precision.
+    @test string(reinterpret(FD{Int32,10}, typemax(Int32))) ==  "0.2147483647"
+    @test string(reinterpret(FD{Int32,10}, typemin(Int32))) == "-0.2147483648"
 end
 
 @testset "show" begin

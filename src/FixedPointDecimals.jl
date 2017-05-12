@@ -283,7 +283,7 @@ function print{T, f}(io::IO, x::FD{T, f})
 
     # note: a is negative if x.i == typemin(x.i)
     s, a = sign(x.i), abs(x.i)
-    integer, fractional = divrem(a, T(10)^f)
+    integer, fractional = divrem(a, exp10(T, f))
     integer = abs(integer)  # ...but since f > 0, this is positive
     fractional = abs(fractional)
 
@@ -380,6 +380,17 @@ function parse_round{T}(::Type{T}, fractional::AbstractString, ::RoundingMode{:N
         end
     end
     return T(0)
+end
+
+function exp10_max{T}(::Type{T})
+    length(digits(typemax(T))) - 1
+end
+
+function exp10(T::Type, y::Integer)
+    while T != BigInt && exp10_max(T) < y
+        T = widen(T)
+    end
+    T(10)^y
 end
 
 end
