@@ -125,14 +125,17 @@ function ceil{T, f}(x::FD{T, f})
     end
 end
 
-for truncfn in [:trunc, :floor, :ceil]
-    @eval $truncfn{TI <: Integer}(::Type{TI}, x::FD)::TI = $truncfn(x)
+for fn in [:trunc, :floor, :ceil]
+    @eval $fn{TI <: Integer}(::Type{TI}, x::FD)::TI = $fn(x)
 
     # round/trunc/ceil/flooring to FD; generic
     # TODO. this is probably incorrect for floating point and we need to check
     # overflow in other cases.
-    @eval function $truncfn{T, f}(::Type{FD{T, f}}, x::Real)
-        reinterpret(FD{T, f}, $truncfn(T, T(10)^f * x))
+    @eval function $fn{T, f}(::Type{FD{T, f}}, x::Real)
+        powt = T(10)^f
+        val = trunc(T, x)
+        val = val * powt + $fn(T, (x - val) * powt)
+        reinterpret(FD{T, f}, val)
     end
 end
 round{TI <: Integer}(::Type{TI}, x::FD,

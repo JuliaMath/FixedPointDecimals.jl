@@ -1,4 +1,5 @@
 using FixedPointDecimals
+import FixedPointDecimals: FD
 using Base.Test
 using Compat
 
@@ -6,6 +7,7 @@ const SFD2 = FixedDecimal{Int16, 2}
 const SFD4 = FixedDecimal{Int16, 4}
 const FD1 = FixedDecimal{Int, 1}
 const FD2 = FixedDecimal{Int, 2}
+const FD3 = FixedDecimal{Int, 3}
 const FD4 = FixedDecimal{Int, 4}
 const WFD2 = FixedDecimal{Int128, 2}
 const WFD4 = FixedDecimal{Int128, 4}
@@ -37,11 +39,21 @@ const keyvalues = Dict(
              reinterpret(WFD4, 164435910993133062409572187012743929911),
              typemax(WFD4)])
 
+# Floating point values written as integer strings. Useful for testing behaviours of
+# trunc, floor, and ceil.
+const INT_2_2 = "22000000000000001776356839400250464677"  # 2.2
+const INT_2_3 = "22999999999999998223643160599749535322"  # 2.3
+
+
 # numbers that may cause overflow
 islarge(x) = x == typemin(x) || abs(x) > 1000
 
 # numbers that can never cause overflow
 issmall(x) = -1 < x ≤ 1
+
+function parse_int{T, f}(::Type{FD{T, f}}, val::AbstractString; ceil::Bool=false)
+    reinterpret(FD{T, f}, parse(T, val[1:(f + 1)]) + T(ceil))
+end
 
 @testset "conversion" begin
     @testset for x in keyvalues[FD2]
@@ -285,6 +297,16 @@ end
         @test isinteger(Base.widemul(10, FD2(trunc(FD1, x))))
         @test abs(FD2(trunc(FD1, x))) ≥ 0
     end
+
+    @testset "truncate precision" begin
+        @test trunc(FD2, 2.3) != trunc(FD3, 2.3)
+        @test trunc(FD2, 2.3) == FD2(2.29)
+        @test trunc(FD3, 2.3) == FD3(2.299)
+
+        for f in 0:12
+            trunc(FD{Int64, f}, 2.3) == parse_int(FD{Int64, f}, INT_2_3)
+        end
+    end
 end
 
 # eps that works for integers too
@@ -301,6 +323,24 @@ epsi{T}(::Type{T}) = eps(T)
         @testset for T in [Int32, Int64, FD1, FD2, FD4, WFD2, WFD4]
             @test floor(T, x) ≤ x < floor(T, x) + epsi(T)
             @test ceil(T, x) - epsi(T) < x ≤ ceil(T, x)
+        end
+    end
+
+    @testset "floor, ceil precision" begin
+        @test floor(FD2, 2.3) != floor(FD3, 2.3)
+        @test floor(FD2, 2.3) == FD2(2.29)
+        @test floor(FD3, 2.3) == FD3(2.299)
+
+        for f in 0:12
+            floor(FD{Int64, f}, 2.3) == parse_int(FD{Int64, f}, INT_2_3)
+        end
+
+        @test ceil(FD2, 2.2) != ceil(FD3, 2.2)
+        @test ceil(FD2, 2.2) == FD2(2.21)
+        @test ceil(FD3, 2.2) == FD3(2.201)
+
+        for f in 0:12
+            ceil(FD{Int64, f}, 2.2) == parse_int(FD{Int64, f}, INT_2_2, ceil=true)
         end
     end
 end
