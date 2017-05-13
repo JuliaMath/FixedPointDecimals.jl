@@ -345,6 +345,16 @@ epsi{T}(::Type{T}) = eps(T)
     end
 end
 
+@testset "print" begin
+    @test string(FD2(1.00)) == "1.00"
+    @test string(FD2(1.23)) == "1.23"
+    @test string(FD2(42.40)) == "42.40"
+    @test string(FD2(-42.40)) == "-42.40"
+    @test string(FD2(-0.01)) == "-0.01"
+    @test string(FD2(0)) == "0.00"
+    @test string(FixedDecimal{Int,0}(123.4)) == "123"
+end
+
 @testset "show" begin
     @testset "compact" begin
         @test sprint(showcompact, FD2(1.00)) == "1.0"
@@ -353,19 +363,22 @@ end
         @test sprint(showcompact, FD2(-42.40)) == "-42.4"
         @test sprint(showcompact, FD2(-0.01)) == "-0.01"
         @test sprint(showcompact, FD2(0)) == "0.0"
-        for x in keyvalues[FD2]
-            if 0 ≤ abs(x) < 1000
-                @test eval(parse(string(x))) == x
-            end
-        end
 
-        @test string(typemin(FixedDecimal{Int64, 2})) ==
+        @test repr(typemin(FixedDecimal{Int64, 2})) ==
               "FixedDecimal{Int64,2}(-92233720368547758.08)"
-        @test string(typemax(FixedDecimal{Int64, 2})) ==
+        @test repr(typemax(FixedDecimal{Int64, 2})) ==
               "FixedDecimal{Int64,2}(92233720368547758.07)"
-        @test string(typemin(FixedDecimal{Int32, 2})) ==
+        @test repr(typemin(FixedDecimal{Int32, 2})) ==
               "FixedDecimal{Int32,2}(-21474836.48)"
-        @test string(typemax(FixedDecimal{Int32, 2})) ==
+        @test repr(typemax(FixedDecimal{Int32, 2})) ==
               "FixedDecimal{Int32,2}(21474836.47)"
+    end
+end
+
+@testset "string" begin
+    for x in keyvalues[FD2]
+        if 0 ≤ abs(x) < 1000
+            @test eval(parse(string(x))) == x
+        end
     end
 end

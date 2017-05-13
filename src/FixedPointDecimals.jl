@@ -29,8 +29,8 @@ using Compat
 
 import Base: reinterpret, zero, one, abs, sign, ==, <, <=, +, -, /, *, div,
              rem, divrem, fld, mod, fldmod, fld1, mod1, fldmod1, isinteger,
-             typemin, typemax, realmin, realmax, show, convert, promote_rule,
-             min, max, trunc, round, floor, ceil, eps, float, widemul
+             typemin, typemax, realmin, realmax, print, show, string, convert,
+             promote_rule, min, max, trunc, round, floor, ceil, eps, float, widemul
 
 """
     FixedDecimal{I <: Integer, f::Int}
@@ -223,17 +223,10 @@ realmin{T <: FD}(::Type{T}) = eps(T)
 realmax{T <: FD}(::Type{T}) = typemax(T)
 
 # printing
-function show{T}(io::IO, x::FD{T, 0})
-    iscompact = get(io, :compact, false)
-    if !iscompact
-        print(io, "FixedDecimal{$T,0}(")
-    end
+function print{T}(io::IO, x::FD{T, 0})
     print(io, x.i)
-    if !iscompact
-        print(io, ')')
-    end
 end
-function show{T, f}(io::IO, x::FD{T, f})
+function print{T, f}(io::IO, x::FD{T, f})
     iscompact = get(io, :compact, false)
 
     # note: a is negative if x.i == typemin(x.i)
@@ -242,9 +235,6 @@ function show{T, f}(io::IO, x::FD{T, f})
     integer = abs(integer)  # ...but since f > 0, this is positive
     fractional = abs(fractional)
 
-    if !iscompact
-        print(io, "FixedDecimal{$T,$f}(")
-    end
     if s == -1
         print(io, "-")
     end
@@ -256,6 +246,14 @@ function show{T, f}(io::IO, x::FD{T, f})
         end
     end
     print(io, integer, '.', fractionchars)
+end
+
+function show{T, f}(io::IO, x::FD{T, f})
+    iscompact = get(io, :compact, false)
+    if !iscompact
+        print(io, "FixedDecimal{$T,$f}(")
+    end
+    print(io, x)
     if !iscompact
         print(io, ')')
     end
