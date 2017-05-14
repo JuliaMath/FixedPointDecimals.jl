@@ -41,8 +41,15 @@ const keyvalues = Dict(
 
 # Floating point values written as integer strings. Useful for testing behaviours of
 # trunc, floor, and ceil.
-const INT_2_2 = "22000000000000001776356839400250464677"  # 2.2
-const INT_2_3 = "22999999999999998223643160599749535322"  # 2.3
+const INTS = Dict(
+    1.22 => "12199999999999999733546474089962430298328399658203125",
+    1.23 => "1229999999999999982236431605997495353221893310546875",
+    1.51 => "15100000000000000088817841970012523233890533447265625",
+    2.2  => "220000000000000017763568394002504646778106689453125",
+    2.3  => "229999999999999982236431605997495353221893310546875"
+)
+const smaller_than_decimal = [1.22, 1.23, 2.3]
+const bigger_than_decimal = [1.51, 2.2]
 
 
 # numbers that may cause overflow
@@ -299,12 +306,22 @@ end
     end
 
     @testset "truncate precision" begin
-        @test trunc(FD2, 2.3) != trunc(FD3, 2.3)
-        @test trunc(FD2, 2.3) == FD2(2.29)
-        @test trunc(FD3, 2.3) == FD3(2.299)
+        for x in smaller_than_decimal
+            @test trunc(FD2, x) ≠ trunc(FD3, x)
+            @test trunc(FD2, x) == FD2(x - 0.01)
+            @test trunc(FD3, x) == FD3(x - 0.001)
 
-        for f in 0:12
-            trunc(FD{Int64, f}, 2.3) == parse_int(FD{Int64, f}, INT_2_3)
+            for f in 0:12
+                @test trunc(FD{Int64, f}, x) ==
+                      parse_int(FD{Int64, f}, INTS[x])
+            end
+        end
+
+        for x in bigger_than_decimal
+            exactval = FD3(x)
+            for f in 3:12
+                @test trunc(FD{Int64, f}, x) == exactval
+            end
         end
     end
 end
@@ -327,20 +344,30 @@ epsi{T}(::Type{T}) = eps(T)
     end
 
     @testset "floor, ceil precision" begin
-        @test floor(FD2, 2.3) != floor(FD3, 2.3)
-        @test floor(FD2, 2.3) == FD2(2.29)
-        @test floor(FD3, 2.3) == FD3(2.299)
+        for x in smaller_than_decimal
+            @test floor(FD2, x) != floor(FD3, x)
+            @test floor(FD2, x) == FD2(x - 0.01)
+            @test floor(FD3, x) == FD3(x - 0.001)
 
-        for f in 0:12
-            floor(FD{Int64, f}, 2.3) == parse_int(FD{Int64, f}, INT_2_3)
+            for f in 0:12
+                @test floor(FD{Int64, f}, x) ==
+                      parse_int(FD{Int64, f}, INTS[x])
+            end
+
+            @test ceil(FD3, x) == ceil(FD4, x) == FD4(x)
         end
 
-        @test ceil(FD2, 2.2) != ceil(FD3, 2.2)
-        @test ceil(FD2, 2.2) == FD2(2.21)
-        @test ceil(FD3, 2.2) == FD3(2.201)
+        for x in bigger_than_decimal
+            @test ceil(FD2, x) ≠ ceil(FD3, x)
+            @test ceil(FD2, x) == FD2(x + 0.01)
+            @test ceil(FD3, x) == FD3(x + 0.001)
 
-        for f in 0:12
-            ceil(FD{Int64, f}, 2.2) == parse_int(FD{Int64, f}, INT_2_2, ceil=true)
+            for f in 0:12
+                @test ceil(FD{Int64, f}, x) ==
+                      parse_int(FD{Int64, f}, INTS[x], ceil=true)
+            end
+
+            @test floor(FD3, x) == floor(FD4, x) == FD4(x)
         end
     end
 end

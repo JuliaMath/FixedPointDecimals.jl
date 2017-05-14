@@ -32,6 +32,41 @@ import Base: reinterpret, zero, one, abs, sign, ==, <, <=, +, -, /, *, div,
              typemin, typemax, realmin, realmax, print, show, string, convert,
              promote_rule, min, max, trunc, round, floor, ceil, eps, float, widemul
 
+const IEEEFloat = Union{Float16, Float32, Float64}
+
+for fn in [:trunc, :floor, :ceil]
+    fnname = Symbol(fn, "mul")
+
+    @eval begin
+        @doc """
+            $($fnname)(x, y) :: Integer
+
+        Compute `$($fn)(x * y)`. For floating point values, this function can
+        be more accurate than `$($fn)(x * y)`. The boundary behavior of this
+        function (e.g. at large values of `x`, `y`) is untested and possibly
+        incorrect.
+        """ function $fnname end
+
+        $fnname{T <: Number}(x::T, y::T) = $fn(x * y)
+
+        $fnname(x::Number, y::Number) = $fnname(promote(x, y)...)
+    end
+
+    if fn === :trunc
+        # trunc a little different, implement in terms of floor
+        @eval function $fnname{T <: IEEEFloat}(x::T, y::T)
+            copysign(floormul(abs(x), abs(y)), x*y)
+        end
+    else
+        # floor and ceil can be implemented the same way
+        @eval function $fnname{T <: IEEEFloat}(x::T, y::T)
+            a = x * y
+            b = fma(x, y, -a)
+            ifelse(isinteger(a), a + $fn(b), $fn(a))
+        end
+    end
+end
+
 """
     FixedDecimal{I <: Integer, f::Int}
 
@@ -129,12 +164,10 @@ for fn in [:trunc, :floor, :ceil]
     @eval $fn{TI <: Integer}(::Type{TI}, x::FD)::TI = $fn(x)
 
     # round/trunc/ceil/flooring to FD; generic
-    # TODO. this is probably incorrect for floating point and we need to check
-    # overflow in other cases.
+    # TODO. we may need to check overflow and boundary conditions here.
     @eval function $fn{T, f}(::Type{FD{T, f}}, x::Real)
         powt = T(10)^f
-        val = trunc(T, x)
-        val = val * powt + $fn(T, (x - val) * powt)
+        val = trunc(T, $(Symbol(fn, "mul"))(x, powt))
         reinterpret(FD{T, f}, val)
     end
 end
