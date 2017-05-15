@@ -3,6 +3,8 @@ import FixedPointDecimals: FD
 using Base.Test
 using Compat
 
+@testset "FixedPointDecimals" begin
+
 const SFD2 = FixedDecimal{Int16, 2}
 const SFD4 = FixedDecimal{Int16, 4}
 const FD1 = FixedDecimal{Int, 1}
@@ -409,3 +411,5 @@ end
         end
     end
 end
+
+end  # global testset
