@@ -301,7 +301,7 @@ function parse{T, f}(::Type{FD{T, f}}, str::AbstractString)
         ending = ex - 1
     else
         pow = 0
-        ending = length(str)
+        ending = endof(str)
     end
 
     # Remove the decimal place from the string
