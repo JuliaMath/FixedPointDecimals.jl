@@ -408,7 +408,8 @@ T or wider.
     end
 end
 
-coefficient{T, f}(fd::FD{T, f}) = widen(exp10(FD{T, f}))
+coefficient{T, f}(::Type{FD{T, f}}) = exp10(FD{T, f})
+coefficient{T, f}(fd::FD{T, f}) = coefficient(FD{T, f})
 value(fd::FD) = fd.i
 
 end
