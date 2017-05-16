@@ -404,6 +404,25 @@ end
             end
         end
     end
+
+    @testset "limits" begin
+        for T in CONTAINER_TYPES
+            f = FixedPointDecimals.max_exp10(T) + 1
+            @eval begin
+                powt = FixedPointDecimals.coefficient(FD{$T,$f})
+
+                # ideally we would just use `typemax(T)` but due to precision issues with
+                # floating-point its possible the closest float will exceed `typemax(T)`.
+                max_int = trunc(BigInt, prevfloat(typemax($T) / powt) * powt)
+                min_int = trunc(BigInt, nextfloat(typemin($T) / powt) * powt)
+
+                # Do not need to know the exact value as we're primarily looking for
+                # issues relating to overflow
+                @test trunc(FD{$T,$f}, max_int / powt).i in (max_int, max_int - 1)
+                @test trunc(FD{$T,$f}, min_int / powt).i in (min_int, min_int + 1)
+            end
+        end
+    end
 end
 
 # eps that works for integers too
@@ -446,6 +465,30 @@ epsi{T}(::Type{T}) = eps(T)
             end
 
             @test floor(FD3, x) == floor(FD4, x) == FD4(x)
+        end
+    end
+
+    @testset "limits" begin
+        for T in CONTAINER_TYPES
+            f = FixedPointDecimals.max_exp10(T) + 1
+            @eval begin
+                powt = FixedPointDecimals.coefficient(FD{$T,$f})
+
+                # ideally we would just use `typemax(T)` but due to precision issues with
+                # floating-point its possible the closest float will exceed `typemax(T)`.
+                # Using BigInt as this will avoid overflowing when we do `max_int + 1` and
+                # `min_int - 1`.
+                max_int = trunc(BigInt, prevfloat(typemax($T) / powt) * powt)
+                min_int = trunc(BigInt, nextfloat(typemin($T) / powt) * powt)
+
+                # Do not need to know the exact value as we're primarily looking for
+                # issues relating to overflow
+                @test floor(FD{$T,$f}, max_int / powt).i in (max_int, max_int - 1)
+                @test floor(FD{$T,$f}, min_int / powt).i in (min_int, min_int - 1)
+
+                @test ceil(FD{$T,$f}, max_int / powt).i in (max_int, max_int + 1)
+                @test ceil(FD{$T,$f}, min_int / powt).i in (min_int, min_int + 1)
+            end
         end
     end
 end

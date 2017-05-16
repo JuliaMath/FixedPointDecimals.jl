@@ -185,7 +185,7 @@ for fn in [:trunc, :floor, :ceil]
     # round/trunc/ceil/flooring to FD; generic
     # TODO. we may need to check overflow and boundary conditions here.
     @eval function $fn{T, f}(::Type{FD{T, f}}, x::Real)
-        powt = T(10)^f
+        powt = coefficient(FD{T, f})
         val = trunc(T, $(Symbol(fn, "mul"))(x, powt))
         reinterpret(FD{T, f}, val)
     end
