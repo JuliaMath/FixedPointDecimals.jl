@@ -372,8 +372,7 @@ end
             @test trunc(FD3, x) == FD3(x - 0.001)
 
             for f in 0:12
-                @test trunc(FD{Int64, f}, x) ==
-                      parse_int(FD{Int64, f}, INTS[x])
+                @test trunc(FD{Int64, f}, x) == parse_int(FD{Int64, f}, INTS[x])
             end
         end
 
@@ -410,8 +409,7 @@ epsi{T}(::Type{T}) = eps(T)
             @test floor(FD3, x) == FD3(x - 0.001)
 
             for f in 0:12
-                @test floor(FD{Int64, f}, x) ==
-                      parse_int(FD{Int64, f}, INTS[x])
+                @test floor(FD{Int64, f}, x) == parse_int(FD{Int64, f}, INTS[x])
             end
 
             @test ceil(FD3, x) == ceil(FD4, x) == FD4(x)
@@ -423,8 +421,7 @@ epsi{T}(::Type{T}) = eps(T)
             @test ceil(FD3, x) == FD3(x + 0.001)
 
             for f in 0:12
-                @test ceil(FD{Int64, f}, x) ==
-                      parse_int(FD{Int64, f}, INTS[x], ceil=true)
+                @test ceil(FD{Int64, f}, x) == parse_int(FD{Int64, f}, INTS[x], ceil=true)
             end
 
             @test floor(FD3, x) == floor(FD4, x) == FD4(x)
