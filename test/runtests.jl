@@ -15,6 +15,8 @@ const FD4 = FixedDecimal{Int, 4}
 const WFD2 = FixedDecimal{Int128, 2}
 const WFD4 = FixedDecimal{Int128, 4}
 
+const CONTAINER_TYPES = [subtypes(Signed); subtypes(Unsigned)]
+
 # these arrays should be kept sorted manually
 const keyvalues = Dict(
     FD2 => [typemin(FD2),  # near minimum range
@@ -68,10 +70,9 @@ end
 # ensure that the coefficient multiplied by the highest and lowest representable values of
 # the container type do not result in overflow.
 @testset "coefficient" begin
-    container_types = [Int8, Int16, Int32, Int64, Int128]
-    for (i, T) in enumerate(container_types)
-        for j in i:length(container_types)
-            f = FixedPointDecimals.max_exp10(container_types[j])
+    for (i, T) in enumerate(CONTAINER_TYPES)
+        for j in i:length(CONTAINER_TYPES)
+            f = FixedPointDecimals.max_exp10(CONTAINER_TYPES[j])
             powt = FixedPointDecimals.coefficient(FD{T, f}(0))
             @test checked_mul(powt, typemax(T)) == powt * typemax(T)
             @test checked_mul(powt, typemin(T)) == powt * typemin(T)
@@ -441,10 +442,16 @@ end
     @test string(FixedDecimal{Int,0}(123.4)) == "123"
 
     # Displaying a decimal could be incorrect when using a decimal place precision which is
-    # close to or at the limit the limit for our storage type. Int32 for example can only
-    # store up to 10 digits of precision.
-    @test string(reinterpret(FD{Int32,10}, typemax(Int32))) ==  "0.2147483647"
-    @test string(reinterpret(FD{Int32,10}, typemin(Int32))) == "-0.2147483648"
+    # close to or at the limit for our storage type.
+    for T in CONTAINER_TYPES
+        f = FixedPointDecimals.max_exp10(T) + 1
+        max_str = "0." * rpad(typemax(T), f, '0')
+        min_str = (typemin(T) < 0 ? "-" : "") * "0." * rpad(abs(widen(typemin(T))), f, '0')
+        @eval begin
+            @test string(reinterpret(FD{$T,$f}, typemax($T))) == $max_str
+            @test string(reinterpret(FD{$T,$f}, typemin($T))) == $min_str
+        end
+    end
 end
 
 @testset "show" begin
