@@ -128,8 +128,8 @@ end
 # TODO: can we use floating point to speed this up? after we build a
 # correctness test suite.
 function *{T, f}(x::FD{T, f}, y::FD{T, f})
-    powt = T(10)^f
-    quotient, remainder = fldmod(Base.widemul(x.i, y.i), powt)
+    powt = coefficient(FD{T,f})
+    quotient, remainder = fldmod(widemul(x.i, y.i), powt)
     reinterpret(FD{T, f}, _round_to_even(quotient, remainder, powt))
 end
 

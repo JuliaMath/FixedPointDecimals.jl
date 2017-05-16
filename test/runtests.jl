@@ -229,6 +229,27 @@ end
         @test 20 * FD{Int8,1}(0.1) == FD{Int8,1}(2.0)
         @test FD{Int8,1}(0.1) * 20 == FD{Int8,1}(2.0)
     end
+
+    @testset "limits" begin
+        for T in CONTAINER_TYPES
+            x = FixedPointDecimals.max_exp10(T)
+            f = x + 1
+
+            @eval begin
+                scalar = reinterpret(FD{$T,$f}, $T(10)^$x)  # 0.1
+
+                # Since multiply will round the result we'll make sure our value does not
+                # always rounds down.
+                max_int = typemax($T) - (typemax($T) % 10)
+                min_int = typemin($T) - (typemin($T) % 10)
+
+                @test reinterpret(FD{$T,$f}, max_int) * scalar ==
+                    reinterpret(FD{$T,$f}, div(max_int, 10))
+                @test reinterpret(FD{$T,$f}, min_int) * scalar ==
+                    reinterpret(FD{$T,$f}, div(min_int, 10))
+            end
+        end
+    end
 end
 
 @testset "division" begin
