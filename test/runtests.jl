@@ -74,6 +74,7 @@ end
         for j in i:length(CONTAINER_TYPES)
             f = FixedPointDecimals.max_exp10(CONTAINER_TYPES[j])
             powt = FixedPointDecimals.coefficient(FD{T, f})
+            @test powt % 10 == 0
             @test checked_mul(widen(powt), typemax(T)) == widemul(powt, typemax(T))
             @test checked_mul(widen(powt), typemin(T)) == widemul(powt, typemin(T))
         end
