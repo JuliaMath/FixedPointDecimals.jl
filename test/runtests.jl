@@ -2,6 +2,7 @@ using FixedPointDecimals
 import FixedPointDecimals: FD
 using Base.Test
 using Compat
+import Base.Checked: checked_mul
 
 @testset "FixedPointDecimals" begin
 
@@ -62,6 +63,20 @@ issmall(x) = -1 < x ≤ 1
 
 function parse_int{T, f}(::Type{FD{T, f}}, val::AbstractString; ceil::Bool=false)
     reinterpret(FD{T, f}, parse(T, val[1:(f + 1)]) + T(ceil))
+end
+
+# ensure that the coefficient multiplied by the highest and lowest representable values of
+# the container type do not result in overflow.
+@testset "coefficient" begin
+    container_types = [Int8, Int16, Int32, Int64, Int128]
+    for (i, T) in enumerate(container_types)
+        for j in i:length(container_types)
+            f = FixedPointDecimals.max_exp10(container_types[j])
+            powt = FixedPointDecimals.coefficient(FD{T, f}(0))
+            @test checked_mul(powt, typemax(T)) == powt * typemax(T)
+            @test checked_mul(powt, typemin(T)) == powt * typemin(T)
+        end
+    end
 end
 
 @testset "conversion" begin
