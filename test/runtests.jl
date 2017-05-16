@@ -93,6 +93,26 @@ end
         end
     end
 
+    @testset "limits" begin
+        for T in CONTAINER_TYPES
+            f = FixedPointDecimals.max_exp10(T) + 1
+            powt = FixedPointDecimals.coefficient(FD{T,f})
+
+            # ideally we would just use `typemax(T)` but due to precision issues with
+            # floating-point its possible the closest float will exceed `typemax(T)`.
+            # Note: we should be doing `trunc(T, ...)` but truncating a BigFloat can be
+            # problematic (https://github.com/JuliaLang/julia/issues/21914)
+            max_int = trunc(BigInt, prevfloat(typemax(T) / powt) * powt)
+            min_int = trunc(BigInt, nextfloat(typemin(T) / powt) * powt)
+            @eval begin
+                @test $max_int <= typemax($T)
+                @test convert(FD{$T,$f}, $(max_int / powt)).i == $max_int
+                @test $min_int >= typemin($T)
+                @test convert(FD{$T,$f}, $(min_int / powt)).i == $min_int
+            end
+        end
+    end
+
     @test_throws InexactError convert(FD2, FD4(0.0001))
     @test_throws InexactError convert(FD4, typemax(FD2))
     @test_throws InexactError convert(SFD2, typemax(FD2))

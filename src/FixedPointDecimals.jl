@@ -190,11 +190,11 @@ for fn in [:trunc, :floor, :ceil]
         reinterpret(FD{T, f}, val)
     end
 end
-round{TI <: Integer}(::Type{TI}, x::FD,
-                     ::RoundingMode{:Nearest}=RoundNearest)::TI = round(x)
-function round{T, f}(::Type{FD{T, f}}, x::Real,
-                     ::RoundingMode{:Nearest}=RoundNearest)
-    reinterpret(FD{T, f}, round(T, T(10)^f * x))
+function round{TI <: Integer}(::Type{TI}, x::FD, ::RoundingMode{:Nearest}=RoundNearest)::TI
+    round(x)
+end
+function round{T, f}(::Type{FD{T, f}}, x::Real, ::RoundingMode{:Nearest}=RoundNearest)
+    reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
 end
 
 # needed to avoid ambiguity
