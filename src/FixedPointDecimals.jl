@@ -34,6 +34,8 @@ import Base: reinterpret, zero, one, abs, sign, ==, <, <=, +, -, /, *, div,
              typemin, typemax, realmin, realmax, print, show, string, convert,
              promote_rule, min, max, trunc, round, floor, ceil, eps, float, widemul
 
+import Base.Checked: checked_mul
+
 const IEEEFloat = Union{Float16, Float32, Float64}
 
 for fn in [:trunc, :floor, :ceil]
@@ -146,7 +148,7 @@ end
 # these functions are needed to avoid InexactError when converting from the integer type
 function /{T, f}(x::Integer, y::FD{T, f})
     powt = T(10)^f
-    xi = widemul(x, powt)
+    xi = checked_mul(x, powt)
     yi = y.i
     quotient, remainder = divrem(xi, yi)
     reinterpret(FD{T, f}, quotient * powt + round(T, remainder / yi * powt))
@@ -155,7 +157,7 @@ end
 function /{T, f}(x::FD{T, f}, y::Integer)
     powt = T(10)^f
     xi = x.i
-    yi = widemul(y, powt)
+    yi = checked_mul(y, powt)
     quotient, remainder = divrem(xi, yi)
     reinterpret(FD{T, f}, quotient * powt + round(T, remainder / yi * powt))
 end

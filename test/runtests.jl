@@ -261,6 +261,18 @@ end
         @test FD2(-1.29) / 2 == FD2(-0.64)
         @test 129 / FD2(200) == FD2(0.64)
         @test -129 / FD2(200) == FD2(-0.64)
+
+        # Use of Float or BigFloat internally can change the calculated result
+        @test round(Int, 109 / 200 * 100) == 55
+        @test round(Int, BigInt(109) / 200 * 100) == 54  # Correct
+
+        x = FD{Int128,2}(1.09)
+        @test x / Int128(2) != x / BigInt(2)
+        @test x / FD{Int128,2}(2) == x / Int128(2)
+
+        y = FD{Int128,2}(200)
+        @test Int128(109) / y != BigInt(109) / y
+        @test FD{Int128,2}(109) / y == Int128(109) / y
     end
 
     @testset "without promotion" begin
