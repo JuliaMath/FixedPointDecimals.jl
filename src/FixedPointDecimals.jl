@@ -148,16 +148,14 @@ end
 # these functions are needed to avoid InexactError when converting from the integer type
 function /{T, f}(x::Integer, y::FD{T, f})
     powt = T(10)^f
-    xi = checked_mul(x, powt)
-    yi = y.i
+    xi, yi = checked_mul(x, powt), y.i
     quotient, remainder = divrem(xi, yi)
     reinterpret(FD{T, f}, quotient * powt + round(T, remainder / yi * powt))
 end
 
 function /{T, f}(x::FD{T, f}, y::Integer)
     powt = T(10)^f
-    xi = x.i
-    yi = checked_mul(y, powt)
+    xi, yi = x.i, checked_mul(y, powt)
     quotient, remainder = divrem(xi, yi)
     reinterpret(FD{T, f}, quotient * powt + round(T, remainder / yi * powt))
 end
