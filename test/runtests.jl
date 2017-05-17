@@ -186,6 +186,12 @@ end
         end
         @test prod(keyvalues[T]) == 0
     end
+
+    @testset "without promotion" begin
+        @test_throws InexactError FD{Int8,1}(20)
+        @test 20 * FD{Int8,1}(0.1) == FD{Int8,1}(2.0)
+        @test FD{Int8,1}(0.1) * 20 == FD{Int8,1}(2.0)
+    end
 end
 
 @testset "division" begin
@@ -237,6 +243,12 @@ end
 
     @testset "divide $x by 0" for x in keyvalues[FD2]
         @test_throws DivideError x/FD2(0)
+    end
+
+    @testset "without promotion" begin
+        @test_throws InexactError FD{Int8,1}(20)
+        @test 20 / FD{Int8,1}(2) == FD{Int8,1}(10.0)
+        @test FD{Int8,1}(2) / 20 == FD{Int8,1}(0.1)
     end
 end
 

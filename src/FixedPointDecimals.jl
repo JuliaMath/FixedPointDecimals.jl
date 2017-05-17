@@ -143,6 +143,10 @@ function /{T, f}(x::FD{T, f}, y::FD{T, f})
     reinterpret(FD{T, f}, quotient * powt + round(T, remainder / y.i * powt))
 end
 
+# these functions are needed to avoid InexactError when converting from the integer type
+/{T, f}(x::Integer, y::FD{T, f}) = reinterpret(FD{T, f}, round(T, x / y.i))
+/{T, f}(x::FD{T, f}, y::Integer) = reinterpret(FD{T, f}, round(T, x.i / y))
+
 # integerification
 trunc{T, f}(x::FD{T, f}) = FD{T, f}(div(x.i, T(10)^f))
 floor{T, f}(x::FD{T, f}) = FD{T, f}(fld(x.i, T(10)^f))
