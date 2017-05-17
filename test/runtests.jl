@@ -245,6 +245,24 @@ end
         @test_throws DivideError x/FD2(0)
     end
 
+    @testset "rounding" begin
+        # RoundNearest: 1.27 / 2 == 0.635 rounds up to 0.64
+        @test FD2(1.27) / FD2(2) == FD2(0.64)
+        @test FD2(-1.27) / FD2(2) == FD2(-0.64)
+        @test FD2(1.27) / 2 == FD2(0.64)
+        @test FD2(-1.27) / 2 == FD2(-0.64)
+        @test 127 / FD2(200) == FD2(0.64)
+        @test -127 / FD2(200) == FD2(-0.64)
+
+        # RoundNearest: 1.29 / 2 == 0.645 rounds down to 0.64
+        @test FD2(1.29) / FD2(2) == FD2(0.64)
+        @test FD2(-1.29) / FD2(2) == FD2(-0.64)
+        @test FD2(1.29) / 2 == FD2(0.64)
+        @test FD2(-1.29) / 2 == FD2(-0.64)
+        @test 129 / FD2(200) == FD2(0.64)
+        @test -129 / FD2(200) == FD2(-0.64)
+    end
+
     @testset "without promotion" begin
         @test_throws InexactError FD{Int8,1}(20)
         @test 20 / FD{Int8,1}(2) == FD{Int8,1}(10.0)
