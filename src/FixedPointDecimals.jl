@@ -23,7 +23,7 @@
 
 module FixedPointDecimals
 
-export FixedDecimal
+export FixedDecimal, RoundThrows
 
 using Compat
 
@@ -293,8 +293,16 @@ function show{T, f}(io::IO, x::FD{T, f})
 end
 
 # parsing
+
+"""
+    RoundThrows
+
+Raises an `InexactError` if any rounding is necessary.
+"""
+const RoundThrows = RoundingMode{:Throw}()
+
 function parse{T, f}(::Type{FD{T, f}}, str::AbstractString, mode::RoundingMode=RoundNearest)
-    if !(mode in [RoundNearest, RoundToZero])
+    if !(mode in [RoundThrows, RoundNearest, RoundToZero])
         throw(ArgumentError("Unhandled rounding mode $mode"))
     end
 
@@ -329,9 +337,14 @@ function parse{T, f}(::Type{FD{T, f}}, str::AbstractString, mode::RoundingMode=R
 
     # Parse the strings
     val = isempty(a) ? T(0) : sign * parse(T, a)
-    if !isempty(b) && mode != RoundToZero
-        val += sign * parse_round(T, b, mode)
+    if !isempty(b) && any(collect(b[2:end]) .!= '0')
+        if mode == RoundThrows
+            throw(InexactError())
+        elseif mode == RoundNearest
+            val += sign * parse_round(T, b, mode)
+        end
     end
+
     reinterpret(FD{T, f}, val)
 end
 

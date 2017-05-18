@@ -520,6 +520,30 @@ end
         @test parse(FD4, "1.5e-4", RoundToZero) == reinterpret(FD4, 0_0001)
     end
 
+    @testset "round throws" begin
+        @test parse(FD2, "0.44", RoundThrows)  == reinterpret(FD2, 0_44)
+        @test parse(FD2, "0.440", RoundThrows) == reinterpret(FD2, 0_44)
+
+        @test_throws InexactError parse(FD2, "0.444", RoundThrows)
+        @test_throws InexactError parse(FD2, "0.445", RoundThrows)
+        @test_throws InexactError parse(FD2, "0.446", RoundThrows)
+        @test_throws InexactError parse(FD2, "0.454", RoundThrows)
+        @test_throws InexactError parse(FD2, "0.455", RoundThrows)
+        @test_throws InexactError parse(FD2, "0.456", RoundThrows)
+
+        @test_throws InexactError parse(FD2, "-0.444", RoundThrows)
+        @test_throws InexactError parse(FD2, "-0.445", RoundThrows)
+        @test_throws InexactError parse(FD2, "-0.446", RoundThrows)
+        @test_throws InexactError parse(FD2, "-0.454", RoundThrows)
+        @test_throws InexactError parse(FD2, "-0.455", RoundThrows)
+        @test_throws InexactError parse(FD2, "-0.456", RoundThrows)
+
+        @test_throws InexactError parse(FD2, "0.009", RoundThrows)
+        @test_throws InexactError parse(FD2, "-0.009", RoundThrows)
+
+        @test_throws InexactError parse(FD4, "1.5e-4", RoundThrows)
+    end
+
     @testset "invalid" begin
         @test_throws OverflowError parse(FD4, "1.2e100")
         @test_throws ArgumentError parse(FD4, "foo")
