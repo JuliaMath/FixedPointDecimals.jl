@@ -420,6 +420,9 @@ end
     @test parse(FD2, "1.23") == reinterpret(FD2, 1_23)
     @test parse(FD2, "12.3") == reinterpret(FD2, 12_30)
     @test parse(FD2, "123.") == reinterpret(FD2, 123_00)
+    @test_skip parse(FD2, "123.456") == reinterpret(FD2, 123_46)
+    @test_skip parse(FD2, "123.455") == reinterpret(FD2, 123_46)
+    @test_skip parse(FD2, "123.465") == reinterpret(FD2, 123_46)
 
     @test parse(FD2, "-123") == reinterpret(FD2, -123_00)
     @test parse(FD2, "-.123") == reinterpret(FD2, -0_12)
@@ -433,6 +436,9 @@ end
     @test parse(FD4, "1.2e0")  == reinterpret(FD4, 00001_2000)
     @test parse(FD4, "1.2e3")  == reinterpret(FD4, 01200_0000)
     @test parse(FD4, "1.2e-3") == reinterpret(FD4, 00000_0012)
+    @test parse(FD4, "1.2e-4") == reinterpret(FD4, 00000_0001)
+    @test_skip parse(FD4, "1.5e-4") == reinterpret(FD4, 00000_0002)
+    @test_throws OverflowError parse("1.2e100")
 
     @test parse(FD4, "-12e0")   == reinterpret(FD4, -00012_0000)
     @test parse(FD4, "-12e3")   == reinterpret(FD4, -12000_0000)
@@ -442,6 +448,9 @@ end
     @test parse(FD4, "-1.2e-3") == reinterpret(FD4, -00000_0012)
 
     @test parse(FD2, "2.3") == reinterpret(FD2, 2_30)
+
+    @test_throws ArgumentError parse(FD4, "foo")
+    @test_throws ArgumentError parse(FD4, "1.2.3")
 end
 
 end  # global testset
