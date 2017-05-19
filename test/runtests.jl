@@ -481,6 +481,10 @@ end
                 # we can have the expected result be a little flexible.
                 @test value(trunc(FD{$T,$f}, max_int / powt)) in [max_int, max_int - 1]
                 @test value(trunc(FD{$T,$f}, min_int / powt)) in [min_int, min_int + 1]
+
+                # Note: all values `x` in FD{T,f} are -1 < x < 1
+                @test trunc(reinterpret(FD{$T,$f}, typemax($T))) == zero(FD{$T,$f})
+                @test trunc(reinterpret(FD{$T,$f}, typemin($T))) == zero(FD{$T,$f})
             end
         end
     end
