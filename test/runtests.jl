@@ -256,7 +256,13 @@ end
     @testset "division by 1" begin
         @testset for x in keyvalues[FD2]
             @test x / one(x) == x
-            @test x / -one(x) == -x
+
+            # signed integers using two's complement have one additional negative value
+            if x < 0 && x == typemin(x)
+                @test_throws InexactError x / -one(x)
+            else
+                @test x / -one(x) == -x
+            end
         end
     end
 
@@ -320,23 +326,54 @@ end
         @test 129 / FD2(200) == FD2(0.64)
         @test -129 / FD2(200) == FD2(-0.64)
 
-        # Use of Float or BigFloat internally can change the calculated result
-        @test round(Int, 109 / 200 * 100) == 55
-        @test round(Int, BigInt(109) / 200 * 100) == 54  # Correct
+        # Using a floating-point number internally can slightly change the result
+        @test round(Int, 109 / 200 * 100) == 55  # Wrong
+        @test round(Int, BigInt(109) / 200 * 100) == 54
+        @test round(Int, 109 // 200 * 100) == 54
 
-        x = FD{Int128,2}(1.09)
-        @test x / Int128(2) != x / BigInt(2)
-        @test x / FD{Int128,2}(2) == x / Int128(2)
-
-        y = FD{Int128,2}(200)
-        @test Int128(109) / y != BigInt(109) / y
-        @test FD{Int128,2}(109) / y == Int128(109) / y
+        x = FD2(1.09)
+        y = FD2(200)
+        for T in [FD2, Int8, Int128, BigInt]
+            @test x / T(2) == FD2(0.54)
+            @test T(109) / y == FD2(0.54)
+        end
     end
 
     @testset "without promotion" begin
         @test_throws InexactError FD{Int8,1}(20)
         @test 20 / FD{Int8,1}(2) == FD{Int8,1}(10.0)
         @test FD{Int8,1}(2) / 20 == FD{Int8,1}(0.1)
+    end
+
+    @testset "limits" begin
+        @test_throws InexactError 1 / FD{Int8,2}(0.4)
+        @test_throws InexactError FD{Int8,2}(1) / FD{Int8,2}(0.4)
+
+        for T in CONTAINER_TYPES
+            x = FixedPointDecimals.max_exp10(T)
+            f = x + 1
+
+            scalar = reinterpret(FD{T,f}, T(10)^x)  # 0.1
+
+            # Since multiply will round the result we'll make sure our value always
+            # rounds down.
+            max_int = typemax(T) - (typemax(T) % 10)
+            min_int = typemin(T) - (typemin(T) % 10)
+            max_fd = reinterpret(FD{T,f}, max_int)
+            min_fd = reinterpret(FD{T,f}, min_int)
+
+            @eval begin
+                @test ($max_fd * $scalar) / $scalar == $max_fd
+                @test ($min_fd * $scalar) / $scalar == $min_fd
+                @test $max_fd / 2 == reinterpret(FD{$T,$f}, div($max_int, 2))
+                @test $min_fd / 2 == reinterpret(FD{$T,$f}, div($min_int, 2))
+
+                # Since the precision of `f` doesn't allow us to make a FixedDecimal >= 1
+                # there is no way testing this function without raising an exception.
+                $max_fd != 0 && @test_throws InexactError 2 / $max_fd
+                $min_fd != 0 && @test_throws InexactError 2 / $min_fd
+            end
+        end
     end
 end
 

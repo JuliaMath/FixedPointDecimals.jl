@@ -140,24 +140,24 @@ end
 
 # TODO. this is probably wrong sometimes.
 function /{T, f}(x::FD{T, f}, y::FD{T, f})
-    powt = T(10)^f
+    powt = coefficient(FD{T,f})
     quotient, remainder = divrem(x.i, y.i)
-    reinterpret(FD{T, f}, quotient * powt + round(T, remainder / y.i * powt))
+    reinterpret(FD{T, f}, T(widemul(quotient, powt) + round(T, remainder // y.i * powt)))
 end
 
 # these functions are needed to avoid InexactError when converting from the integer type
 function /{T, f}(x::Integer, y::FD{T, f})
-    powt = T(10)^f
+    powt = coefficient(FD{T,f})
     xi, yi = checked_mul(x, powt), y.i
     quotient, remainder = divrem(xi, yi)
-    reinterpret(FD{T, f}, quotient * powt + round(T, remainder / yi * powt))
+    reinterpret(FD{T, f}, T(widemul(quotient, powt) + round(T, remainder // yi * powt)))
 end
 
 function /{T, f}(x::FD{T, f}, y::Integer)
-    powt = T(10)^f
+    powt = coefficient(FD{T,f})
     xi, yi = x.i, checked_mul(y, powt)
     quotient, remainder = divrem(xi, yi)
-    reinterpret(FD{T, f}, quotient * powt + round(T, remainder / yi * powt))
+    reinterpret(FD{T, f}, T(widemul(quotient, powt) + round(T, remainder // yi * powt)))
 end
 
 # integerification
