@@ -138,26 +138,26 @@ end
 *{T, f}(x::Integer, y::FD{T, f}) = reinterpret(FD{T, f}, T(x * y.i))
 *{T, f}(x::FD{T, f}, y::Integer) = reinterpret(FD{T, f}, T(x.i * y))
 
-# TODO. this is probably wrong sometimes.
 function /{T, f}(x::FD{T, f}, y::FD{T, f})
     powt = coefficient(FD{T,f})
     quotient, remainder = divrem(x.i, y.i)
     reinterpret(FD{T, f}, T(widemul(quotient, powt) + round(T, remainder // y.i * powt)))
 end
 
-# these functions are needed to avoid InexactError when converting from the integer type
+# These functions allow us to perform division with integers outside of the range of the
+# FixedDecimal.
 function /{T, f}(x::Integer, y::FD{T, f})
     powt = coefficient(FD{T,f})
-    xi, yi = checked_mul(x, powt), y.i
+    xi, yi = widemul(x, powt), y.i
     quotient, remainder = divrem(xi, yi)
-    reinterpret(FD{T, f}, T(widemul(quotient, powt) + round(T, remainder // yi * powt)))
+    reinterpret(FD{T, f}, T(quotient * powt + round(T, remainder // yi * powt)))
 end
 
 function /{T, f}(x::FD{T, f}, y::Integer)
     powt = coefficient(FD{T,f})
-    xi, yi = x.i, checked_mul(y, powt)
+    xi, yi = x.i, widemul(y, powt)
     quotient, remainder = divrem(xi, yi)
-    reinterpret(FD{T, f}, T(widemul(quotient, powt) + round(T, remainder // yi * powt)))
+    reinterpret(FD{T, f}, T(quotient * powt + round(T, remainder // yi * powt)))
 end
 
 # integerification

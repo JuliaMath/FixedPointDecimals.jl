@@ -341,12 +341,12 @@ end
 
     @testset "without promotion" begin
         @test_throws InexactError FD{Int8,1}(20)
-        @test 20 / FD{Int8,1}(2) == FD{Int8,1}(10.0)
-        @test FD{Int8,1}(2) / 20 == FD{Int8,1}(0.1)
+        @test Int8(20) / FD{Int8,1}(2) == FD{Int8,1}(10.0)
+        @test FD{Int8,1}(2) / Int8(20) == FD{Int8,1}(0.1)
     end
 
     @testset "limits" begin
-        @test_throws InexactError 1 / FD{Int8,2}(0.4)
+        @test_throws InexactError Int8(1) / FD{Int8,2}(0.4)
         @test_throws InexactError FD{Int8,2}(1) / FD{Int8,2}(0.4)
 
         for T in CONTAINER_TYPES
@@ -365,13 +365,13 @@ end
             @eval begin
                 @test ($max_fd * $scalar) / $scalar == $max_fd
                 @test ($min_fd * $scalar) / $scalar == $min_fd
-                @test $max_fd / 2 == reinterpret(FD{$T,$f}, div($max_int, 2))
-                @test $min_fd / 2 == reinterpret(FD{$T,$f}, div($min_int, 2))
+                @test $max_fd / $T(2) == reinterpret(FD{$T,$f}, div($max_int, 2))
+                @test $min_fd / $T(2) == reinterpret(FD{$T,$f}, div($min_int, 2))
 
                 # Since the precision of `f` doesn't allow us to make a FixedDecimal >= 1
                 # there is no way testing this function without raising an exception.
-                $max_fd != 0 && @test_throws InexactError 2 / $max_fd
-                $min_fd != 0 && @test_throws InexactError 2 / $min_fd
+                $max_fd != 0 && @test_throws InexactError $T(2) / $max_fd
+                $min_fd != 0 && @test_throws InexactError $T(2) / $min_fd
             end
         end
     end
