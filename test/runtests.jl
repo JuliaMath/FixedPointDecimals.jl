@@ -1,5 +1,5 @@
 using FixedPointDecimals
-import FixedPointDecimals: FD
+import FixedPointDecimals: FD, value
 using Base.Test
 using Compat
 import Base.Checked: checked_mul
@@ -469,15 +469,18 @@ end
             @eval begin
                 powt = FixedPointDecimals.coefficient(FD{$T,$f})
 
-                # ideally we would just use `typemax(T)` but due to precision issues with
+                # Ideally we would just use `typemax(T)` but due to precision issues with
                 # floating-point its possible the closest float will exceed `typemax(T)`.
-                max_int = trunc(BigInt, prevfloat(typemax($T) / powt) * powt)
-                min_int = trunc(BigInt, nextfloat(typemin($T) / powt) * powt)
+                # Additionally, when the division results in a `BigFloat` we need to first
+                # truncate to a `BigInt` before we can truncate the type we want.
+                max_int = $T(trunc(BigInt, prevfloat(typemax($T) / powt) * powt))
+                min_int = $T(trunc(BigInt, nextfloat(typemin($T) / powt) * powt))
 
-                # Do not need to know the exact value as we're primarily looking for
-                # issues relating to overflow
-                @test trunc(FD{$T,$f}, max_int / powt).i in (max_int, max_int - 1)
-                @test trunc(FD{$T,$f}, min_int / powt).i in (min_int, min_int + 1)
+                # floating-point inprecision makes it hard to know exactly that value to
+                # expect. Since we're primarily looking for issues relating to overflow this
+                # we can have the expected result be a little flexible.
+                @test value(trunc(FD{$T,$f}, max_int / powt)) in [max_int, max_int - 1]
+                @test value(trunc(FD{$T,$f}, min_int / powt)) in [min_int, min_int + 1]
             end
         end
     end
@@ -532,20 +535,30 @@ epsi{T}(::Type{T}) = eps(T)
             @eval begin
                 powt = FixedPointDecimals.coefficient(FD{$T,$f})
 
-                # ideally we would just use `typemax(T)` but due to precision issues with
+                # Ideally we would just use `typemax(T)` but due to precision issues with
                 # floating-point its possible the closest float will exceed `typemax(T)`.
-                # Using BigInt as this will avoid overflowing when we do `max_int + 1` and
-                # `min_int - 1`.
-                max_int = trunc(BigInt, prevfloat(typemax($T) / powt) * powt)
-                min_int = trunc(BigInt, nextfloat(typemin($T) / powt) * powt)
+                # Additionally, when the division results in a `BigFloat` we need to first
+                # truncate to a `BigInt` before we can truncate the type we want.
+                max_int = $T(trunc(BigInt, prevfloat(typemax($T) / powt) * powt))
+                min_int = $T(trunc(BigInt, nextfloat(typemin($T) / powt) * powt))
 
-                # Do not need to know the exact value as we're primarily looking for
-                # issues relating to overflow
-                @test floor(FD{$T,$f}, max_int / powt).i in (max_int, max_int - 1)
-                @test floor(FD{$T,$f}, min_int / powt).i in (min_int, min_int - 1)
+                # When working with Int128/UInt128 ceil with max_int will fail without this
+                # Fixed in: https://github.com/JuliaLang/julia/pull/19779
+                if VERSION < v"0.6"
+                    max_dec = /(promote(max_int, powt)...)
+                    min_dec = /(promote(min_int, powt)...)
+                else
+                    max_dec = max_int / powt
+                    min_dec = min_dec / powt
+                end
 
-                @test ceil(FD{$T,$f}, max_int / powt).i in (max_int, max_int + 1)
-                @test ceil(FD{$T,$f}, min_int / powt).i in (min_int, min_int + 1)
+                # Note: Using a larger signed type as the max/min values may be at the
+                # limits and overflow when adding or subtracting 1.
+                @test value(floor(FD{$T,$f}, max_dec)) in [max_int, max_int - 1]
+                @test value(floor(FD{$T,$f}, min_dec)) in [min_int, signed(widen(min_int)) - 1]
+
+                @test value(ceil(FD{$T,$f}, max_dec)) in [max_int, signed(widen(max_int)) + 1]
+                @test value(ceil(FD{$T,$f}, min_dec)) in [min_int, min_int + 1]
             end
         end
     end
