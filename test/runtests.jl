@@ -435,6 +435,31 @@ end
         # to FD2
         @test x == round(FD2, x)
     end
+
+    @testset "limits" begin
+        for T in CONTAINER_TYPES
+            f = FixedPointDecimals.max_exp10(T) + 1
+            @eval begin
+                powt = FixedPointDecimals.coefficient(FD{$T,$f})
+
+                max_rounded = round($T, typemax($T) / powt)
+                min_rounded = round($T, typemin($T) / powt)
+
+                # Note: all values `x` in FD{T,f} are -1 < x < 1
+                if max_rounded > 0
+                    @test_throws InexactError round(reinterpret(FD{$T,$f}, typemax($T)))
+                else
+                    @test round(reinterpret(FD{$T,$f}, typemax($T))) == FD{$T,$f}(max_rounded)
+                end
+
+                if min_rounded < 0
+                    @test_throws InexactError round(reinterpret(FD{$T,$f}, typemin($T)))
+                else
+                    @test round(reinterpret(FD{$T,$f}, typemin($T))) == FD{$T,$f}(min_rounded)
+                end
+            end
+        end
+    end
 end
 
 @testset "trunc" begin

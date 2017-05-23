@@ -166,7 +166,7 @@ floor{T, f}(x::FD{T, f}) = FD{T, f}(fld(x.i, coefficient(FD{T, f})))
 
 # TODO: round with number of digits; should be easy
 function round{T, f}(x::FD{T, f}, ::RoundingMode{:Nearest}=RoundNearest)
-    powt = T(10)^f
+    powt = coefficient(FD{T, f})
     quotient, remainder = fldmod(x.i, powt)
     FD{T, f}(_round_to_even(quotient, remainder, powt))
 end
