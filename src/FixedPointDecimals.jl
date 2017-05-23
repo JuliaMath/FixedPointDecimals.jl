@@ -162,7 +162,8 @@ end
 
 # integerification
 trunc{T, f}(x::FD{T, f}) = FD{T, f}(div(x.i, coefficient(FD{T, f})))
-floor{T, f}(x::FD{T, f}) = FD{T, f}(fld(x.i, T(10)^f))
+floor{T, f}(x::FD{T, f}) = FD{T, f}(fld(x.i, coefficient(FD{T, f})))
+
 # TODO: round with number of digits; should be easy
 function round{T, f}(x::FD{T, f}, ::RoundingMode{:Nearest}=RoundNearest)
     powt = T(10)^f

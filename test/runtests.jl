@@ -581,6 +581,14 @@ epsi{T}(::Type{T}) = eps(T)
 
                 @test value(ceil(FD{$T,$f}, max_dec)) in [max_int, signed(widen(max_int)) + 1]
                 @test value(ceil(FD{$T,$f}, min_dec)) in [min_int, min_int + 1]
+
+                # Note: all values `x` in FD{T,f} are -1 < x < 1
+                @test floor(reinterpret(FD{$T,$f}, typemax($T))) == zero(FD{$T,$f})
+                if $T <: Unsigned
+                    @test floor(reinterpret(FD{$T,$f}, typemin($T))) == zero(FD{$T,$f})
+                else
+                    @test_throws InexactError floor(reinterpret(FD{$T,$f}, typemin($T)))
+                end
             end
         end
     end
