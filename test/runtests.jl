@@ -589,6 +589,9 @@ epsi{T}(::Type{T}) = eps(T)
                 else
                     @test_throws InexactError floor(reinterpret(FD{$T,$f}, typemin($T)))
                 end
+
+                @test_throws InexactError ceil(reinterpret(FD{$T,$f}, typemax($T)))
+                @test ceil(reinterpret(FD{$T,$f}, typemin($T))) == zero(FD{$T,$f})
             end
         end
     end

@@ -171,7 +171,7 @@ function round{T, f}(x::FD{T, f}, ::RoundingMode{:Nearest}=RoundNearest)
     FD{T, f}(_round_to_even(quotient, remainder, powt))
 end
 function ceil{T, f}(x::FD{T, f})
-    powt = T(10)^f
+    powt = coefficient(FD{T, f})
     quotient, remainder = fldmod(x.i, powt)
     if remainder > 0
         FD{T, f}(quotient + one(quotient))
