@@ -67,6 +67,13 @@ function parse_int{T, f}(::Type{FD{T, f}}, val::AbstractString; ceil::Bool=false
     reinterpret(FD{T, f}, parse(T, val[1:(f + 1)]) + T(ceil))
 end
 
+# When working with typemax of Int128 or UInt128 we can run into issues.
+# https://github.com/JuliaLang/julia/pull/19779
+if VERSION < v"0.6.0-dev.1849"
+    Base.:/(x::Int128, y::BigInt)  = /(promote(x, y)...)
+    Base.:/(x::UInt128, y::BigInt) = /(promote(x, y)...)
+end
+
 # ensure that the coefficient multiplied by the highest and lowest representable values of
 # the container type do not result in overflow.
 @testset "coefficient" begin
@@ -436,28 +443,35 @@ end
         @test x == round(FD2, x)
     end
 
-    @testset "limits" begin
-        for T in CONTAINER_TYPES
-            f = FixedPointDecimals.max_exp10(T) + 1
-            @eval begin
-                powt = FixedPointDecimals.coefficient(FD{$T,$f})
+    @testset "limits $T" for T in CONTAINER_TYPES
+        f = FixedPointDecimals.max_exp10(T) + 1
+        powt = FixedPointDecimals.coefficient(FD{T,f})
 
-                max_rounded = round($T, typemax($T) / powt)
-                min_rounded = round($T, typemin($T) / powt)
+        # Ideally we would just use `typemax(T)` but due to precision issues with
+        # floating-point its possible the closest float will exceed `typemax(T)`.
+        # Additionally, when the division results in a `BigFloat` we need to first truncate
+        # to a `BigInt` before we can truncate the type we want.
+        max_int = T(trunc(BigInt, prevfloat(typemax(T) / powt) * powt))
+        min_int = T(trunc(BigInt, nextfloat(typemin(T) / powt) * powt))
 
-                # Note: all values `x` in FD{T,f} are -1 < x < 1
-                if max_rounded > 0
-                    @test_throws InexactError round(reinterpret(FD{$T,$f}, typemax($T)))
-                else
-                    @test round(reinterpret(FD{$T,$f}, typemax($T))) == FD{$T,$f}(max_rounded)
-                end
+        @test round(FD{T,f}, max_int / powt) == reinterpret(FD{T,f}, max_int)
+        @test round(FD{T,f}, min_int / powt) == reinterpret(FD{T,f}, min_int)
 
-                if min_rounded < 0
-                    @test_throws InexactError round(reinterpret(FD{$T,$f}, typemin($T)))
-                else
-                    @test round(reinterpret(FD{$T,$f}, typemin($T))) == FD{$T,$f}(min_rounded)
-                end
-            end
+        @test round(FD{T,f}, typemax(T) // powt) == reinterpret(FD{T,f}, typemax(T))
+        @test round(FD{T,f}, typemin(T) // powt) == reinterpret(FD{T,f}, typemin(T))
+
+        # Note: due to the size of `f` all values `x::FD{T,f}` are `-1 < x < 1` which means
+        # that rounding away from zero will result in an exception.
+        if round(T, typemax(T) / powt) != 0
+            @test_throws InexactError round(reinterpret(FD{T,f}, typemax(T)))
+        else
+            @test round(reinterpret(FD{T,f}, typemax(T))) == zero(FD{T,f})
+        end
+
+        if round(T, typemin(T) / powt) != 0
+            @test_throws InexactError round(reinterpret(FD{T,f}, typemin(T)))
+        else
+            @test round(reinterpret(FD{T,f}, typemin(T))) == zero(FD{T,f})
         end
     end
 end
@@ -589,15 +603,8 @@ epsi{T}(::Type{T}) = eps(T)
                 max_int = $T(trunc(BigInt, prevfloat(typemax($T) / powt) * powt))
                 min_int = $T(trunc(BigInt, nextfloat(typemin($T) / powt) * powt))
 
-                # When working with Int128/UInt128 ceil with max_int will fail without this
-                # Fixed in: https://github.com/JuliaLang/julia/pull/19779
-                if VERSION < v"0.6"
-                    max_dec = /(promote(max_int, powt)...)
-                    min_dec = /(promote(min_int, powt)...)
-                else
-                    max_dec = max_int / powt
-                    min_dec = min_dec / powt
-                end
+                max_dec = max_int / powt
+                min_dec = min_int / powt
 
                 # Note: Using a larger signed type as the max/min values may be at the
                 # limits and overflow when adding or subtracting 1.

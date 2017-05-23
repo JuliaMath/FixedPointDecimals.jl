@@ -199,9 +199,8 @@ function round{T, f}(::Type{FD{T, f}}, x::Real, ::RoundingMode{:Nearest}=RoundNe
 end
 
 # needed to avoid ambiguity
-function round{T, f}(::Type{FD{T, f}}, x::Rational,
-                     ::RoundingMode{:Nearest}=RoundNearest)
-    reinterpret(FD{T, f}, round(T, T(10)^f * x))
+function round{T, f}(::Type{FD{T, f}}, x::Rational, ::RoundingMode{:Nearest}=RoundNearest)
+    reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
 end
 
 # conversions and promotions
