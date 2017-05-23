@@ -211,12 +211,8 @@ end
 convert{T <: FD}(::Type{T}, x::AbstractFloat) = round(T, x)
 
 function convert{T, f}(::Type{FD{T, f}}, x::Rational)::FD{T, f}
-    powt = T(10)^f
-    num::T, den::T = numerator(x), denominator(x)
-    g = gcd(powt, den)
-    powt = div(powt, g)
-    den = div(den, g)
-    reinterpret(FD{T, f}, powt * num) / FD{T, f}(den)
+    powt = coefficient(FD{T, f})
+    reinterpret(FD{T, f}, T(x * powt))
 end
 
 function convert{T, f, U, g}(::Type{FD{T, f}}, x::FD{U, g})

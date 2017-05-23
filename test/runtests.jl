@@ -116,10 +116,13 @@ end
         @test min_int >= typemin(T)
         @test value(convert(FD{T,f}, min_int / powt)) == min_int
 
+        @test convert(FD{T,f}, typemax(T) // powt) == reinterpret(FD{T,f}, typemax(T))
+        @test convert(FD{T,f}, typemin(T) // powt) == reinterpret(FD{T,f}, typemin(T))
+
         @test_throws InexactError convert(FD{T,f}, T(1))
 
         # Adjust number of decimal places allowed so we can have `-10 < x < 10` where x is
-        # a FD{T,f}.
+        # a FD{T,f}. Only needed to test `convert(::FD, ::Integer)`
         f = FixedPointDecimals.max_exp10(T)
         powt = FixedPointDecimals.coefficient(FD{T,f})
 
@@ -136,6 +139,8 @@ end
     @test_throws InexactError convert(FD2, FD4(0.0001))
     @test_throws InexactError convert(FD4, typemax(FD2))
     @test_throws InexactError convert(SFD2, typemax(FD2))
+    @test_throws InexactError convert(FD2, 1//3)
+    @test_throws InexactError convert(FD{Int8,1}, 1//4)
 end
 
 @testset "promotion" begin
