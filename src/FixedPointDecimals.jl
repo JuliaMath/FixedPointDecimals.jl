@@ -204,8 +204,9 @@ function round{T, f}(::Type{FD{T, f}}, x::Rational,
 end
 
 # conversions and promotions
-convert{T, f}(::Type{FD{T, f}}, x::Integer) =
-    reinterpret(FD{T, f}, round(T, Base.widemul(T(x), T(10)^f)))
+function convert{T, f}(::Type{FD{T, f}}, x::Integer)
+    reinterpret(FD{T, f}, T(widemul(x, coefficient(FD{T, f}))))
+end
 
 convert{T <: FD}(::Type{T}, x::AbstractFloat) = round(T, x)
 

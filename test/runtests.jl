@@ -109,6 +109,24 @@ end
                 @test convert(FD{$T,$f}, $(max_int / powt)).i == $max_int
                 @test $min_int >= typemin($T)
                 @test convert(FD{$T,$f}, $(min_int / powt)).i == $min_int
+
+                @test_throws InexactError convert(FD{$T,$f}, $T(1))
+            end
+        end
+
+        for T in CONTAINER_TYPES
+            f = FixedPointDecimals.max_exp10(T)
+            powt = FixedPointDecimals.coefficient(FD{T,f})
+
+            max_int = typemax(T) ÷ powt * powt
+            min_int = typemin(T) ÷ powt * powt
+
+            @eval begin
+                @test convert(FD{$T,$f}, $(max_int ÷ powt)) == reinterpret(FD{$T,$f}, $max_int)
+                @test convert(FD{$T,$f}, $(min_int ÷ powt)) == reinterpret(FD{$T,$f}, $min_int)
+
+                @test_throws InexactError convert(FD{$T,$f}, $(max_int ÷ powt) + $T(1))
+                @test_throws InexactError convert(FD{$T,$f}, $(min_int ÷ powt) - $T(1))  # Overflows with Unsigned
             end
         end
     end
