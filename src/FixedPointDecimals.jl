@@ -217,14 +217,17 @@ end
 
 function convert{T, f, U, g}(::Type{FD{T, f}}, x::FD{U, g})
     if f ≥ g
-        reinterpret(FD{T, f}, convert(T, Base.widemul(T(10)^(f-g), x.i)))
+        # Compute `10^(f - g)` without overflow
+        powt = div(coefficient(FD{T, f}), coefficient(FD{U, g}))
+        reinterpret(FD{T, f}, T(widemul(x.i, powt)))
     else
-        sf = T(10)^(g - f)
-        q, r = divrem(x.i, sf)
-        if r ≠ 0
-            throw(InexactError())
+        # Compute `10^(g - f)` without overflow
+        powt = div(coefficient(FD{U, g}), coefficient(FD{T, f}))
+        q, r = divrem(x.i, powt)
+        if r == 0
+            reinterpret(FD{T, f}, T(q))
         else
-            reinterpret(FD{T, f}, convert(T, q))
+            throw(InexactError())
         end
     end
 end

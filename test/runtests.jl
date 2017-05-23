@@ -100,6 +100,14 @@ end
         end
     end
 
+    @testset "invalid" begin
+        @test_throws InexactError convert(FD2, FD4(0.0001))
+        @test_throws InexactError convert(FD4, typemax(FD2))
+        @test_throws InexactError convert(SFD2, typemax(FD2))
+        @test_throws InexactError convert(FD2, 1//3)
+        @test_throws InexactError convert(FD{Int8,1}, 1//4)
+    end
+
     @testset "limits of $T" for T in CONTAINER_TYPES
         f = FixedPointDecimals.max_exp10(T) + 1
         powt = FixedPointDecimals.coefficient(FD{T,f})
@@ -136,11 +144,24 @@ end
         @test_throws InexactError convert(FD{T,f}, min_int ÷ powt - T(1))  # Overflows with Unsigned
     end
 
-    @test_throws InexactError convert(FD2, FD4(0.0001))
-    @test_throws InexactError convert(FD4, typemax(FD2))
-    @test_throws InexactError convert(SFD2, typemax(FD2))
-    @test_throws InexactError convert(FD2, 1//3)
-    @test_throws InexactError convert(FD{Int8,1}, 1//4)
+    @testset "limits from $U to $T" for T in CONTAINER_TYPES, U in CONTAINER_TYPES
+        f = FixedPointDecimals.max_exp10(T) + 1
+        g = FixedPointDecimals.max_exp10(U) + 1
+        powt = div(
+            FixedPointDecimals.coefficient(FD{T, f}),
+            FixedPointDecimals.coefficient(FD{U, g}),
+        )
+
+        val = typemax(U)
+        expected = widemul(typemax(U), powt)
+
+        # Mixed usage of signed and unsigned types makes testing with typemin hard.
+        if f >= g && expected <= typemax(T)
+            @test convert(FD{T,f}, reinterpret(FD{U,g}, val)) == reinterpret(FD{T,f}, expected)
+        else
+            @test_throws InexactError convert(FD{T,f}, reinterpret(FD{U,g}, val))
+        end
+    end
 end
 
 @testset "promotion" begin
