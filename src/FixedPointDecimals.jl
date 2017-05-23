@@ -250,7 +250,7 @@ end
 
 function convert{TI <: Integer, T, f}(::Type{TI}, x::FD{T, f})::TI
     isinteger(x) || throw(InexactError())
-    div(x.i, T(10)^f)
+    div(x.i, coefficient(FD{T, f}))
 end
 
 convert{TR<:Rational,T,f}(::Type{TR}, x::FD{T, f})::TR =
