@@ -100,42 +100,37 @@ end
         end
     end
 
-    @testset "limits" begin
-        for T in CONTAINER_TYPES
-            f = FixedPointDecimals.max_exp10(T) + 1
-            powt = FixedPointDecimals.coefficient(FD{T,f})
+    @testset "limits of $T" for T in CONTAINER_TYPES
+        f = FixedPointDecimals.max_exp10(T) + 1
+        powt = FixedPointDecimals.coefficient(FD{T,f})
 
-            # ideally we would just use `typemax(T)` but due to precision issues with
-            # floating-point its possible the closest float will exceed `typemax(T)`.
-            # Note: we should be doing `trunc(T, ...)` but truncating a BigFloat can be
-            # problematic (https://github.com/JuliaLang/julia/issues/21914)
-            max_int = trunc(BigInt, prevfloat(typemax(T) / powt) * powt)
-            min_int = trunc(BigInt, nextfloat(typemin(T) / powt) * powt)
-            @eval begin
-                @test $max_int <= typemax($T)
-                @test convert(FD{$T,$f}, $(max_int / powt)).i == $max_int
-                @test $min_int >= typemin($T)
-                @test convert(FD{$T,$f}, $(min_int / powt)).i == $min_int
+        # ideally we would just use `typemax(T)` but due to precision issues with
+        # floating-point its possible the closest float will exceed `typemax(T)`.
+        # Note: we should be doing `trunc(T, ...)` but truncating a BigFloat can be
+        # problematic (https://github.com/JuliaLang/julia/issues/21914)
+        max_int = trunc(BigInt, prevfloat(typemax(T) / powt) * powt)
+        min_int = trunc(BigInt, nextfloat(typemin(T) / powt) * powt)
 
-                @test_throws InexactError convert(FD{$T,$f}, $T(1))
-            end
-        end
+        @test max_int <= typemax(T)
+        @test value(convert(FD{T,f}, max_int / powt)) == max_int
+        @test min_int >= typemin(T)
+        @test value(convert(FD{T,f}, min_int / powt)) == min_int
 
-        for T in CONTAINER_TYPES
-            f = FixedPointDecimals.max_exp10(T)
-            powt = FixedPointDecimals.coefficient(FD{T,f})
+        @test_throws InexactError convert(FD{T,f}, T(1))
 
-            max_int = typemax(T) ÷ powt * powt
-            min_int = typemin(T) ÷ powt * powt
+        # Adjust number of decimal places allowed so we can have `-10 < x < 10` where x is
+        # a FD{T,f}.
+        f = FixedPointDecimals.max_exp10(T)
+        powt = FixedPointDecimals.coefficient(FD{T,f})
 
-            @eval begin
-                @test convert(FD{$T,$f}, $(max_int ÷ powt)) == reinterpret(FD{$T,$f}, $max_int)
-                @test convert(FD{$T,$f}, $(min_int ÷ powt)) == reinterpret(FD{$T,$f}, $min_int)
+        max_int = typemax(T) ÷ powt * powt
+        min_int = typemin(T) ÷ powt * powt
 
-                @test_throws InexactError convert(FD{$T,$f}, $(max_int ÷ powt) + $T(1))
-                @test_throws InexactError convert(FD{$T,$f}, $(min_int ÷ powt) - $T(1))  # Overflows with Unsigned
-            end
-        end
+        @test convert(FD{T,f}, max_int ÷ powt) == reinterpret(FD{T,f}, max_int)
+        @test convert(FD{T,f}, min_int ÷ powt) == reinterpret(FD{T,f}, min_int)
+
+        @test_throws InexactError convert(FD{T,f}, max_int ÷ powt + T(1))
+        @test_throws InexactError convert(FD{T,f}, min_int ÷ powt - T(1))  # Overflows with Unsigned
     end
 
     @test_throws InexactError convert(FD2, FD4(0.0001))
@@ -255,25 +250,21 @@ end
         @test FD{Int8,1}(0.1) * 20 == FD{Int8,1}(2.0)
     end
 
-    @testset "limits" begin
-        for T in CONTAINER_TYPES
-            x = FixedPointDecimals.max_exp10(T)
-            f = x + 1
+    @testset "limits of $T" for T in CONTAINER_TYPES
+        x = FixedPointDecimals.max_exp10(T)
+        f = x + 1
 
-            @eval begin
-                scalar = reinterpret(FD{$T,$f}, $T(10)^$x)  # 0.1
+        scalar = reinterpret(FD{T,f}, T(10)^x)  # 0.1
 
-                # Since multiply will round the result we'll make sure our value does not
-                # always rounds down.
-                max_int = typemax($T) - (typemax($T) % 10)
-                min_int = typemin($T) - (typemin($T) % 10)
+        # Since multiply will round the result we'll make sure our value does not
+        # always rounds down.
+        max_int = typemax(T) - (typemax(T) % 10)
+        min_int = typemin(T) - (typemin(T) % 10)
 
-                @test reinterpret(FD{$T,$f}, max_int) * scalar ==
-                    reinterpret(FD{$T,$f}, div(max_int, 10))
-                @test reinterpret(FD{$T,$f}, min_int) * scalar ==
-                    reinterpret(FD{$T,$f}, div(min_int, 10))
-            end
-        end
+        @test reinterpret(FD{T,f}, max_int) * scalar ==
+            reinterpret(FD{T,f}, div(max_int, 10))
+        @test reinterpret(FD{T,f}, min_int) * scalar ==
+            reinterpret(FD{T,f}, div(min_int, 10))
     end
 end
 
@@ -373,32 +364,30 @@ end
     @testset "limits" begin
         @test_throws InexactError Int8(1) / FD{Int8,2}(0.4)
         @test_throws InexactError FD{Int8,2}(1) / FD{Int8,2}(0.4)
+    end
 
-        for T in CONTAINER_TYPES
-            x = FixedPointDecimals.max_exp10(T)
-            f = x + 1
+    @testset "limits of $T" for T in CONTAINER_TYPES
+        x = FixedPointDecimals.max_exp10(T)
+        f = x + 1
 
-            scalar = reinterpret(FD{T,f}, T(10)^x)  # 0.1
+        scalar = reinterpret(FD{T,f}, T(10)^x)  # 0.1
 
-            # Since multiply will round the result we'll make sure our value always
-            # rounds down.
-            max_int = typemax(T) - (typemax(T) % 10)
-            min_int = typemin(T) - (typemin(T) % 10)
-            max_fd = reinterpret(FD{T,f}, max_int)
-            min_fd = reinterpret(FD{T,f}, min_int)
+        # Since multiply will round the result we'll make sure our value always
+        # rounds down.
+        max_int = typemax(T) - (typemax(T) % 10)
+        min_int = typemin(T) - (typemin(T) % 10)
+        max_fd = reinterpret(FD{T,f}, max_int)
+        min_fd = reinterpret(FD{T,f}, min_int)
 
-            @eval begin
-                @test ($max_fd * $scalar) / $scalar == $max_fd
-                @test ($min_fd * $scalar) / $scalar == $min_fd
-                @test $max_fd / $T(2) == reinterpret(FD{$T,$f}, div($max_int, 2))
-                @test $min_fd / $T(2) == reinterpret(FD{$T,$f}, div($min_int, 2))
+        @test (max_fd * scalar) / scalar == max_fd
+        @test (min_fd * scalar) / scalar == min_fd
+        @test max_fd / T(2) == reinterpret(FD{T,f}, div(max_int, 2))
+        @test min_fd / T(2) == reinterpret(FD{T,f}, div(min_int, 2))
 
-                # Since the precision of `f` doesn't allow us to make a FixedDecimal >= 1
-                # there is no way testing this function without raising an exception.
-                $max_fd != 0 && @test_throws InexactError $T(2) / $max_fd
-                $min_fd != 0 && @test_throws InexactError $T(2) / $min_fd
-            end
-        end
+        # Since the precision of `f` doesn't allow us to make a FixedDecimal >= 1
+        # there is no way testing this function without raising an exception.
+        max_fd != 0 && @test_throws InexactError T(2) / max_fd
+        min_fd != 0 && @test_throws InexactError T(2) / min_fd
     end
 end
 
@@ -443,7 +432,7 @@ end
         @test x == round(FD2, x)
     end
 
-    @testset "limits $T" for T in CONTAINER_TYPES
+    @testset "limits of $T" for T in CONTAINER_TYPES
         f = FixedPointDecimals.max_exp10(T) + 1
         powt = FixedPointDecimals.coefficient(FD{T,f})
 
@@ -520,30 +509,26 @@ end
         end
     end
 
-    @testset "limits" begin
-        for T in CONTAINER_TYPES
-            f = FixedPointDecimals.max_exp10(T) + 1
-            @eval begin
-                powt = FixedPointDecimals.coefficient(FD{$T,$f})
+    @testset "limits of $T" for T in CONTAINER_TYPES
+        f = FixedPointDecimals.max_exp10(T) + 1
+        powt = FixedPointDecimals.coefficient(FD{T,f})
 
-                # Ideally we would just use `typemax(T)` but due to precision issues with
-                # floating-point its possible the closest float will exceed `typemax(T)`.
-                # Additionally, when the division results in a `BigFloat` we need to first
-                # truncate to a `BigInt` before we can truncate the type we want.
-                max_int = $T(trunc(BigInt, prevfloat(typemax($T) / powt) * powt))
-                min_int = $T(trunc(BigInt, nextfloat(typemin($T) / powt) * powt))
+        # Ideally we would just use `typemax(T)` but due to precision issues with
+        # floating-point its possible the closest float will exceed `typemax(T)`.
+        # Additionally, when the division results in a `BigFloat` we need to first
+        # truncate to a `BigInt` before we can truncate the type we want.
+        max_int = T(trunc(BigInt, prevfloat(typemax(T) / powt) * powt))
+        min_int = T(trunc(BigInt, nextfloat(typemin(T) / powt) * powt))
 
-                # floating-point inprecision makes it hard to know exactly that value to
-                # expect. Since we're primarily looking for issues relating to overflow this
-                # we can have the expected result be a little flexible.
-                @test value(trunc(FD{$T,$f}, max_int / powt)) in [max_int, max_int - 1]
-                @test value(trunc(FD{$T,$f}, min_int / powt)) in [min_int, min_int + 1]
+        # floating-point inprecision makes it hard to know exactly that value to
+        # expect. Since we're primarily looking for issues relating to overflow this
+        # we can have the expected result be a little flexible.
+        @test value(trunc(FD{T,f}, max_int / powt)) in [max_int, max_int - 1]
+        @test value(trunc(FD{T,f}, min_int / powt)) in [min_int, min_int + 1]
 
-                # Note: all values `x` in FD{T,f} are -1 < x < 1
-                @test trunc(reinterpret(FD{$T,$f}, typemax($T))) == zero(FD{$T,$f})
-                @test trunc(reinterpret(FD{$T,$f}, typemin($T))) == zero(FD{$T,$f})
-            end
-        end
+        # Note: all values `x` in FD{T,f} are -1 < x < 1
+        @test trunc(reinterpret(FD{T,f}, typemax(T))) == zero(FD{T,f})
+        @test trunc(reinterpret(FD{T,f}, typemin(T))) == zero(FD{T,f})
     end
 end
 
@@ -590,42 +575,38 @@ epsi{T}(::Type{T}) = eps(T)
         end
     end
 
-    @testset "limits" begin
-        for T in CONTAINER_TYPES
-            f = FixedPointDecimals.max_exp10(T) + 1
-            @eval begin
-                powt = FixedPointDecimals.coefficient(FD{$T,$f})
+    @testset "limits of $T" for T in CONTAINER_TYPES
+        f = FixedPointDecimals.max_exp10(T) + 1
+        powt = FixedPointDecimals.coefficient(FD{T,f})
 
-                # Ideally we would just use `typemax(T)` but due to precision issues with
-                # floating-point its possible the closest float will exceed `typemax(T)`.
-                # Additionally, when the division results in a `BigFloat` we need to first
-                # truncate to a `BigInt` before we can truncate the type we want.
-                max_int = $T(trunc(BigInt, prevfloat(typemax($T) / powt) * powt))
-                min_int = $T(trunc(BigInt, nextfloat(typemin($T) / powt) * powt))
+        # Ideally we would just use `typemax(T)` but due to precision issues with
+        # floating-point its possible the closest float will exceed `typemax(T)`.
+        # Additionally, when the division results in a `BigFloat` we need to first
+        # truncate to a `BigInt` before we can truncate the type we want.
+        max_int = T(trunc(BigInt, prevfloat(typemax(T) / powt) * powt))
+        min_int = T(trunc(BigInt, nextfloat(typemin(T) / powt) * powt))
 
-                max_dec = max_int / powt
-                min_dec = min_int / powt
+        max_dec = max_int / powt
+        min_dec = min_int / powt
 
-                # Note: Using a larger signed type as the max/min values may be at the
-                # limits and overflow when adding or subtracting 1.
-                @test value(floor(FD{$T,$f}, max_dec)) in [max_int, max_int - 1]
-                @test value(floor(FD{$T,$f}, min_dec)) in [min_int, signed(widen(min_int)) - 1]
+        # Note: Using a larger signed type as the max/min values may be at the
+        # limits and overflow when adding or subtracting 1.
+        @test value(floor(FD{T,f}, max_dec)) in [max_int, max_int - 1]
+        @test value(floor(FD{T,f}, min_dec)) in [min_int, signed(widen(min_int)) - 1]
 
-                @test value(ceil(FD{$T,$f}, max_dec)) in [max_int, signed(widen(max_int)) + 1]
-                @test value(ceil(FD{$T,$f}, min_dec)) in [min_int, min_int + 1]
+        @test value(ceil(FD{T,f}, max_dec)) in [max_int, signed(widen(max_int)) + 1]
+        @test value(ceil(FD{T,f}, min_dec)) in [min_int, min_int + 1]
 
-                # Note: all values `x` in FD{T,f} are -1 < x < 1
-                @test floor(reinterpret(FD{$T,$f}, typemax($T))) == zero(FD{$T,$f})
-                if $T <: Unsigned
-                    @test floor(reinterpret(FD{$T,$f}, typemin($T))) == zero(FD{$T,$f})
-                else
-                    @test_throws InexactError floor(reinterpret(FD{$T,$f}, typemin($T)))
-                end
-
-                @test_throws InexactError ceil(reinterpret(FD{$T,$f}, typemax($T)))
-                @test ceil(reinterpret(FD{$T,$f}, typemin($T))) == zero(FD{$T,$f})
-            end
+        # Note: all values `x` in FD{T,f} are -1 < x < 1
+        @test floor(reinterpret(FD{T,f}, typemax(T))) == zero(FD{T,f})
+        if T <: Unsigned
+            @test floor(reinterpret(FD{T,f}, typemin(T))) == zero(FD{T,f})
+        else
+            @test_throws InexactError floor(reinterpret(FD{T,f}, typemin(T)))
         end
+
+        @test_throws InexactError ceil(reinterpret(FD{T,f}, typemax(T)))
+        @test ceil(reinterpret(FD{T,f}, typemin(T))) == zero(FD{T,f})
     end
 end
 
@@ -640,14 +621,13 @@ end
 
     # Displaying a decimal could be incorrect when using a decimal place precision which is
     # close to or at the limit for our storage type.
-    for T in CONTAINER_TYPES
+    @testset "limits of $T" for T in CONTAINER_TYPES
         f = FixedPointDecimals.max_exp10(T) + 1
         max_str = "0." * rpad(typemax(T), f, '0')
         min_str = (typemin(T) < 0 ? "-" : "") * "0." * rpad(abs(widen(typemin(T))), f, '0')
-        @eval begin
-            @test string(reinterpret(FD{$T,$f}, typemax($T))) == $max_str
-            @test string(reinterpret(FD{$T,$f}, typemin($T))) == $min_str
-        end
+
+        @test string(reinterpret(FD{T,f}, typemax(T))) == max_str
+        @test string(reinterpret(FD{T,f}, typemin(T))) == min_str
     end
 end
 
