@@ -114,6 +114,11 @@ end
         @test convert(BigFloat, fd) == BigInt(val) / BigInt(powt)
     end
 
+    @testset "to rational" begin
+        fd = reinterpret(FD2, 25)
+        @test convert(Rational, fd) == 1//4
+    end
+
     @testset "invalid" begin
         @test_throws InexactError convert(FD2, FD4(0.0001))
         @test_throws InexactError convert(FD4, typemax(FD2))
@@ -153,6 +158,13 @@ end
         @test convert(Float32, fd)  == Float32(typemin(T) / powt)
         @test convert(Float64, fd)  == Float64(typemin(T) / powt)
         @test convert(BigFloat, fd) == BigInt(typemin(T)) / powt
+
+        # Converting to a rational
+        fd = reinterpret(FD{T,f}, typemax(T))
+        @test convert(Rational, fd)  == typemax(T) // powt
+
+        fd = reinterpret(FD{T,f}, typemin(T))
+        @test convert(Rational, fd)  == typemin(T) // powt
 
         # Adjust number of decimal places allowed so we can have `-10 < x < 10` where x is
         # a FD{T,f}. Only needed to test `convert(::FD, ::Integer)`

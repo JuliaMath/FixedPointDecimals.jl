@@ -253,8 +253,7 @@ function convert{TI <: Integer, T, f}(::Type{TI}, x::FD{T, f})::TI
     div(x.i, coefficient(FD{T, f}))
 end
 
-convert{TR<:Rational,T,f}(::Type{TR}, x::FD{T, f})::TR =
-    x.i // T(10)^f
+convert{TR <: Rational, T, f}(::Type{TR}, x::FD{T, f})::TR = x.i // coefficient(FD{T, f})
 
 promote_rule{T, f, TI <: Integer}(::Type{FD{T, f}}, ::Type{TI}) = FD{T, f}
 promote_rule{T, f, TF <: AbstractFloat}(::Type{FD{T, f}}, ::Type{TF}) = TF
