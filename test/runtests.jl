@@ -458,6 +458,26 @@ end
     end
 end
 
+@testset "isinteger" begin
+    @testset "overflow" begin
+        # Note: After overflow `Int8(10)^6 == 64`
+        @test !isinteger(reinterpret(FD{Int8,6}, 64))  # 0.000064
+    end
+
+    @testset "limits of $T" for T in CONTAINER_TYPES
+        f = FixedPointDecimals.max_exp10(T)
+
+        max_fd = typemax(FD{T,f})
+        min_fd = typemin(FD{T,f})
+
+        @test !isinteger(max_fd)
+        @test isinteger(trunc(max_fd))
+
+        @test isinteger(min_fd) == (min_fd == zero(min_fd))
+        @test isinteger(trunc(min_fd))
+    end
+end
+
 @testset "round" begin
     @testset "to Int" begin
         @test round(Int, FD2(-0.51)) === -1

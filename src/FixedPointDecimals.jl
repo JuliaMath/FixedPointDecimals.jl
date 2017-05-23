@@ -271,7 +271,7 @@ Base.@pure promote_rule{T, f, U, g}(::Type{FD{T, f}}, ::Type{FD{U, g}}) =
 <={T <: FD}(x::T, y::T) = x.i <= y.i
 
 # predicates and traits
-isinteger{T, f}(x::FD{T, f}) = rem(x.i, T(10)^f) == 0
+isinteger{T, f}(x::FD{T, f}) = rem(x.i, coefficient(FD{T, f})) == 0
 typemin{T, f}(::Type{FD{T, f}}) = reinterpret(FD{T, f}, typemin(T))
 typemax{T, f}(::Type{FD{T, f}}) = reinterpret(FD{T, f}, typemax(T))
 eps{T <: FD}(::Type{T}) = reinterpret(T, 1)
