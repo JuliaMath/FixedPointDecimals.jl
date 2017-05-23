@@ -240,8 +240,13 @@ for divfn in [:div, :fld, :fld1]
 end
 
 convert(::Type{AbstractFloat}, x::FD) = convert(floattype(typeof(x)), x)
-convert{TF <: AbstractFloat, T, f}(::Type{TF}, x::FD{T, f})::TF =
-    x.i / TF(10)^f
+function convert{TF <: AbstractFloat, T, f}(::Type{TF}, x::FD{T, f})::TF
+    x.i / coefficient(FD{T, f})
+end
+
+function convert{TF <: BigFloat, T, f}(::Type{TF}, x::FD{T, f})::TF
+    BigInt(x.i) / BigInt(coefficient(FD{T, f}))
+end
 
 function convert{TI <: Integer, T, f}(::Type{TI}, x::FD{T, f})::TI
     isinteger(x) || throw(InexactError())

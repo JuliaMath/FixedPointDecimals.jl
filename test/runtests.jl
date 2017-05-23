@@ -100,6 +100,20 @@ end
         end
     end
 
+    @testset "to float" begin
+        # Convert the rational 5//7 into a FixedDecimal with as much precision as we can
+        # without using BigInt.
+        T = Int128
+        f = FixedPointDecimals.max_exp10(T)
+        powt = FixedPointDecimals.coefficient(FD{T,f})
+        val = T(trunc(BigInt, widemul(5//7, powt)))
+
+        fd = reinterpret(FD{T,f}, val)
+        @test convert(Float64, fd) != convert(BigFloat, fd)
+        @test convert(Float64, fd) == T(val) / T(powt)
+        @test convert(BigFloat, fd) == BigInt(val) / BigInt(powt)
+    end
+
     @testset "invalid" begin
         @test_throws InexactError convert(FD2, FD4(0.0001))
         @test_throws InexactError convert(FD4, typemax(FD2))
@@ -128,6 +142,17 @@ end
         @test convert(FD{T,f}, typemin(T) // powt) == reinterpret(FD{T,f}, typemin(T))
 
         @test_throws InexactError convert(FD{T,f}, T(1))
+
+        # Converting to a floating-point
+        fd = reinterpret(FD{T,f}, typemax(T))
+        @test convert(Float32, fd)  == Float32(typemax(T) / powt)
+        @test convert(Float64, fd)  == Float64(typemax(T) / powt)
+        @test convert(BigFloat, fd) == BigInt(typemax(T)) / powt
+
+        fd = reinterpret(FD{T,f}, typemin(T))
+        @test convert(Float32, fd)  == Float32(typemin(T) / powt)
+        @test convert(Float64, fd)  == Float64(typemin(T) / powt)
+        @test convert(BigFloat, fd) == BigInt(typemin(T)) / powt
 
         # Adjust number of decimal places allowed so we can have `-10 < x < 10` where x is
         # a FD{T,f}. Only needed to test `convert(::FD, ::Integer)`
