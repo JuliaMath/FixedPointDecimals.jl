@@ -198,7 +198,13 @@ end
     @testset "division by 1" begin
         @testset for x in keyvalues[FD2]
             @test x / one(x) == x
-            @test x / -one(x) == -x
+
+             # signed integers using two's complement have one additional negative value
+            if x < 0 && x == typemin(x)
+                @test_throws InexactError x / -one(x)
+            else
+                @test x / -one(x) == -x
+            end
         end
     end
 
@@ -262,17 +268,18 @@ end
         @test 129 / FD2(200) == FD2(0.64)
         @test -129 / FD2(200) == FD2(-0.64)
 
-        # Use of Float or BigFloat internally can change the calculated result
+        # Use of Float or BigFloat internally should not change the calculated
+        # result
         @test round(Int, 109 / 200 * 100) == 55
         @test round(Int, BigInt(109) / 200 * 100) == 54  # Correct
 
         x = FD{Int128,2}(1.09)
-        @test x / Int128(2) != x / BigInt(2)
-        @test x / FD{Int128,2}(2) == x / Int128(2)
+        @test x / Int128(2) == x / BigInt(2) == FD2(0.54)
+        @test x / FD{Int128,2}(2) == x / Int128(2) == FD2(0.54)
 
         y = FD{Int128,2}(200)
-        @test Int128(109) / y != BigInt(109) / y
-        @test FD{Int128,2}(109) / y == Int128(109) / y
+        @test Int128(109) / y == BigInt(109) / y == FD2(0.54)
+        @test FD{Int128,2}(109) / y == Int128(109) / y == FD2(0.54)
     end
 
     @testset "without promotion" begin
