@@ -34,8 +34,6 @@ import Base: reinterpret, zero, one, abs, sign, ==, <, <=, +, -, /, *, div,
              typemin, typemax, realmin, realmax, print, show, string, convert,
              promote_rule, min, max, trunc, round, floor, ceil, eps, float, widemul
 
-import Base.Checked: checked_mul
-
 const IEEEFloat = Union{Float16, Float32, Float64}
 
 for fn in [:trunc, :floor, :ceil]
@@ -109,18 +107,22 @@ Base.@pure function widemul{T, f}(x::FD{T, f}, y::Integer)
 end
 Base.@pure widemul(x::Integer, y::FD) = widemul(y, x)
 
-function _round_to_even(quotient, remainder, powt)
-    if powt == 1
-        quotient
+"""
+    _round_to_even(quotient, remainder, divisor)
+
+Round `quotient + remainder / divisor` to the nearest even integer, given that
+`0 ≤ remainder < divisor` or `0 ≥ remainder > divisor`. (This assumption is
+satisfied by the return value of `fldmod` in all cases, and the return value of
+`divrem` in cases where `divisor` is known to be positive.)
+"""
+function _round_to_even(quotient, remainder, divisor)
+    halfdivisor = divisor >> 1
+    if iseven(divisor) && remainder == halfdivisor
+        ifelse(iseven(quotient), quotient, quotient + one(quotient))
+    elseif abs(remainder) > abs(halfdivisor)
+        quotient + one(quotient)
     else
-        halfpowt = powt >> 1
-        if remainder == halfpowt
-            ifelse(iseven(quotient), quotient, quotient + one(quotient))
-        elseif remainder < halfpowt
-            quotient
-        else
-            quotient + one(quotient)
-        end
+        quotient
     end
 end
 
@@ -138,26 +140,33 @@ end
 *{T, f}(x::Integer, y::FD{T, f}) = reinterpret(FD{T, f}, T(x * y.i))
 *{T, f}(x::FD{T, f}, y::Integer) = reinterpret(FD{T, f}, T(x.i * y))
 
-# TODO. this is probably wrong sometimes.
 function /{T, f}(x::FD{T, f}, y::FD{T, f})
     powt = T(10)^f
-    quotient, remainder = divrem(x.i, y.i)
-    reinterpret(FD{T, f}, quotient * powt + round(T, remainder / y.i * powt))
+    quotient, remainder = fldmod(widemul(x.i, powt), widen(y.i))
+    reinterpret(FD{T, f}, T(_round_to_even(quotient, remainder, widen(y.i))))
 end
 
 # these functions are needed to avoid InexactError when converting from the integer type
 function /{T, f}(x::Integer, y::FD{T, f})
-    powt = T(10)^f
-    xi, yi = checked_mul(x, powt), y.i
-    quotient, remainder = divrem(xi, yi)
-    reinterpret(FD{T, f}, quotient * powt + round(T, remainder / yi * powt))
+    S = promote_type(typeof(x), T)
+    xi, yi = promote(x, y.i)
+
+    # The integer part of our result is x.i * 10^2f / y.i, so we need to
+    # double-widen to get a precise result.
+    powt = S(10)^f
+    powtsq = widemul(powt, powt)
+    quotient, remainder = fldmod(widemul(widen(xi), powtsq), widen(widen(yi)))
+
+    reinterpret(FD{T, f},
+                T(_round_to_even(quotient, remainder, widen(widen(yi)))))
 end
 
 function /{T, f}(x::FD{T, f}, y::Integer)
-    powt = T(10)^f
-    xi, yi = x.i, checked_mul(y, powt)
-    quotient, remainder = divrem(xi, yi)
-    reinterpret(FD{T, f}, quotient * powt + round(T, remainder / yi * powt))
+    S = promote_type(T, typeof(y))
+    xi, yi = promote(x.i, y)
+
+    quotient, remainder = fldmod(xi, yi)
+    reinterpret(FD{T, f}, T(_round_to_even(quotient, remainder, yi)))
 end
 
 # integerification
