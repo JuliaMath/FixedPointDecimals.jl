@@ -25,13 +25,13 @@ __precompile__()
 
 module FixedPointDecimals
 
-export FixedDecimal
+export FixedDecimal, RoundThrows
 
 using Compat
 
 import Base: reinterpret, zero, one, abs, sign, ==, <, <=, +, -, /, *, div,
              rem, divrem, fld, mod, fldmod, fld1, mod1, fldmod1, isinteger,
-             typemin, typemax, realmin, realmax, print, show, string, convert,
+             typemin, typemax, realmin, realmax, print, show, string, convert, parse,
              promote_rule, min, max, trunc, round, floor, ceil, eps, float, widemul
 
 import Base.Checked: checked_mul
@@ -309,6 +309,77 @@ function show{T, f}(io::IO, x::FD{T, f})
     if !iscompact
         print(io, ')')
     end
+end
+
+# parsing
+
+"""
+    RoundThrows
+
+Raises an `InexactError` if any rounding is necessary.
+"""
+const RoundThrows = RoundingMode{:Throw}()
+
+function parse{T, f}(::Type{FD{T, f}}, str::AbstractString, mode::RoundingMode=RoundNearest)
+    if !(mode in [RoundThrows, RoundNearest, RoundToZero])
+        throw(ArgumentError("Unhandled rounding mode $mode"))
+    end
+
+    # Parse exponent information
+    exp_index = findfirst(str, 'e')
+    if exp_index > 0
+        exp = parse(Int, str[(exp_index + 1):end])
+        sig_end = exp_index - 1
+    else
+        exp = 0
+        sig_end = endof(str)
+    end
+
+    # Remove the decimal place from the string
+    sign = T(first(str) == '-' ? -1 : 1)
+    dec_index = findfirst(str, '.')
+    sig_start = sign < 0 ? 2 : 1
+    if dec_index > 0
+        int_str = str[sig_start:(dec_index - 1)] * str[(dec_index + 1):sig_end]
+        exp -= sig_end - dec_index
+    else
+        int_str = str[sig_start:sig_end]
+    end
+
+    # Split the integer string into the value we can represent inside the FixedDecimal and
+    # the remaining digits we'll use during rounding
+    int_end = endof(int_str)
+    pivot = int_end + exp - (-f)
+
+    a = rpad(int_str[1:min(pivot, int_end)], pivot, '0')
+    b = lpad(int_str[max(pivot, 1):int_end], int_end - pivot + 1, '0')
+
+    # Parse the strings
+    val = isempty(a) ? T(0) : sign * parse(T, a)
+    if !isempty(b) && any(collect(b[2:end]) .!= '0')
+        if mode == RoundThrows
+            throw(InexactError())
+        elseif mode == RoundNearest
+            val += sign * parse_round(T, b, mode)
+        end
+    end
+
+    reinterpret(FD{T, f}, val)
+end
+
+function parse_round{T}(::Type{T}, fractional::AbstractString, ::RoundingMode{:Nearest})
+    # Note: parsing each digit individually ensures we don't run into an OverflowError
+    digits = Int8[parse(Int8, d) for d in fractional]
+    for i in length(digits):-1:2
+        if digits[i] > 5 || digits[i] == 5 && isodd(digits[i - 1])
+            if i - 1 == 1
+                return T(1)
+            else
+                digits[i - 1] += 1
+            end
+        end
+    end
+    return T(0)
 end
 
 end
