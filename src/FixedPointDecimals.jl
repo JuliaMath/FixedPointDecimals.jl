@@ -128,7 +128,7 @@ end
 # TODO: can we use floating point to speed this up? after we build a
 # correctness test suite.
 function *{T, f}(x::FD{T, f}, y::FD{T, f})
-    powt = coefficient(FD{T,f})
+    powt = coefficient(FD{T, f})
     quotient, remainder = fldmod(widemul(x.i, y.i), powt)
     reinterpret(FD{T, f}, _round_to_even(quotient, remainder, powt))
 end
@@ -139,7 +139,7 @@ end
 *{T, f}(x::FD{T, f}, y::Integer) = reinterpret(FD{T, f}, T(x.i * y))
 
 function /{T, f}(x::FD{T, f}, y::FD{T, f})
-    powt = coefficient(FD{T,f})
+    powt = coefficient(FD{T, f})
     quotient, remainder = divrem(x.i, y.i)
     reinterpret(FD{T, f}, T(widemul(quotient, powt) + round(T, remainder // y.i * powt)))
 end
@@ -147,14 +147,14 @@ end
 # These functions allow us to perform division with integers outside of the range of the
 # FixedDecimal.
 function /{T, f}(x::Integer, y::FD{T, f})
-    powt = coefficient(FD{T,f})
+    powt = coefficient(FD{T, f})
     xi, yi = widemul(x, powt), y.i
     quotient, remainder = divrem(xi, yi)
     reinterpret(FD{T, f}, T(quotient * powt + round(T, remainder // yi * powt)))
 end
 
 function /{T, f}(x::FD{T, f}, y::Integer)
-    powt = coefficient(FD{T,f})
+    powt = coefficient(FD{T, f})
     xi, yi = x.i, widemul(y, powt)
     quotient, remainder = divrem(xi, yi)
     reinterpret(FD{T, f}, T(quotient * powt + round(T, remainder // yi * powt)))
