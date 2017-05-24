@@ -142,31 +142,21 @@ end
 
 function /{T, f}(x::FD{T, f}, y::FD{T, f})
     powt = T(10)^f
-    quotient, remainder = fldmod(widemul(x.i, powt), widen(y.i))
-    reinterpret(FD{T, f}, T(_round_to_even(quotient, remainder, widen(y.i))))
+    quotient, remainder = fldmod(widemul(x.i, powt), y.i)
+    reinterpret(FD{T, f}, T(_round_to_even(quotient, remainder, y.i)))
 end
 
 # these functions are needed to avoid InexactError when converting from the integer type
 function /{T, f}(x::Integer, y::FD{T, f})
-    S = promote_type(typeof(x), T)
-    xi, yi = promote(x, y.i)
-
-    # The integer part of our result is x.i * 10^2f / y.i, so we need to
-    # double-widen to get a precise result.
-    powt = S(10)^f
+    powt = T(10)^f
     powtsq = widemul(powt, powt)
-    quotient, remainder = fldmod(widemul(widen(xi), powtsq), widen(widen(yi)))
-
-    reinterpret(FD{T, f},
-                T(_round_to_even(quotient, remainder, widen(widen(yi)))))
+    quotient, remainder = fldmod(widemul(x, powtsq), y.i)
+    reinterpret(FD{T, f}, T(_round_to_even(quotient, remainder, y.i)))
 end
 
 function /{T, f}(x::FD{T, f}, y::Integer)
-    S = promote_type(T, typeof(y))
-    xi, yi = promote(x.i, y)
-
-    quotient, remainder = fldmod(xi, yi)
-    reinterpret(FD{T, f}, T(_round_to_even(quotient, remainder, yi)))
+    quotient, remainder = fldmod(x.i, y)
+    reinterpret(FD{T, f}, T(_round_to_even(quotient, remainder, y)))
 end
 
 # integerification
