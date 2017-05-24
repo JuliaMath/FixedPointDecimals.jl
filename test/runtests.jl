@@ -101,6 +101,14 @@ end
     end
 end
 
+@testset "constructor" begin
+    @testset "invalid $T" for T in CONTAINER_TYPES
+        f = FixedPointDecimals.max_exp10(T) + 1
+        @test_throws ArgumentError reinterpret(FD{T,f}, 0)
+        @test_throws ArgumentError reinterpret(FD{T,-1}, 0)
+    end
+end
+
 @testset "conversion" begin
     @testset for x in keyvalues[FD2]
         @testset for T in [Rational{Int128}, WFD2, WFD4]
