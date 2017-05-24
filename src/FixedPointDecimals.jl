@@ -32,7 +32,7 @@ using Compat
 import Base: reinterpret, zero, one, abs, sign, ==, <, <=, +, -, /, *, div, rem, divrem,
              fld, mod, fldmod, fld1, mod1, fldmod1, isinteger, typemin, typemax,
              realmin, realmax, print, show, string, convert, parse, promote_rule, min, max,
-             trunc, round, floor, ceil, eps, float, widemul, exp10
+             trunc, round, floor, ceil, eps, float, widemul
 
 import Base.Checked: checked_mul
 
@@ -414,22 +414,6 @@ function max_exp10{T <: Integer}(::Type{T})
     end
 
     exponent - 1
-end
-
-"""
-    exp10(::Type{FD{T, f}})
-
-Compute `10^f` as an Integer without overflow. The resulting type will be an integer of type
-T or wider.
-"""
-@generated function exp10{T <: Integer, f}(::Type{FD{T, f}})
-    P = T
-    while P != BigInt && f > max_exp10(P)
-        P = widen(P)
-    end
-    quote
-        $(P(10)^f)
-    end
 end
 
 """
