@@ -74,6 +74,21 @@ if VERSION < v"0.6.0-dev.1849"
     Base.:/(x::UInt128, y::BigInt) = /(promote(x, y)...)
 end
 
+@testset "max_exp10" begin
+    @test FixedPointDecimals.max_exp10(Int8) == 2
+    @test FixedPointDecimals.max_exp10(Int64) == 18
+    @test FixedPointDecimals.max_exp10(Int128) == 38
+    @test FixedPointDecimals.max_exp10(UInt8) == 2
+    @test FixedPointDecimals.max_exp10(UInt64) == 19
+    @test FixedPointDecimals.max_exp10(UInt128) == 38
+    @test_throws MethodError FixedPointDecimals.max_exp10(BigInt)
+
+    for T in CONTAINER_TYPES
+        x = FixedPointDecimals.max_exp10(T)
+        @test T(10)^x == widen(T(10))^x
+    end
+end
+
 # ensure that the coefficient multiplied by the highest and lowest representable values of
 # the container type do not result in overflow.
 @testset "coefficient" begin

@@ -393,7 +393,19 @@ end
 The highest value of `x` which does not result in an overflow when evaluating `T(10)^x`.
 """
 function max_exp10{T <: Integer}(::Type{T})
-    length(digits(typemax(T))) - 1
+    W = widen(T)
+    type_max = W(typemax(T))
+
+    powt = one(W)
+    ten = W(10)
+    exponent = 0
+
+    while type_max > powt
+        powt *= ten
+        exponent += 1
+    end
+
+    exponent - 1
 end
 
 """
