@@ -72,17 +72,25 @@ for fn in [:trunc, :floor, :ceil]
 end
 
 """
-    FixedDecimal{I <: Integer, f::Int}
+    FixedDecimal{T <: Integer, f::Int}
 
-A fixed-point decimal type backed by integral type `I`, with `f` digits after
+A fixed-point decimal type backed by integral type `T`, with `f` digits after
 the decimal point stored.
 """
 immutable FixedDecimal{T <: Integer, f} <: Real
     i::T
 
-    # internal constructor
-    Base.reinterpret{T, f}(::Type{FixedDecimal{T, f}}, i::Integer) =
-        new{T, f}(i % T)
+    # inner constructor
+    function Base.reinterpret{T, f}(::Type{FixedDecimal{T, f}}, i::Integer)
+        if T != BigInt && 0 <= f <= max_exp10(T) || T == BigInt && f >= 0
+            new{T, f}(i % T)
+        else
+            throw(ArgumentError(
+                "Requested number of decimal places $f exceeds the max allowed for the " *
+                "storage type $T: [0, $(max_exp10(T))]"
+            ))
+        end
+    end
 end
 
 const FD = FixedDecimal
@@ -424,7 +432,13 @@ T or wider.
     end
 end
 
-coefficient{T, f}(::Type{FD{T, f}}) = exp10(FD{T, f})
+"""
+    coefficient(::Type{FD{T, f}}) -> T
+
+Compute `10^f` as an Integer without overflow. Note that overflow will not occur for any
+constructable `FD{T, f}`.
+"""
+coefficient{T, f}(::Type{FD{T, f}}) = T(10)^f
 coefficient{T, f}(fd::FD{T, f}) = coefficient(FD{T, f})
 value(fd::FD) = fd.i
 
