@@ -115,7 +115,7 @@ Round `quotient + remainder / divisor` to the nearest even integer, given that
 satisfied by the return value of `fldmod` in all cases, and the return value of
 `divrem` in cases where `divisor` is known to be positive.)
 """
-function _round_to_even(quotient, remainder, divisor)
+function _round_to_even{T <: Integer}(quotient::T, remainder::T, divisor::T)
     halfdivisor = divisor >> 1
     if iseven(divisor) && remainder == halfdivisor
         ifelse(iseven(quotient), quotient, quotient + one(quotient))
@@ -125,6 +125,7 @@ function _round_to_even(quotient, remainder, divisor)
         quotient
     end
 end
+_round_to_even(q, r, d) = _round_to_even(promote(q, r, d)...)
 
 # multiplication rounds to nearest even representation
 # TODO: can we use floating point to speed this up? after we build a
