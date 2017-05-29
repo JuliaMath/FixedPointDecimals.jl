@@ -82,7 +82,8 @@ immutable FixedDecimal{T <: Integer, f} <: Real
 
     # inner constructor
     function Base.reinterpret{T, f}(::Type{FixedDecimal{T, f}}, i::Integer)
-        if T != BigInt && 0 <= f <= max_exp10(T) || T == BigInt && f >= 0
+        n = max_exp10(T)
+        if f >= 0 && (n < 0 || f <= n)
             new{T, f}(i % T)
         else
             throw(ArgumentError(
@@ -398,9 +399,11 @@ end
 """
     max_exp10(T)
 
-The highest value of `x` which does not result in an overflow when evaluating `T(10)^x`.
+The highest value of `x` which does not result in an overflow when evaluating `T(10)^x`. For
+types of `T` that do not overflow -1 will be returned.
 """
 function max_exp10{T <: Integer}(::Type{T})
+    applicable(typemax, T) || return -1
     W = widen(T)
     type_max = W(typemax(T))
 

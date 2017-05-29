@@ -81,7 +81,7 @@ end
     @test FixedPointDecimals.max_exp10(UInt8) == 2
     @test FixedPointDecimals.max_exp10(UInt64) == 19
     @test FixedPointDecimals.max_exp10(UInt128) == 38
-    @test_throws MethodError FixedPointDecimals.max_exp10(BigInt)
+    @test FixedPointDecimals.max_exp10(BigInt) == -1
 
     for T in CONTAINER_TYPES
         x = FixedPointDecimals.max_exp10(T)
