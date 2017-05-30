@@ -53,6 +53,9 @@ const INTS = Dict(
     2.2  => "220000000000000017763568394002504646778106689453125",
     2.3  => "229999999999999982236431605997495353221893310546875"
 )
+for (k, v) in INTS
+    INTS[k] = rpad(v, 201, "0")
+end
 const smaller_than_decimal = [1.22, 1.23, 2.3]
 const bigger_than_decimal = [1.51, 2.2]
 
@@ -603,15 +606,21 @@ end
             @test trunc(FD2, x) == FD2(x - 0.01)
             @test trunc(FD3, x) == FD3(x - 0.001)
 
-            for f in 0:12
+            for f in 0:18
                 @test trunc(FD{Int64, f}, x) == parse_int(FD{Int64, f}, INTS[x])
+            end
+            for f in 0:200
+                @test trunc(FD{BigInt, f}, x) == parse_int(FD{BigInt, f}, INTS[x])
             end
         end
 
         for x in bigger_than_decimal
             exactval = FD3(x)
-            for f in 3:12
+            for f in 3:14
                 @test trunc(FD{Int64, f}, x) == exactval
+            end
+            for f in 0:18
+                @test trunc(FD{Int64, f}, x) == parse_int(FD{Int64, f}, INTS[x])
             end
         end
     end
@@ -661,7 +670,7 @@ epsi{T}(::Type{T}) = eps(T)
             @test floor(FD2, x) == FD2(x - 0.01)
             @test floor(FD3, x) == FD3(x - 0.001)
 
-            for f in 0:12
+            for f in 0:18
                 @test floor(FD{Int64, f}, x) == parse_int(FD{Int64, f}, INTS[x])
             end
 
@@ -673,7 +682,7 @@ epsi{T}(::Type{T}) = eps(T)
             @test ceil(FD2, x) == FD2(x + 0.01)
             @test ceil(FD3, x) == FD3(x + 0.001)
 
-            for f in 0:12
+            for f in 0:18
                 @test ceil(FD{Int64, f}, x) == parse_int(FD{Int64, f}, INTS[x], ceil=true)
             end
 
