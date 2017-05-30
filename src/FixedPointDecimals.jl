@@ -34,37 +34,40 @@ import Base: reinterpret, zero, one, abs, sign, ==, <, <=, +, -, /, *, div, rem,
              realmin, realmax, print, show, string, convert, parse, promote_rule, min, max,
              trunc, round, floor, ceil, eps, float, widemul
 
-const IEEEFloat = Union{Float16, Float32, Float64}
+const BitInteger = Union{Int8, UInt8, Int16, UInt16, Int32, UInt32, Int64,
+                         UInt64, Int128, UInt128}
+
+# floats that support fma and are roughly IEEE-like
+const FMAFloat = Union{Float16, Float32, Float64, BigFloat}
 
 for fn in [:trunc, :floor, :ceil]
     fnname = Symbol(fn, "mul")
 
     @eval begin
         @doc """
-            $($fnname)(x, y) :: Integer
+            $($fnname)(I, x, y) :: I
 
-        Compute `$($fn)(x * y)`. For floating point values, this function can
-        be more accurate than `$($fn)(x * y)`. The boundary behavior of this
-        function (e.g. at large values of `x`, `y`) is untested and possibly
-        incorrect.
+        Compute `$($fn)(I, x * y)`, returning the result as type `I`. For
+        floating point values, this function can be more accurate than
+        `$($fn)(x * y)`.
         """ function $fnname end
 
-        $fnname{T <: Number}(x::T, y::T) = $fn(x * y)
+        $fnname{I, T <: Number}(::Type{I}, x::T, y::T) = $fn(I, x * y)
 
-        $fnname(x::Number, y::Number) = $fnname(promote(x, y)...)
+        $fnname{I}(::Type{I}, x::Number, y::Number) = $fnname(I, promote(x, y)...)
     end
 
     if fn === :trunc
         # trunc a little different, implement in terms of floor
-        @eval function $fnname{T <: IEEEFloat}(x::T, y::T)
-            copysign(floormul(abs(x), abs(y)), x*y)
+        @eval function $fnname{I, T <: FMAFloat}(::Type{I}, x::T, y::T)
+            copysign(floormul(I, abs(x), abs(y)), x*y)
         end
     else
         # floor and ceil can be implemented the same way
-        @eval function $fnname{T <: IEEEFloat}(x::T, y::T)
+        @eval function $fnname{I, T <: FMAFloat}(::Type{I}, x::T, y::T)
             a = x * y
             b = fma(x, y, -a)
-            ifelse(isinteger(a), a + $fn(b), $fn(a))
+            $fn(I, a) + ifelse(isinteger(a), $fn(I, b), zero(I))
         end
     end
 end
@@ -190,14 +193,46 @@ function ceil{T, f}(x::FD{T, f})
     end
 end
 
+"""
+    required_precision(n::Integer)
+
+Compute the number of bits of precision needed to represent an integer exactly
+as a floating point number.
+
+This is equivalent to counting the number of bits needed to represent the
+integer, excluding any trailing zeros.
+"""
+required_precision(n::Integer) = ndigits(n, 2) - trailing_zeros(n)
+
+"""
+    _apply_exact_float(f, T, x::Real, i::Integer)
+
+Compute `f(T, x, i)::T` but avoiding possible loss of precision from an
+intermediate conversion of `i` to a floating point type by instead using a
+`BigFloat` with sufficient precision if necessary.
+"""
+function _apply_exact_float{T}(f, ::Type{T}, x::FMAFloat, i::Integer)
+    prec = required_precision(i)
+    if prec > 53
+        setprecision(BigFloat, prec) do
+            f(T, x, BigFloat(i))
+        end
+    else
+        f(T, x, Float64(i))
+    end
+end
+
+_apply_exact_float{T}(f, ::Type{T}, x::Real, i::Integer) = f(T, x, i)
+
 for fn in [:trunc, :floor, :ceil]
     @eval $fn{TI <: Integer}(::Type{TI}, x::FD)::TI = $fn(x)
 
     # round/trunc/ceil/flooring to FD; generic
-    # TODO. we may need to check overflow and boundary conditions here.
     @eval function $fn{T, f}(::Type{FD{T, f}}, x::Real)
         powt = coefficient(FD{T, f})
-        val = trunc(T, $(Symbol(fn, "mul"))(x, powt))
+        # Use machine Float64 if possible, but fall back to BigFloat if we need
+        # more precision. 4f bits suffices.
+        val = _apply_exact_float($(Symbol(fn, "mul")), T, x, powt)
         reinterpret(FD{T, f}, val)
     end
 end
