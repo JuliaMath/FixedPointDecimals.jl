@@ -1,7 +1,8 @@
 using FixedPointDecimals
-import FixedPointDecimals: FD
+import FixedPointDecimals: FD, value
 using Base.Test
 using Compat
+import Base.Checked: checked_mul
 
 @testset "FixedPointDecimals" begin
 
@@ -13,6 +14,8 @@ const FD3 = FixedDecimal{Int, 3}
 const FD4 = FixedDecimal{Int, 4}
 const WFD2 = FixedDecimal{Int128, 2}
 const WFD4 = FixedDecimal{Int128, 4}
+
+const CONTAINER_TYPES = [subtypes(Signed); subtypes(Unsigned)]
 
 # these arrays should be kept sorted manually
 const keyvalues = Dict(
@@ -64,6 +67,48 @@ function parse_int{T, f}(::Type{FD{T, f}}, val::AbstractString; ceil::Bool=false
     reinterpret(FD{T, f}, parse(T, val[1:(f + 1)]) + T(ceil))
 end
 
+# When working with typemax of Int128 or UInt128 we can run into issues.
+# https://github.com/JuliaLang/julia/pull/19779
+if VERSION < v"0.6.0-dev.1849"
+    Base.:/(x::Int128, y::BigInt)  = /(promote(x, y)...)
+    Base.:/(x::UInt128, y::BigInt) = /(promote(x, y)...)
+end
+
+@testset "max_exp10" begin
+    @test FixedPointDecimals.max_exp10(Int8) == 2
+    @test FixedPointDecimals.max_exp10(Int64) == 18
+    @test FixedPointDecimals.max_exp10(Int128) == 38
+    @test FixedPointDecimals.max_exp10(UInt8) == 2
+    @test FixedPointDecimals.max_exp10(UInt64) == 19
+    @test FixedPointDecimals.max_exp10(UInt128) == 38
+    @test FixedPointDecimals.max_exp10(BigInt) == -1
+
+    for T in CONTAINER_TYPES
+        x = FixedPointDecimals.max_exp10(T)
+        @test T(10)^x == widen(T(10))^x
+    end
+end
+
+# ensure that the coefficient multiplied by the highest and lowest representable values of
+# the container type do not result in overflow.
+@testset "coefficient" begin
+    @testset "overflow $T" for T in CONTAINER_TYPES
+        f = FixedPointDecimals.max_exp10(T)
+        powt = FixedPointDecimals.coefficient(FD{T, f})
+        @test powt % 10 == 0
+        @test checked_mul(widen(powt), typemax(T)) == widemul(powt, typemax(T))
+        @test checked_mul(widen(powt), typemin(T)) == widemul(powt, typemin(T))
+    end
+end
+
+@testset "constructor" begin
+    @testset "invalid $T" for T in CONTAINER_TYPES
+        f = FixedPointDecimals.max_exp10(T) + 1
+        @test_throws ArgumentError reinterpret(FD{T,f}, 0)
+        @test_throws ArgumentError reinterpret(FD{T,-1}, 0)
+    end
+end
+
 @testset "conversion" begin
     @testset for x in keyvalues[FD2]
         @testset for T in [Rational{Int128}, WFD2, WFD4]
@@ -76,9 +121,107 @@ end
         end
     end
 
-    @test_throws InexactError convert(FD2, FD4(0.0001))
-    @test_throws InexactError convert(FD4, typemax(FD2))
-    @test_throws InexactError convert(SFD2, typemax(FD2))
+    @testset "to float" begin
+        # Convert the rational 5//7 into a FixedDecimal with as much precision as we can
+        # without using BigInt.
+        T = Int128
+        f = FixedPointDecimals.max_exp10(T)
+        powt = FixedPointDecimals.coefficient(FD{T,f})
+        val = T(trunc(BigInt, widemul(5//7, powt)))
+
+        fd = reinterpret(FD{T,f}, val)
+        @test convert(Float64, fd) != convert(BigFloat, fd)
+        @test convert(Float64, fd) == T(val) / T(powt)
+        @test convert(BigFloat, fd) == BigInt(val) / BigInt(powt)
+    end
+
+    @testset "to rational" begin
+        fd = reinterpret(FD2, 25)
+        @test convert(Rational, fd) == 1//4
+    end
+
+    @testset "invalid" begin
+        @test_throws InexactError convert(FD2, FD4(0.0001))
+        @test_throws InexactError convert(FD4, typemax(FD2))
+        @test_throws InexactError convert(SFD2, typemax(FD2))
+        @test_throws InexactError convert(FD2, 1//3)
+        @test_throws InexactError convert(FD{Int8,1}, 1//4)
+    end
+
+    @testset "limits of $T" for T in CONTAINER_TYPES
+        max_exp = FixedPointDecimals.max_exp10(T)
+        f = max_exp
+        powt = widen(FixedPointDecimals.coefficient(FD{T,f}))
+
+        # Smallest positive integer which is out-of-bounds for the FD
+        x = max_exp - f + 1
+        oob = T(10)^(x > 0 ? x : 0)
+
+        # ideally we would just use `typemax(T)` but due to precision issues with
+        # floating-point its possible the closest float will exceed `typemax(T)`.
+        # Note: we should be doing `trunc(T, ...)` but truncating a BigFloat can be
+        # problematic (https://github.com/JuliaLang/julia/issues/21914)
+        max_int = trunc(BigInt, prevfloat(typemax(T) / powt) * powt)
+        min_int = trunc(BigInt, nextfloat(typemin(T) / powt) * powt)
+
+        @test max_int <= typemax(T)
+        @test value(convert(FD{T,f}, max_int / powt)) == max_int
+        @test min_int >= typemin(T)
+        @test value(convert(FD{T,f}, min_int / powt)) == min_int
+
+        @test convert(FD{T,f}, typemax(T) // powt) == reinterpret(FD{T,f}, typemax(T))
+        @test convert(FD{T,f}, typemin(T) // powt) == reinterpret(FD{T,f}, typemin(T))
+
+        @test_throws InexactError convert(FD{T,f}, oob)
+
+        # Converting to a floating-point
+        fd = reinterpret(FD{T,f}, typemax(T))
+        @test convert(Float32, fd)  == Float32(typemax(T) / powt)
+        @test convert(Float64, fd)  == Float64(typemax(T) / powt)
+        @test convert(BigFloat, fd) == BigInt(typemax(T)) / powt
+
+        fd = reinterpret(FD{T,f}, typemin(T))
+        @test convert(Float32, fd)  == Float32(typemin(T) / powt)
+        @test convert(Float64, fd)  == Float64(typemin(T) / powt)
+        @test convert(BigFloat, fd) == BigInt(typemin(T)) / powt
+
+        # Converting to a rational
+        fd = reinterpret(FD{T,f}, typemax(T))
+        @test convert(Rational, fd)  == typemax(T) // powt
+
+        fd = reinterpret(FD{T,f}, typemin(T))
+        @test convert(Rational, fd)  == typemin(T) // powt
+
+        # The following tests require that the number of decimal places allow for
+        # `-10 < x < 10` where x is a FD{T,f}. Needed to test `convert(::FD, ::Integer)`.
+        max_int = typemax(T) ÷ powt * powt
+        min_int = typemin(T) ÷ powt * powt
+
+        @test convert(FD{T,f}, max_int ÷ powt) == reinterpret(FD{T,f}, max_int)
+        @test convert(FD{T,f}, min_int ÷ powt) == reinterpret(FD{T,f}, min_int)
+
+        @test_throws InexactError convert(FD{T,f}, max_int ÷ powt + oob)
+        @test_throws InexactError convert(FD{T,f}, min_int ÷ powt - oob)  # Overflows with Unsigned
+    end
+
+    @testset "limits from $U to $T" for T in CONTAINER_TYPES, U in CONTAINER_TYPES
+        f = FixedPointDecimals.max_exp10(T)
+        g = FixedPointDecimals.max_exp10(U)
+        powt = div(
+            FixedPointDecimals.coefficient(FD{T, f}),
+            FixedPointDecimals.coefficient(FD{U, g}),
+        )
+
+        val = typemax(U)
+        expected = widemul(typemax(U), powt)
+
+        # Mixed usage of signed and unsigned types makes testing with typemin hard.
+        if f >= g && expected <= typemax(T)
+            @test convert(FD{T,f}, reinterpret(FD{U,g}, val)) == reinterpret(FD{T,f}, expected)
+        else
+            @test_throws InexactError convert(FD{T,f}, reinterpret(FD{U,g}, val))
+        end
+    end
 end
 
 @testset "promotion" begin
@@ -192,6 +335,21 @@ end
         @test 20 * FD{Int8,1}(0.1) == FD{Int8,1}(2.0)
         @test FD{Int8,1}(0.1) * 20 == FD{Int8,1}(2.0)
     end
+
+    @testset "limits of $T" for T in CONTAINER_TYPES
+        f = FixedPointDecimals.max_exp10(T)
+        scalar = convert(FD{T,f}, 1 // 10)  # 0.1
+
+        # Since multiply will round the result we'll make sure our value does not
+        # always rounds down.
+        max_int = typemax(T) - (typemax(T) % 10)
+        min_int = typemin(T) - (typemin(T) % 10)
+
+        @test reinterpret(FD{T,f}, max_int) * scalar ==
+            reinterpret(FD{T,f}, div(max_int, 10))
+        @test reinterpret(FD{T,f}, min_int) * scalar ==
+            reinterpret(FD{T,f}, div(min_int, 10))
+    end
 end
 
 @testset "division" begin
@@ -282,8 +440,35 @@ end
 
     @testset "without promotion" begin
         @test_throws InexactError FD{Int8,1}(20)
-        @test 20 / FD{Int8,1}(2) == FD{Int8,1}(10.0)
-        @test FD{Int8,1}(2) / 20 == FD{Int8,1}(0.1)
+        @test Int8(20) / FD{Int8,1}(2) == FD{Int8,1}(10.0)
+        @test FD{Int8,1}(2) / Int8(20) == FD{Int8,1}(0.1)
+    end
+
+    @testset "limits" begin
+        @test_throws InexactError Int8(1) / FD{Int8,2}(0.4)
+        @test_throws InexactError FD{Int8,2}(1) / FD{Int8,2}(0.4)
+    end
+
+    @testset "limits of $T" for T in CONTAINER_TYPES
+        max_exp = FixedPointDecimals.max_exp10(T)
+        f = max_exp
+        scalar = convert(FD{T,f}, 1 // 10)  # 0.1
+
+        # Should be outside of the bounds of a FD{T,f}
+        x = T(10)
+        @test_throws InexactError FD{T,f}(x)
+
+        # Since multiply will round the result we'll make sure our value always
+        # rounds down.
+        max_int = typemax(T) - (typemax(T) % 10)
+        min_int = typemin(T) - (typemin(T) % 10)
+        max_fd = reinterpret(FD{T,f}, max_int)
+        min_fd = reinterpret(FD{T,f}, min_int)
+
+        @test (max_fd * scalar) / scalar == max_fd
+        @test (min_fd * scalar) / scalar == min_fd
+        @test max_fd / x == reinterpret(FD{T,f}, div(max_int, x))
+        @test min_fd / x == reinterpret(FD{T,f}, div(min_int, x))
     end
 end
 
@@ -300,6 +485,27 @@ end
             end
             @test (abs(x) == 0) === (x == 0)
         end
+    end
+end
+
+@testset "isinteger" begin
+    # Note: Test cannot be used unless we can construct `FD{Int8,6}`
+    # @testset "overflow" begin
+    #     # Note: After overflow `Int8(10)^6 == 64`
+    #     @test !isinteger(reinterpret(FD{Int8,6}, 64))  # 0.000064
+    # end
+
+    @testset "limits of $T" for T in CONTAINER_TYPES
+        f = FixedPointDecimals.max_exp10(T)
+
+        max_fd = typemax(FD{T,f})
+        min_fd = typemin(FD{T,f})
+
+        @test !isinteger(max_fd)
+        @test isinteger(trunc(max_fd))
+
+        @test isinteger(min_fd) == (min_fd == zero(min_fd))
+        @test isinteger(trunc(min_fd))
     end
 end
 
@@ -326,6 +532,43 @@ end
         @test x - FD2(1//20) ≤ round(FD1, x) ≤ x + FD2(1//20)
         # to FD2
         @test x == round(FD2, x)
+    end
+
+    @testset "limits of $T" for T in CONTAINER_TYPES
+        f = FixedPointDecimals.max_exp10(T)
+        powt = FixedPointDecimals.coefficient(FD{T,f})
+
+        # Ideally we would just use `typemax(T)` but due to precision issues with
+        # floating-point its possible the closest float will exceed `typemax(T)`.
+        # Additionally, when the division results in a `BigFloat` we need to first truncate
+        # to a `BigInt` before we can truncate the type we want.
+        max_int = T(trunc(BigInt, prevfloat(typemax(T) / powt) * powt))
+        min_int = T(trunc(BigInt, nextfloat(typemin(T) / powt) * powt))
+
+        @test round(FD{T,f}, max_int / powt) == reinterpret(FD{T,f}, max_int)
+        @test round(FD{T,f}, min_int / powt) == reinterpret(FD{T,f}, min_int)
+
+        @test round(FD{T,f}, typemax(T) // powt) == reinterpret(FD{T,f}, typemax(T))
+        @test round(FD{T,f}, typemin(T) // powt) == reinterpret(FD{T,f}, typemin(T))
+
+        # Note: rounding away from zero will result in an exception.
+        max_int = typemax(T)
+        min_int = typemin(T)
+
+        max_dec = max_int / powt
+        min_dec = min_int / powt
+
+        if round(T, max_dec) == trunc(T, max_dec)
+            @test round(reinterpret(FD{T,f}, max_int)) == FD{T,f}(round(T, max_dec))
+        else
+            @test_throws InexactError round(reinterpret(FD{T,f}, max_int))
+        end
+
+        if round(T, min_dec) == trunc(T, min_dec)
+            @test round(reinterpret(FD{T,f}, min_int)) == FD{T,f}(round(T, min_dec))
+        else
+            @test_throws InexactError round(reinterpret(FD{T,f}, min_int))
+        end
     end
 end
 
@@ -361,8 +604,7 @@ end
             @test trunc(FD3, x) == FD3(x - 0.001)
 
             for f in 0:12
-                @test trunc(FD{Int64, f}, x) ==
-                      parse_int(FD{Int64, f}, INTS[x])
+                @test trunc(FD{Int64, f}, x) == parse_int(FD{Int64, f}, INTS[x])
             end
         end
 
@@ -372,6 +614,27 @@ end
                 @test trunc(FD{Int64, f}, x) == exactval
             end
         end
+    end
+
+    @testset "limits of $T" for T in CONTAINER_TYPES
+        f = FixedPointDecimals.max_exp10(T)
+        powt = FixedPointDecimals.coefficient(FD{T,f})
+
+        # Ideally we would just use `typemax(T)` but due to precision issues with
+        # floating-point its possible the closest float will exceed `typemax(T)`.
+        # Additionally, when the division results in a `BigFloat` we need to first
+        # truncate to a `BigInt` before we can truncate the type we want.
+        max_int = T(trunc(BigInt, prevfloat(typemax(T) / powt) * powt))
+        min_int = T(trunc(BigInt, nextfloat(typemin(T) / powt) * powt))
+
+        # floating-point inprecision makes it hard to know exactly that value to
+        # expect. Since we're primarily looking for issues relating to overflow this
+        # we can have the expected result be a little flexible.
+        @test value(trunc(FD{T,f}, max_int / powt)) in [max_int, max_int - 1]
+        @test value(trunc(FD{T,f}, min_int / powt)) in [min_int, min_int + 1]
+
+        @test trunc(reinterpret(FD{T,f}, typemax(T))) == FD{T,f}(div(typemax(T), powt))
+        @test trunc(reinterpret(FD{T,f}, typemin(T))) == FD{T,f}(div(typemin(T), powt))
     end
 end
 
@@ -399,8 +662,7 @@ epsi{T}(::Type{T}) = eps(T)
             @test floor(FD3, x) == FD3(x - 0.001)
 
             for f in 0:12
-                @test floor(FD{Int64, f}, x) ==
-                      parse_int(FD{Int64, f}, INTS[x])
+                @test floor(FD{Int64, f}, x) == parse_int(FD{Int64, f}, INTS[x])
             end
 
             @test ceil(FD3, x) == ceil(FD4, x) == FD4(x)
@@ -412,12 +674,55 @@ epsi{T}(::Type{T}) = eps(T)
             @test ceil(FD3, x) == FD3(x + 0.001)
 
             for f in 0:12
-                @test ceil(FD{Int64, f}, x) ==
-                      parse_int(FD{Int64, f}, INTS[x], ceil=true)
+                @test ceil(FD{Int64, f}, x) == parse_int(FD{Int64, f}, INTS[x], ceil=true)
             end
 
             @test floor(FD3, x) == floor(FD4, x) == FD4(x)
         end
+    end
+
+    @testset "limits of $T" for T in CONTAINER_TYPES
+        f = FixedPointDecimals.max_exp10(T)
+        powt = FixedPointDecimals.coefficient(FD{T,f})
+
+        # Ideally we would just use `typemax(T)` but due to precision issues with
+        # floating-point its possible the closest float will exceed `typemax(T)`.
+        # Additionally, when the division results in a `BigFloat` we need to first
+        # truncate to a `BigInt` before we can truncate the type we want.
+        max_int = T(trunc(BigInt, prevfloat(typemax(T) / powt) * powt))
+        min_int = T(trunc(BigInt, nextfloat(typemin(T) / powt) * powt))
+
+        max_dec = max_int / powt
+        min_dec = min_int / powt
+
+        # Note: Using a larger signed type as the max/min values may be at the
+        # limits and overflow when adding or subtracting 1.
+        @test value(floor(FD{T,f}, max_dec)) in [max_int, max_int - 1]
+        @test value(floor(FD{T,f}, min_dec)) in [min_int, signed(widen(min_int)) - 1]
+
+        @test value(ceil(FD{T,f}, max_dec)) in [max_int, signed(widen(max_int)) + 1]
+        @test value(ceil(FD{T,f}, min_dec)) in [min_int, min_int + 1]
+
+        # Note: rounding away from zero will result in an exception.
+        max_int = typemax(T)
+        min_int = typemin(T)
+
+        max_dec = max_int / powt
+        min_dec = min_int / powt
+
+        @test floor(reinterpret(FD{T,f}, max_int)) == FD{T,f}(floor(T, max_dec))
+        if floor(T, min_dec) == trunc(T, min_dec)
+            @test floor(reinterpret(FD{T,f}, min_int)) == FD{T,f}(floor(T, min_dec))
+        else
+            @test_throws InexactError floor(reinterpret(FD{T,f}, min_int))
+        end
+
+        if ceil(T, max_dec) == trunc(T, max_dec)
+            @test ceil(reinterpret(FD{T,f}, max_int)) == FD{T,f}(ceil(T, max_dec))
+        else
+            @test_throws InexactError ceil(reinterpret(FD{T,f}, max_int))
+        end
+        @test ceil(reinterpret(FD{T,f}, min_int)) == FD{T,f}(ceil(T, min_dec))
     end
 end
 
@@ -429,6 +734,25 @@ end
     @test string(FD2(-0.01)) == "-0.01"
     @test string(FD2(0)) == "0.00"
     @test string(FixedDecimal{Int,0}(123.4)) == "123"
+
+    # Displaying a decimal could be incorrect when using a decimal place precision which is
+    # close to or at the limit for our storage type.
+    @testset "limits of $T" for T in CONTAINER_TYPES
+        f = FixedPointDecimals.max_exp10(T)
+
+        function fmt(val, f)
+            str = string(val)
+            neg = ""
+            if str[1] == '-'
+                neg = "-"
+                str = str[2:end]
+            end
+            return string(neg, str[1], ".", rpad(str[2:end], f, '0'))
+        end
+
+        @test string(reinterpret(FD{T,f}, typemax(T))) == fmt(typemax(T), f)
+        @test string(reinterpret(FD{T,f}, typemin(T))) == fmt(typemin(T), f)
+    end
 end
 
 @testset "show" begin
