@@ -47,15 +47,15 @@ const keyvalues = Dict(
 # Floating point values written as integer strings. Useful for testing behaviours of
 # trunc, floor, and ceil.
 const INTS = Dict(
-    1.22 => "12199999999999999733546474089962430298328399658203125",
-    1.23 => "1229999999999999982236431605997495353221893310546875",
-    1.51 => "15100000000000000088817841970012523233890533447265625",
-    2.2  => "220000000000000017763568394002504646778106689453125",
-    2.3  => "229999999999999982236431605997495353221893310546875"
+    v => replace(@sprintf("%.200f", v), ".", "")
+    for v in [
+        1.22,
+        1.23,
+        1.51,
+        2.2,
+        2.3,
+    ]
 )
-for (k, v) in INTS
-    INTS[k] = rpad(v, 201, "0")
-end
 const smaller_than_decimal = [1.22, 1.23, 2.3]
 const bigger_than_decimal = [1.51, 2.2]
 
