@@ -4,6 +4,8 @@ using Base.Test
 using Compat
 import Base.Checked: checked_mul
 
+include("utils.jl")
+
 @testset "FixedPointDecimals" begin
 
 const SFD2 = FixedDecimal{Int16, 2}
@@ -75,6 +77,29 @@ end
 if VERSION < v"0.6.0-dev.1849"
     Base.:/(x::Int128, y::BigInt)  = /(promote(x, y)...)
     Base.:/(x::UInt128, y::BigInt) = /(promote(x, y)...)
+end
+
+# Basic tests for the methods created above
+@testset "alt" begin
+    @test trunc_alt(FD2, 0.0) == FD2(0)
+    @test floor_alt(FD2, 0.0) == FD2(0)
+    @test ceil_alt(FD2,  0.0) == FD2(0)
+
+    @test trunc_alt(FD2, 2.149) == FD2(2.14)
+    @test floor_alt(FD2, 2.149) == FD2(2.14)
+    @test ceil_alt(FD2,  2.149) == FD2(2.15)
+
+    @test trunc_alt(FD2, -2.149) == FD2(-2.14)
+    @test floor_alt(FD2, -2.149) == FD2(-2.15)
+    @test ceil_alt(FD2,  -2.149) == FD2(-2.14)
+
+    @test trunc_alt(FD2, nextfloat(0.0)) == FD2(0)
+    @test floor_alt(FD2, nextfloat(0.0)) == FD2(0)
+    @test ceil_alt(FD2,  nextfloat(0.0)) == FD2(0.01)
+
+    @test trunc_alt(FD2, prevfloat(0.0)) == FD2(0)
+    @test floor_alt(FD2, prevfloat(0.0)) == FD2(-0.01)
+    @test ceil_alt(FD2,  prevfloat(0.0)) == FD2(0)
 end
 
 @testset "max_exp10" begin
@@ -629,18 +654,13 @@ end
         f = FixedPointDecimals.max_exp10(T)
         powt = FixedPointDecimals.coefficient(FD{T,f})
 
-        # Ideally we would just use `typemax(T)` but due to precision issues with
-        # floating-point its possible the closest float will exceed `typemax(T)`.
-        # Additionally, when the division results in a `BigFloat` we need to first
-        # truncate to a `BigInt` before we can truncate the type we want.
-        max_int = T(trunc(BigInt, prevfloat(typemax(T) / powt) * powt))
-        min_int = T(trunc(BigInt, nextfloat(typemin(T) / powt) * powt))
+        # When converting from typemax to a floating-point it is possible that due to
+        # precision issues that the closest possible float will exceed the typemax.
+        max_float = prevfloat(convert(AbstractFloat, typemax(FD{T,f})))
+        min_float = nextfloat(convert(AbstractFloat, typemin(FD{T,f})))
 
-        # floating-point inprecision makes it hard to know exactly that value to
-        # expect. Since we're primarily looking for issues relating to overflow this
-        # we can have the expected result be a little flexible.
-        @test value(trunc(FD{T,f}, max_int / powt)) in [max_int, max_int - 1]
-        @test value(trunc(FD{T,f}, min_int / powt)) in [min_int, min_int + 1]
+        @test trunc(FD{T,f}, max_float) == trunc_alt(FD{T,f}, max_float)
+        @test trunc(FD{T,f}, min_float) == trunc_alt(FD{T,f}, min_float)
 
         @test trunc(reinterpret(FD{T,f}, typemax(T))) == FD{T,f}(div(typemax(T), powt))
         @test trunc(reinterpret(FD{T,f}, typemin(T))) == FD{T,f}(div(typemin(T), powt))
@@ -694,23 +714,16 @@ epsi{T}(::Type{T}) = eps(T)
         f = FixedPointDecimals.max_exp10(T)
         powt = FixedPointDecimals.coefficient(FD{T,f})
 
-        # Ideally we would just use `typemax(T)` but due to precision issues with
-        # floating-point its possible the closest float will exceed `typemax(T)`.
-        # Additionally, when the division results in a `BigFloat` we need to first
-        # truncate to a `BigInt` before we can truncate the type we want.
-        max_int = T(trunc(BigInt, prevfloat(typemax(T) / powt) * powt))
-        min_int = T(trunc(BigInt, nextfloat(typemin(T) / powt) * powt))
+        # When converting from typemax to a floating-point it is possible that due to
+        # precision issues that the closest possible float will exceed the typemax.
+        max_float = prevfloat(convert(AbstractFloat, typemax(FD{T,f})))
+        min_float = nextfloat(convert(AbstractFloat, typemin(FD{T,f})))
 
-        max_dec = max_int / powt
-        min_dec = min_int / powt
+        @test floor(FD{T,f}, max_float) == floor_alt(FD{T,f}, max_float)
+        @test floor(FD{T,f}, min_float) == floor_alt(FD{T,f}, min_float)
 
-        # Note: Using a larger signed type as the max/min values may be at the
-        # limits and overflow when adding or subtracting 1.
-        @test value(floor(FD{T,f}, max_dec)) in [max_int, max_int - 1]
-        @test value(floor(FD{T,f}, min_dec)) in [min_int, signed(widen(min_int)) - 1]
-
-        @test value(ceil(FD{T,f}, max_dec)) in [max_int, signed(widen(max_int)) + 1]
-        @test value(ceil(FD{T,f}, min_dec)) in [min_int, min_int + 1]
+        @test ceil(FD{T,f}, max_float) == ceil_alt(FD{T,f}, max_float)
+        @test ceil(FD{T,f}, min_float) == ceil_alt(FD{T,f}, min_float)
 
         # Note: rounding away from zero will result in an exception.
         max_int = typemax(T)
