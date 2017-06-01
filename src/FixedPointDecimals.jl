@@ -42,6 +42,7 @@ const FMAFloat = Union{Float16, Float32, Float64, BigFloat}
 
 for fn in [:trunc, :floor, :ceil]
     fnname = Symbol(fn, "mul")
+    opp_fn = fn == :floor ? :ceil : :floor
 
     @eval begin
         @doc """
@@ -67,7 +68,11 @@ for fn in [:trunc, :floor, :ceil]
         @eval function $fnname{I, T <: FMAFloat}(::Type{I}, x::T, y::T)
             a = x * y
             b = fma(x, y, -a)
-            $fn(I, a) + ifelse(isinteger(a), $fn(I, b), zero(I))
+            if signbit(b)
+                $fn(I, a) - (isinteger(a) ? $opp_fn(I, abs(b)) : zero(I))
+            else
+                $fn(I, a) + (isinteger(a) ? $fn(I, abs(b)) : zero(I))
+            end
         end
     end
 end
