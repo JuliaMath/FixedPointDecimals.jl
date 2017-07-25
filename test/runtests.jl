@@ -72,13 +72,6 @@ function parse_int{T, f}(::Type{FD{T, f}}, val::AbstractString; ceil::Bool=false
     reinterpret(FD{T, f}, parse(T, val[1:(f + 1)]) + T(ceil))
 end
 
-# When working with typemax of Int128 or UInt128 we can run into issues.
-# https://github.com/JuliaLang/julia/pull/19779
-if VERSION < v"0.6.0-dev.1849"
-    Base.:/(x::Int128, y::BigInt)  = /(promote(x, y)...)
-    Base.:/(x::UInt128, y::BigInt) = /(promote(x, y)...)
-end
-
 # Basic tests for the methods created above
 @testset "alt" begin
     @test trunc_alt(FD2, 0.0) == FD2(0)
