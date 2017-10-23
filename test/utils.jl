@@ -19,7 +19,7 @@ function integer_alt{T<:Integer}(::Type{T}, dp::Integer, val::AbstractFloat)
     # perform any rounding.
     str = float_string(val)
     sign = T(first(str) == '-' ? -1 : 1)
-    decimal = findfirst(str, '.')
+    decimal = findfirst(equalto('.'), str)
     int_start = sign < 0 ? 2 : 1
     int_end = decimal + dp
     v = parse(T, str[int_start:(decimal - 1)] * str[(decimal + 1):int_end])

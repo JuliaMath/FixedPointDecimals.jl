@@ -380,7 +380,7 @@ function parse{T, f}(::Type{FD{T, f}}, str::AbstractString, mode::RoundingMode=R
     end
 
     # Parse exponent information
-    exp_index = findfirst(str, 'e')
+    exp_index = findfirst(equalto('e'), str)
     if exp_index > 0
         exp = parse(Int, str[(exp_index + 1):end])
         sig_end = exp_index - 1
@@ -391,7 +391,7 @@ function parse{T, f}(::Type{FD{T, f}}, str::AbstractString, mode::RoundingMode=R
 
     # Remove the decimal place from the string
     sign = T(first(str) == '-' ? -1 : 1)
-    dec_index = findfirst(str, '.')
+    dec_index = findfirst(equalto('.'), str)
     sig_start = sign < 0 ? 2 : 1
     if dec_index > 0
         int_str = str[sig_start:(dec_index - 1)] * str[(dec_index + 1):sig_end]
