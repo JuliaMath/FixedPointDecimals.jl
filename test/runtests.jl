@@ -1,7 +1,8 @@
 using FixedPointDecimals
 import FixedPointDecimals: FD, value
 using Compat
-using Compat.Test
+VERSION < v"0.7.0-DEV.2047" && import Compat: Test
+using Test
 import Base.Checked: checked_mul
 
 include("utils.jl")
