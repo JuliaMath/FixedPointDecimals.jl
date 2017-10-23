@@ -66,7 +66,7 @@ islarge(x) = x == typemin(x) || abs(x) > 1000
 # numbers that can never cause overflow
 issmall(x) = -1 < x ≤ 1
 
-function parse_int{T, f}(::Type{FD{T, f}}, val::AbstractString; ceil::Bool=false)
+function parse_int(::Type{FD{T, f}}, val::AbstractString; ceil::Bool=false) where {T, f}
     reinterpret(FD{T, f}, parse(T, val[1:(f + 1)]) + T(ceil))
 end
 
@@ -661,8 +661,8 @@ end
 end
 
 # eps that works for integers too
-epsi{T <: Integer}(::Type{T})::T = 1
-epsi{T}(::Type{T}) = eps(T)
+epsi(::Type{T}) where T <: Integer = one(T)::T
+epsi(::Type{T}) where T = eps(T)
 
 @testset "floor, ceil" begin
     @testset for x in filter(!islarge, keyvalues[FD2])

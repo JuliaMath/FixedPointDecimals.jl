@@ -53,19 +53,19 @@ for fn in [:trunc, :floor, :ceil]
         `$($fn)(x * y)`.
         """ function $fnname end
 
-        $fnname{I, T <: Number}(::Type{I}, x::T, y::T) = $fn(I, x * y)
+        $fnname(::Type{I}, x::T, y::T) where {I, T <: Number} = $fn(I, x * y)
 
-        $fnname{I}(::Type{I}, x::Number, y::Number) = $fnname(I, promote(x, y)...)
+        $fnname(::Type{I}, x::Number, y::Number) where I = $fnname(I, promote(x, y)...)
     end
 
     if fn === :trunc
         # trunc a little different, implement in terms of floor
-        @eval function $fnname{I, T <: FMAFloat}(::Type{I}, x::T, y::T)
+        @eval function $fnname(::Type{I}, x::T, y::T) where {I, T <: FMAFloat}
             copysign(floormul(I, abs(x), abs(y)), x*y)
         end
     else
         # floor and ceil can be implemented the same way
-        @eval function $fnname{I, T <: FMAFloat}(::Type{I}, x::T, y::T)
+        @eval function $fnname(::Type{I}, x::T, y::T) where {I, T <: FMAFloat}
             a = x * y
             b = fma(x, y, -a)
             if signbit(b)
@@ -87,7 +87,7 @@ immutable FixedDecimal{T <: Integer, f} <: Real
     i::T
 
     # inner constructor
-    function Base.reinterpret{T, f}(::Type{FixedDecimal{T, f}}, i::Integer)
+    function Base.reinterpret(::Type{FixedDecimal{T, f}}, i::Integer) where {T, f}
         n = max_exp10(T)
         if f >= 0 && (n < 0 || f <= n)
             new{T, f}(i % T)
@@ -102,23 +102,23 @@ end
 
 const FD = FixedDecimal
 
-floattype{T<:Union{Int8, UInt8, Int16, UInt16}, f}(::Type{FD{T, f}}) = Float32
-floattype{T<:Integer, f}(::Type{FD{T, f}}) = Float64
-floattype{f}(::Type{FD{BigInt, f}}) = BigFloat
+floattype(::Type{FD{T, f}}) where {T<:Union{Int8, UInt8, Int16, UInt16}, f} = Float32
+floattype(::Type{FD{T, f}}) where {T<:Integer, f} = Float64
+floattype(::Type{FD{T, f}}) where {T<:BigInt, f} = BigFloat
 
 # basic operators
--{T, f}(x::FD{T, f}) = reinterpret(FD{T, f}, -x.i)
-abs{T, f}(x::FD{T, f}) = reinterpret(FD{T, f}, abs(x.i))
+-(x::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, -x.i)
+abs(x::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, abs(x.i))
 
-+{T, f}(x::FD{T, f}, y::FD{T, f}) = reinterpret(FD{T, f}, x.i+y.i)
--{T, f}(x::FD{T, f}, y::FD{T, f}) = reinterpret(FD{T, f}, x.i-y.i)
++(x::FD{T, f}, y::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, x.i+y.i)
+-(x::FD{T, f}, y::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, x.i-y.i)
 
 # wide multiplication
-Base.@pure function widemul{T, f, U, g}(x::FD{T, f}, y::FD{U, g})
+Base.@pure function widemul(x::FD{<:Any, f}, y::FD{<:Any, g}) where {f, g}
     i = widemul(x.i, y.i)
     reinterpret(FD{typeof(i), f + g}, i)
 end
-Base.@pure function widemul{T, f}(x::FD{T, f}, y::Integer)
+Base.@pure function widemul(x::FD{T, f}, y::Integer) where {T, f}
     i = widemul(x.i, y)
     reinterpret(FD{typeof(i), f}, i)
 end
@@ -132,7 +132,7 @@ Round `quotient + remainder / divisor` to the nearest even integer, given that
 satisfied by the return value of `fldmod` in all cases, and the return value of
 `divrem` in cases where `divisor` is known to be positive.)
 """
-function _round_to_even{T <: Integer}(quotient::T, remainder::T, divisor::T)
+function _round_to_even(quotient::T, remainder::T, divisor::T) where {T <: Integer}
     halfdivisor = divisor >> 1
     if iseven(divisor) && remainder == halfdivisor
         ifelse(iseven(quotient), quotient, quotient + one(quotient))
@@ -147,7 +147,7 @@ _round_to_even(q, r, d) = _round_to_even(promote(q, r, d)...)
 # multiplication rounds to nearest even representation
 # TODO: can we use floating point to speed this up? after we build a
 # correctness test suite.
-function *{T, f}(x::FD{T, f}, y::FD{T, f})
+function *(x::FD{T, f}, y::FD{T, f}) where {T, f}
     powt = coefficient(FD{T, f})
     quotient, remainder = fldmod(widemul(x.i, y.i), powt)
     reinterpret(FD{T, f}, _round_to_even(quotient, remainder, powt))
@@ -155,10 +155,10 @@ end
 
 # these functions are needed to avoid InexactError when converting from the
 # integer type
-*{T, f}(x::Integer, y::FD{T, f}) = reinterpret(FD{T, f}, T(x * y.i))
-*{T, f}(x::FD{T, f}, y::Integer) = reinterpret(FD{T, f}, T(x.i * y))
+*(x::Integer, y::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, T(x * y.i))
+*(x::FD{T, f}, y::Integer) where {T, f} = reinterpret(FD{T, f}, T(x.i * y))
 
-function /{T, f}(x::FD{T, f}, y::FD{T, f})
+function /(x::FD{T, f}, y::FD{T, f}) where {T, f}
     powt = coefficient(FD{T, f})
     quotient, remainder = fldmod(widemul(x.i, powt), y.i)
     reinterpret(FD{T, f}, T(_round_to_even(quotient, remainder, y.i)))
@@ -166,29 +166,29 @@ end
 
 # These functions allow us to perform division with integers outside of the range of the
 # FixedDecimal.
-function /{T, f}(x::Integer, y::FD{T, f})
+function /(x::Integer, y::FD{T, f}) where {T, f}
     powt = coefficient(FD{T, f})
     powtsq = widemul(powt, powt)
     quotient, remainder = fldmod(widemul(x, powtsq), y.i)
     reinterpret(FD{T, f}, T(_round_to_even(quotient, remainder, y.i)))
 end
 
-function /{T, f}(x::FD{T, f}, y::Integer)
+function /(x::FD{T, f}, y::Integer) where {T, f}
     quotient, remainder = fldmod(x.i, y)
     reinterpret(FD{T, f}, T(_round_to_even(quotient, remainder, y)))
 end
 
 # integerification
-trunc{T, f}(x::FD{T, f}) = FD{T, f}(div(x.i, coefficient(FD{T, f})))
-floor{T, f}(x::FD{T, f}) = FD{T, f}(fld(x.i, coefficient(FD{T, f})))
+trunc(x::FD{T, f}) where {T, f} = FD{T, f}(div(x.i, coefficient(FD{T, f})))
+floor(x::FD{T, f}) where {T, f} = FD{T, f}(fld(x.i, coefficient(FD{T, f})))
 
 # TODO: round with number of digits; should be easy
-function round{T, f}(x::FD{T, f}, ::RoundingMode{:Nearest}=RoundNearest)
+function round(x::FD{T, f}, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
     powt = coefficient(FD{T, f})
     quotient, remainder = fldmod(x.i, powt)
     FD{T, f}(_round_to_even(quotient, remainder, powt))
 end
-function ceil{T, f}(x::FD{T, f})
+function ceil(x::FD{T, f}) where {T, f}
     powt = coefficient(FD{T, f})
     quotient, remainder = fldmod(x.i, powt)
     if remainder > 0
@@ -216,7 +216,7 @@ Compute `f(T, x, i)::T` but avoiding possible loss of precision from an
 intermediate conversion of `i` to a floating point type by instead using a
 `BigFloat` with sufficient precision if necessary.
 """
-function _apply_exact_float{T}(f, ::Type{T}, x::FMAFloat, i::Integer)
+function _apply_exact_float(f, ::Type{T}, x::FMAFloat, i::Integer) where T
     prec = required_precision(i)
     if prec > 53
         setprecision(BigFloat, prec) do
@@ -227,13 +227,13 @@ function _apply_exact_float{T}(f, ::Type{T}, x::FMAFloat, i::Integer)
     end
 end
 
-_apply_exact_float{T}(f, ::Type{T}, x::Real, i::Integer) = f(T, x, i)
+_apply_exact_float(f, ::Type{T}, x::Real, i::Integer) where T = f(T, x, i)
 
 for fn in [:trunc, :floor, :ceil]
-    @eval ($fn{TI <: Integer}(::Type{TI}, x::FD)::TI) = $fn(x)
+    @eval ($fn(::Type{TI}, x::FD)::TI) where {TI <: Integer} = $fn(x)
 
     # round/trunc/ceil/flooring to FD; generic
-    @eval function $fn{T, f}(::Type{FD{T, f}}, x::Real)
+    @eval function $fn(::Type{FD{T, f}}, x::Real) where {T, f}
         powt = coefficient(FD{T, f})
         # Use machine Float64 if possible, but fall back to BigFloat if we need
         # more precision. 4f bits suffices.
@@ -241,31 +241,31 @@ for fn in [:trunc, :floor, :ceil]
         reinterpret(FD{T, f}, val)
     end
 end
-function round{TI <: Integer}(::Type{TI}, x::FD, ::RoundingMode{:Nearest}=RoundNearest)
+function round(::Type{TI}, x::FD, ::RoundingMode{:Nearest}=RoundNearest) where {TI <: Integer}
     convert(TI, round(x))::TI
 end
-function round{T, f}(::Type{FD{T, f}}, x::Real, ::RoundingMode{:Nearest}=RoundNearest)
+function round(::Type{FD{T, f}}, x::Real, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
     reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
 end
 
 # needed to avoid ambiguity
-function round{T, f}(::Type{FD{T, f}}, x::Rational, ::RoundingMode{:Nearest}=RoundNearest)
+function round(::Type{FD{T, f}}, x::Rational, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
     reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
 end
 
 # conversions and promotions
-function convert{T, f}(::Type{FD{T, f}}, x::Integer)
+function convert(::Type{FD{T, f}}, x::Integer) where {T, f}
     reinterpret(FD{T, f}, T(widemul(x, coefficient(FD{T, f}))))
 end
 
-convert{T <: FD}(::Type{T}, x::AbstractFloat) = round(T, x)
+convert(::Type{T}, x::AbstractFloat) where {T <: FD} = round(T, x)
 
-function convert{T, f}(::Type{FD{T, f}}, x::Rational)
+function convert(::Type{FD{T, f}}, x::Rational) where {T, f}
     powt = coefficient(FD{T, f})
     reinterpret(FD{T, f}, T(x * powt))::FD{T, f}
 end
 
-function convert{T, f, U, g}(::Type{FD{T, f}}, x::FD{U, g})
+function convert(::Type{FD{T, f}}, x::FD{U, g}) where {T, f, U, g}
     if f ≥ g
         # Compute `10^(f - g)` without overflow
         powt = div(coefficient(FD{T, f}), coefficient(FD{U, g}))
@@ -283,58 +283,59 @@ function convert{T, f, U, g}(::Type{FD{T, f}}, x::FD{U, g})
 end
 
 for remfn in [:rem, :mod, :mod1, :min, :max]
-    @eval $remfn{T <: FD}(x::T, y::T) = reinterpret(T, $remfn(x.i, y.i))
+    @eval $remfn(x::T, y::T) where {T <: FD} = reinterpret(T, $remfn(x.i, y.i))
 end
 for divfn in [:div, :fld, :fld1]
-    @eval $divfn{T <: FD}(x::T, y::T) = $divfn(x.i, y.i)
+    @eval $divfn(x::T, y::T) where {T <: FD} = $divfn(x.i, y.i)
 end
 
 convert(::Type{AbstractFloat}, x::FD) = convert(floattype(typeof(x)), x)
-function convert{TF <: AbstractFloat, T, f}(::Type{TF}, x::FD{T, f})
+function convert(::Type{TF}, x::FD{T, f}) where {TF <: AbstractFloat, T, f}
     convert(TF, x.i / coefficient(FD{T, f}))::TF
 end
 
-function convert{TF <: BigFloat, T, f}(::Type{TF}, x::FD{T, f})
+function convert(::Type{TF}, x::FD{T, f}) where {TF <: BigFloat, T, f}
     convert(TF, BigInt(x.i) / BigInt(coefficient(FD{T, f})))::TF
 end
 
-function convert{TI <: Integer, T, f}(::Type{TI}, x::FD{T, f})
+function convert(::Type{TI}, x::FD{T, f}) where {TI <: Integer, T, f}
     isinteger(x) || throw(InexactError(:convert, TI, x))
     convert(TI, div(x.i, coefficient(FD{T, f})))::TI
 end
 
-function convert{TR <: Rational, T, f}(::Type{TR}, x::FD{T, f})
+function convert(::Type{TR}, x::FD{T, f}) where {TR <: Rational, T, f}
     convert(TR, x.i // coefficient(FD{T, f}))::TR
 end
 
-promote_rule{T, f, TI <: Integer}(::Type{FD{T, f}}, ::Type{TI}) = FD{T, f}
-promote_rule{T, f, TF <: AbstractFloat}(::Type{FD{T, f}}, ::Type{TF}) = TF
-promote_rule{T, f, TR}(::Type{FD{T, f}}, ::Type{Rational{TR}}) = Rational{TR}
+promote_rule(::Type{FD{T, f}}, ::Type{<:Integer}) where {T, f} = FD{T, f}
+promote_rule(::Type{<:FD}, ::Type{TF}) where {TF <: AbstractFloat} = TF
+promote_rule(::Type{<:FD}, ::Type{Rational{TR}}) where {TR} = Rational{TR}
 
 # TODO: decide if these are the right semantics;
 # right now we pick the bigger int type and the bigger decimal point
-Base.@pure promote_rule{T, f, U, g}(::Type{FD{T, f}}, ::Type{FD{U, g}}) =
+Base.@pure function promote_rule(::Type{FD{T, f}}, ::Type{FD{U, g}}) where {T, f, U, g}
     FD{promote_type(T, U), max(f, g)}
+end
 
 # comparison
-=={T <: FD}(x::T, y::T) = x.i == y.i
- <{T <: FD}(x::T, y::T) = x.i  < y.i
-<={T <: FD}(x::T, y::T) = x.i <= y.i
+==(x::T, y::T) where {T <: FD} = x.i == y.i
+ <(x::T, y::T) where {T <: FD} = x.i  < y.i
+<=(x::T, y::T) where {T <: FD} = x.i <= y.i
 
 # predicates and traits
-isinteger{T, f}(x::FD{T, f}) = rem(x.i, coefficient(FD{T, f})) == 0
-typemin{T, f}(::Type{FD{T, f}}) = reinterpret(FD{T, f}, typemin(T))
-typemax{T, f}(::Type{FD{T, f}}) = reinterpret(FD{T, f}, typemax(T))
-eps{T <: FD}(::Type{T}) = reinterpret(T, 1)
+isinteger(x::FD{T, f}) where {T, f} = rem(x.i, coefficient(FD{T, f})) == 0
+typemin(::Type{FD{T, f}}) where {T, f} = reinterpret(FD{T, f}, typemin(T))
+typemax(::Type{FD{T, f}}) where {T, f}= reinterpret(FD{T, f}, typemax(T))
+eps(::Type{T}) where {T <: FD} = reinterpret(T, 1)
 eps(x::FD) = eps(typeof(x))
-realmin{T <: FD}(::Type{T}) = eps(T)
-realmax{T <: FD}(::Type{T}) = typemax(T)
+realmin(::Type{T}) where {T <: FD} = eps(T)
+realmax(::Type{T}) where {T <: FD} = typemax(T)
 
 # printing
-function print{T}(io::IO, x::FD{T, 0})
+function print(io::IO, x::FD{T, 0}) where T
     print(io, x.i)
 end
-function print{T, f}(io::IO, x::FD{T, f})
+function print(io::IO, x::FD{T, f}) where {T, f}
     iscompact = get(io, :compact, false)
 
     # note: a is negative if x.i == typemin(x.i)
@@ -356,7 +357,7 @@ function print{T, f}(io::IO, x::FD{T, f})
     print(io, integer, '.', fractionchars)
 end
 
-function show{T, f}(io::IO, x::FD{T, f})
+function show(io::IO, x::FD{T, f}) where {T, f}
     iscompact = get(io, :compact, false)
     if !iscompact
         print(io, "FixedDecimal{$T,$f}(")
@@ -376,7 +377,7 @@ Raises an `InexactError` if any rounding is necessary.
 """
 const RoundThrows = RoundingMode{:Throw}()
 
-function parse{T, f}(::Type{FD{T, f}}, str::AbstractString, mode::RoundingMode=RoundNearest)
+function parse(::Type{FD{T, f}}, str::AbstractString, mode::RoundingMode=RoundNearest) where {T, f}
     if !(mode in [RoundThrows, RoundNearest, RoundToZero])
         throw(ArgumentError("Unhandled rounding mode $mode"))
     end
@@ -423,7 +424,7 @@ function parse{T, f}(::Type{FD{T, f}}, str::AbstractString, mode::RoundingMode=R
     reinterpret(FD{T, f}, val)
 end
 
-function parse_round{T}(::Type{T}, fractional::AbstractString, ::RoundingMode{:Nearest})
+function parse_round(::Type{T}, fractional::AbstractString, ::RoundingMode{:Nearest}) where T
     # Note: parsing each digit individually ensures we don't run into an OverflowError
     digits = Int8[parse(Int8, d) for d in fractional]
     for i in length(digits):-1:2
@@ -445,7 +446,7 @@ end
 The highest value of `x` which does not result in an overflow when evaluating `T(10)^x`. For
 types of `T` that do not overflow -1 will be returned.
 """
-function max_exp10{T <: Integer}(::Type{T})
+function max_exp10(::Type{T}) where {T <: Integer}
     applicable(typemax, T) || return -1
     W = widen(T)
     type_max = W(typemax(T))
@@ -468,8 +469,8 @@ end
 Compute `10^f` as an Integer without overflow. Note that overflow will not occur for any
 constructable `FD{T, f}`.
 """
-coefficient{T, f}(::Type{FD{T, f}}) = T(10)^f
-coefficient{T, f}(fd::FD{T, f}) = coefficient(FD{T, f})
+coefficient(::Type{FD{T, f}}) where {T, f} = T(10)^f
+coefficient(fd::FD{T, f}) where {T, f} = coefficient(FD{T, f})
 value(fd::FD) = fd.i
 
 end

@@ -14,7 +14,7 @@ end
 # primarily use the string representation of the floating-point. These `*_alt` methods exist
 # to ensure the accuracy of the packages mathematical methods for trunc, floor, and ceil.
 
-function integer_alt{T<:Integer}(::Type{T}, dp::Integer, val::AbstractFloat)
+function integer_alt(::Type{T}, dp::Integer, val::AbstractFloat) where {T<:Integer}
     # Note: Use a precision larger than the value can represent so that `sprintf` doesn't
     # perform any rounding.
     str = float_string(val)
@@ -27,17 +27,17 @@ function integer_alt{T<:Integer}(::Type{T}, dp::Integer, val::AbstractFloat)
     return (sign, v, r)
 end
 
-function trunc_alt{T<:Integer,f}(::Type{FD{T,f}}, val::AbstractFloat)
+function trunc_alt(::Type{FD{T,f}}, val::AbstractFloat) where {T<:Integer, f}
     s, v, r = integer_alt(T, f, val)
     reinterpret(FD{T,f}, copysign(v, s))
 end
 
-function floor_alt{T<:Integer,f}(::Type{FD{T,f}}, val::AbstractFloat)
+function floor_alt(::Type{FD{T,f}}, val::AbstractFloat) where {T<:Integer, f}
     s, v, r = integer_alt(T, f, val)
     reinterpret(FD{T,f}, copysign(v + (s < 0 ? r : zero(T)), s))
 end
 
-function ceil_alt{T<:Integer,f}(::Type{FD{T,f}}, val::AbstractFloat)
+function ceil_alt(::Type{FD{T,f}}, val::AbstractFloat) where {T<:Integer, f}
     s, v, r = integer_alt(T, f, val)
     reinterpret(FD{T,f}, copysign(v + (s > 0 ? r : zero(T)), s))
 end
