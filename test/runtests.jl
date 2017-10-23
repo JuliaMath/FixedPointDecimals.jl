@@ -6,8 +6,6 @@ import Base.Checked: checked_mul
 
 include("utils.jl")
 
-@testset "FixedPointDecimals" begin
-
 const SFD2 = FixedDecimal{Int16, 2}
 const SFD4 = FixedDecimal{Int16, 4}
 const FD1 = FixedDecimal{Int, 1}
@@ -71,6 +69,8 @@ issmall(x) = -1 < x ≤ 1
 function parse_int{T, f}(::Type{FD{T, f}}, val::AbstractString; ceil::Bool=false)
     reinterpret(FD{T, f}, parse(T, val[1:(f + 1)]) + T(ceil))
 end
+
+@testset "FixedPointDecimals" begin
 
 # Basic tests for the methods created above
 @testset "alt" begin
