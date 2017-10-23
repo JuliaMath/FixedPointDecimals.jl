@@ -83,7 +83,7 @@ end
 A fixed-point decimal type backed by integral type `T`, with `f` digits after
 the decimal point stored.
 """
-immutable FixedDecimal{T <: Integer, f} <: Real
+struct FixedDecimal{T <: Integer, f} <: Real
     i::T
 
     # inner constructor
