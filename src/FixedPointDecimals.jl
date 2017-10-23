@@ -230,7 +230,7 @@ end
 _apply_exact_float{T}(f, ::Type{T}, x::Real, i::Integer) = f(T, x, i)
 
 for fn in [:trunc, :floor, :ceil]
-    @eval $fn{TI <: Integer}(::Type{TI}, x::FD)::TI = $fn(x)
+    @eval ($fn{TI <: Integer}(::Type{TI}, x::FD)::TI) = $fn(x)
 
     # round/trunc/ceil/flooring to FD; generic
     @eval function $fn{T, f}(::Type{FD{T, f}}, x::Real)
@@ -241,8 +241,8 @@ for fn in [:trunc, :floor, :ceil]
         reinterpret(FD{T, f}, val)
     end
 end
-function round{TI <: Integer}(::Type{TI}, x::FD, ::RoundingMode{:Nearest}=RoundNearest)::TI
-    round(x)
+function round{TI <: Integer}(::Type{TI}, x::FD, ::RoundingMode{:Nearest}=RoundNearest)
+    convert(TI, round(x))::TI
 end
 function round{T, f}(::Type{FD{T, f}}, x::Real, ::RoundingMode{:Nearest}=RoundNearest)
     reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
@@ -260,9 +260,9 @@ end
 
 convert{T <: FD}(::Type{T}, x::AbstractFloat) = round(T, x)
 
-function convert{T, f}(::Type{FD{T, f}}, x::Rational)::FD{T, f}
+function convert{T, f}(::Type{FD{T, f}}, x::Rational)
     powt = coefficient(FD{T, f})
-    reinterpret(FD{T, f}, T(x * powt))
+    reinterpret(FD{T, f}, T(x * powt))::FD{T, f}
 end
 
 function convert{T, f, U, g}(::Type{FD{T, f}}, x::FD{U, g})
@@ -290,20 +290,22 @@ for divfn in [:div, :fld, :fld1]
 end
 
 convert(::Type{AbstractFloat}, x::FD) = convert(floattype(typeof(x)), x)
-function convert{TF <: AbstractFloat, T, f}(::Type{TF}, x::FD{T, f})::TF
-    x.i / coefficient(FD{T, f})
+function convert{TF <: AbstractFloat, T, f}(::Type{TF}, x::FD{T, f})
+    convert(TF, x.i / coefficient(FD{T, f}))::TF
 end
 
-function convert{TF <: BigFloat, T, f}(::Type{TF}, x::FD{T, f})::TF
-    BigInt(x.i) / BigInt(coefficient(FD{T, f}))
+function convert{TF <: BigFloat, T, f}(::Type{TF}, x::FD{T, f})
+    convert(TF, BigInt(x.i) / BigInt(coefficient(FD{T, f})))::TF
 end
 
-function convert{TI <: Integer, T, f}(::Type{TI}, x::FD{T, f})::TI
+function convert{TI <: Integer, T, f}(::Type{TI}, x::FD{T, f})
     isinteger(x) || throw(InexactError(:convert, TI, x))
-    div(x.i, coefficient(FD{T, f}))
+    convert(TI, div(x.i, coefficient(FD{T, f})))::TI
 end
 
-convert{TR <: Rational, T, f}(::Type{TR}, x::FD{T, f})::TR = x.i // coefficient(FD{T, f})
+function convert{TR <: Rational, T, f}(::Type{TR}, x::FD{T, f})
+    convert(TR, x.i // coefficient(FD{T, f}))::TR
+end
 
 promote_rule{T, f, TI <: Integer}(::Type{FD{T, f}}, ::Type{TI}) = FD{T, f}
 promote_rule{T, f, TF <: AbstractFloat}(::Type{FD{T, f}}, ::Type{TF}) = TF
