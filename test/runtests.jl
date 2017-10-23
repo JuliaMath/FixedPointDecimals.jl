@@ -17,7 +17,7 @@ const FD4 = FixedDecimal{Int, 4}
 const WFD2 = FixedDecimal{Int128, 2}
 const WFD4 = FixedDecimal{Int128, 4}
 
-const CONTAINER_TYPES = [subtypes(Signed); subtypes(Unsigned)]
+const CONTAINER_TYPES = Base.BitInteger_types  # Integer concrete subtypes which are bits
 
 # these arrays should be kept sorted manually
 const keyvalues = Dict(
