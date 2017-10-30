@@ -277,7 +277,7 @@ function convert{T, f, U, g}(::Type{FD{T, f}}, x::FD{U, g})
         if r == 0
             reinterpret(FD{T, f}, T(q))
         else
-            throw(InexactError())
+            throw(InexactError(:convert, FD{T, f}, x))
         end
     end
 end
@@ -299,7 +299,7 @@ function convert{TF <: BigFloat, T, f}(::Type{TF}, x::FD{T, f})::TF
 end
 
 function convert{TI <: Integer, T, f}(::Type{TI}, x::FD{T, f})::TI
-    isinteger(x) || throw(InexactError())
+    isinteger(x) || throw(InexactError(:convert, TI, x))
     div(x.i, coefficient(FD{T, f}))
 end
 
@@ -380,7 +380,7 @@ function parse{T, f}(::Type{FD{T, f}}, str::AbstractString, mode::RoundingMode=R
     end
 
     # Parse exponent information
-    exp_index = findfirst(str, 'e')
+    exp_index = findfirst(equalto('e'), str)
     if exp_index > 0
         exp = parse(Int, str[(exp_index + 1):end])
         sig_end = exp_index - 1
@@ -391,7 +391,7 @@ function parse{T, f}(::Type{FD{T, f}}, str::AbstractString, mode::RoundingMode=R
 
     # Remove the decimal place from the string
     sign = T(first(str) == '-' ? -1 : 1)
-    dec_index = findfirst(str, '.')
+    dec_index = findfirst(equalto('.'), str)
     sig_start = sign < 0 ? 2 : 1
     if dec_index > 0
         int_str = str[sig_start:(dec_index - 1)] * str[(dec_index + 1):sig_end]
@@ -412,7 +412,7 @@ function parse{T, f}(::Type{FD{T, f}}, str::AbstractString, mode::RoundingMode=R
     val = isempty(a) ? T(0) : sign * parse(T, a)
     if !isempty(b) && any(collect(b[2:end]) .!= '0')
         if mode == RoundThrows
-            throw(InexactError())
+            throw(InexactError(:parse, FD{T, f}, str))
         elseif mode == RoundNearest
             val += sign * parse_round(T, b, mode)
         end
