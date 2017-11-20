@@ -794,7 +794,7 @@ end
 @testset "string" begin
     for x in keyvalues[FD2]
         if 0 ≤ abs(x) < 1000
-            @test eval(parse(string(x))) == x
+            @test eval(Meta.parse(string(x))) == x
         end
     end
 end
