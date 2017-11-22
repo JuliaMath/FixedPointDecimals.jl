@@ -102,9 +102,9 @@ end
 
 const FD = FixedDecimal
 
-floattype(::Type{FD{T, f}}) where {T<:Union{Int8, UInt8, Int16, UInt16}, f} = Float32
-floattype(::Type{FD{T, f}}) where {T<:Integer, f} = Float64
-floattype(::Type{FD{T, f}}) where {T<:BigInt, f} = BigFloat
+floattype(::Type{<:FD{T}}) where {T<:Union{Int8, UInt8, Int16, UInt16}} = Float32
+floattype(::Type{<:FD{T}}) where {T<:Integer} = Float64
+floattype(::Type{<:FD{BigInt}}) = BigFloat
 
 # basic operators
 -(x::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, -x.i)
