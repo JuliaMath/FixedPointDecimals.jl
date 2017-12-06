@@ -94,7 +94,7 @@ struct FixedDecimal{T <: Integer, f} <: Real
         else
             throw(ArgumentError(
                 "Requested number of decimal places $f exceeds the max allowed for the " *
-                "storage type $T: [0, $(max_exp10(T))]"
+                "storage type $T: [0, $n]"
             ))
         end
     end
