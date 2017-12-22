@@ -30,7 +30,7 @@ export FixedDecimal, RoundThrows
 using Compat
 
 import Base: reinterpret, zero, one, abs, sign, ==, <, <=, +, -, /, *, div, rem, divrem,
-             fld, mod, fldmod, fld1, mod1, fldmod1, isinteger, typemin, typemax,
+             fld, mod, fldmod, fld1, mod1, fldmod1, var, isinteger, typemin, typemax,
              realmin, realmax, print, show, string, convert, parse, promote_rule, min, max,
              trunc, round, floor, ceil, eps, float, widemul
 
@@ -176,6 +176,15 @@ end
 function /(x::FD{T, f}, y::Integer) where {T, f}
     quotient, remainder = fldmod(x.i, y)
     reinterpret(FD{T, f}, T(_round_to_even(quotient, remainder, y)))
+end
+
+# Use floating-point when calculating variance to avoid divide by zero errors
+function var(A::AbstractArray{<:FixedDecimal}; corrected::Bool=true, mean=nothing)
+    var(convert.(AbstractFloat, A); corrected=corrected, mean=mean)
+end
+
+function var(A::AbstractArray{<:FixedDecimal}, region; corrected::Bool=true, mean=nothing)
+    var(convert.(AbstractFloat, A), region; corrected=corrected, mean=mean)
 end
 
 # integerification

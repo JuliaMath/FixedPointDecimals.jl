@@ -494,6 +494,16 @@ end
     end
 end
 
+@testset "var" begin
+    @test isequal(var(FD2[]), NaN)
+    @test isequal(var(FD2[1]), NaN)
+    @test isequal(var(FD2[1, 2]), 0.5)
+
+    @test isequal(var(FD2[], 1), [NaN])
+    @test isequal(var(FD2[1], 1), [NaN])
+    @test isequal(var(FD2[1, 2], 1), [0.5])
+end
+
 @testset "abs, sign" begin
     @testset for T in [FD2, WFD4]
         for x in keyvalues[T]
