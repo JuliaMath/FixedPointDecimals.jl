@@ -2,6 +2,7 @@ using FixedPointDecimals
 import FixedPointDecimals: FD, value
 using Compat
 VERSION < v"0.7.0-DEV.2047" && import Compat: Test
+import Compat.Printf: @sprintf
 using Test
 import Base.Checked: checked_mul
 
