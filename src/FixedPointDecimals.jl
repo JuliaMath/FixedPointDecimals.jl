@@ -102,6 +102,8 @@ end
 
 const FD = FixedDecimal
 
+(::Type{T})(x::Real) where {T <: FD} = convert(T, x)
+
 floattype(::Type{<:FD{T}}) where {T<:Union{Int8, UInt8, Int16, UInt16}} = Float32
 floattype(::Type{<:FD{T}}) where {T<:Integer} = Float64
 floattype(::Type{<:FD{BigInt}}) = BigFloat
