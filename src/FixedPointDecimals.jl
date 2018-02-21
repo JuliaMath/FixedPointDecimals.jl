@@ -473,8 +473,6 @@ coefficient(::Type{FD{T, f}}) where {T, f} = T(10)^f
 coefficient(fd::FD{T, f}) where {T, f} = coefficient(FD{T, f})
 value(fd::FD) = fd.i
 
-
-Base.hash(fd::FD{T, f}) where {T, f} = Base.hash(BigFloat(fd))
 Base.hash(fd::FD{T, f}, h::UInt) where {T, f} = Base.hash(BigFloat(fd), h)
 
 end
