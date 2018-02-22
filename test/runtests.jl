@@ -938,6 +938,16 @@ end
         @test_throws ArgumentError parse(FD4, "1.2.3")
         @test_throws ArgumentError parse(FD4, "1.2", RoundUp)
     end
+
+    @testset "hashing" begin
+        fd1 = FixedDecimal{Int, 4}(2.5)
+        fd2 = FixedDecimal{Int, 5}(2.5)
+        fd3 = FixedDecimal{Int, 4}(3.5)
+
+        @test hash(fd1) == hash(fd2)
+        @test hash(fd1) != hash(fd3)
+        @test hash(fd1) != hash(fd1.i)
+    end
 end
 
 end  # global testset
