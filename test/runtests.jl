@@ -947,6 +947,8 @@ end
         @test hash(fd1) == hash(fd2)
         @test hash(fd1) != hash(fd3)
         @test hash(fd1) != hash(fd1.i)
+        @test hash(FD2(1//10)) == hash(1//10)
+        @test hash(FD2(1//10)) ≠ hash(0.1)
     end
 end
 
