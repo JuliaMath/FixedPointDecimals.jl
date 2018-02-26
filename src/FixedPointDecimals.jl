@@ -32,7 +32,7 @@ using Compat
 import Base: reinterpret, zero, one, abs, sign, ==, <, <=, +, -, /, *, div, rem, divrem,
              fld, mod, fldmod, fld1, mod1, fldmod1, isinteger, typemin, typemax,
              realmin, realmax, print, show, string, convert, parse, promote_rule, min, max,
-             trunc, round, floor, ceil, eps, float, widemul
+             trunc, round, floor, ceil, eps, float, widemul, decompose
 
 const BitInteger = Union{Int8, UInt8, Int16, UInt16, Int32, UInt32, Int64,
                          UInt64, Int128, UInt128}
@@ -475,6 +475,7 @@ coefficient(::Type{FD{T, f}}) where {T, f} = T(10)^f
 coefficient(fd::FD{T, f}) where {T, f} = coefficient(FD{T, f})
 value(fd::FD) = fd.i
 
-Base.hash(fd::FD{T, f}, h::UInt) where {T, f} = Base.hash(BigFloat(fd), h)
+# for generic hashing
+decompose(fd::FD) = decompose(Rational(fd))
 
 end
