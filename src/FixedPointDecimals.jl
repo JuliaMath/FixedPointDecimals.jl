@@ -309,6 +309,8 @@ function convert(::Type{TR}, x::FD{T, f}) where {TR <: Rational, T, f}
     convert(TR, x.i // coefficient(FD{T, f}))::TR
 end
 
+(::Type{T})(x::FD) where {T<:Union{AbstractFloat,Integer,Rational}} = convert(T, x)
+
 promote_rule(::Type{FD{T, f}}, ::Type{<:Integer}) where {T, f} = FD{T, f}
 promote_rule(::Type{<:FD}, ::Type{TF}) where {TF <: AbstractFloat} = TF
 promote_rule(::Type{<:FD}, ::Type{Rational{TR}}) where {TR} = Rational{TR}

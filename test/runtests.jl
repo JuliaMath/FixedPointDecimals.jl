@@ -135,6 +135,7 @@ end
     @testset for x in keyvalues[FD2]
         @testset for T in [Rational{Int128}, WFD2, WFD4]
             @test convert(FD2, convert(T, x)) == x
+            @test T(x) == convert(T, x)
         end
         if 0 ≤ abs(x) < 2
             @testset for T in [SFD2, SFD4, FD4]
