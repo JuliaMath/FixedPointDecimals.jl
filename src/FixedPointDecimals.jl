@@ -309,6 +309,8 @@ function convert(::Type{TR}, x::FD{T, f}) where {TR <: Rational, T, f}
     convert(TR, x.i // coefficient(FD{T, f}))::TR
 end
 
+(::Type{T})(x::FD) where {T<:Union{AbstractFloat,Integer,Rational}} = convert(T, x)
+
 promote_rule(::Type{FD{T, f}}, ::Type{<:Integer}) where {T, f} = FD{T, f}
 promote_rule(::Type{<:FD}, ::Type{TF}) where {TF <: AbstractFloat} = TF
 promote_rule(::Type{<:FD}, ::Type{Rational{TR}}) where {TR} = Rational{TR}
@@ -385,18 +387,18 @@ function parse(::Type{FD{T, f}}, str::AbstractString, mode::RoundingMode=RoundNe
     end
 
     # Parse exponent information
-    exp_index = findfirst(equalto('e'), str)
+    exp_index = coalesce(findfirst(==('e'), str), 0)
     if exp_index > 0
         exp = parse(Int, str[(exp_index + 1):end])
         sig_end = exp_index - 1
     else
         exp = 0
-        sig_end = endof(str)
+        sig_end = lastindex(str)
     end
 
     # Remove the decimal place from the string
     sign = T(first(str) == '-' ? -1 : 1)
-    dec_index = findfirst(equalto('.'), str)
+    dec_index = coalesce(findfirst(==('.'), str), 0)
     sig_start = sign < 0 ? 2 : 1
     if dec_index > 0
         int_str = str[sig_start:(dec_index - 1)] * str[(dec_index + 1):sig_end]
@@ -407,7 +409,7 @@ function parse(::Type{FD{T, f}}, str::AbstractString, mode::RoundingMode=RoundNe
 
     # Split the integer string into the value we can represent inside the FixedDecimal and
     # the remaining digits we'll use during rounding
-    int_end = endof(int_str)
+    int_end = lastindex(int_str)
     pivot = int_end + exp - (-f)
 
     a = rpad(int_str[1:min(pivot, int_end)], pivot, '0')
@@ -415,7 +417,7 @@ function parse(::Type{FD{T, f}}, str::AbstractString, mode::RoundingMode=RoundNe
 
     # Parse the strings
     val = isempty(a) ? T(0) : sign * parse(T, a)
-    if !isempty(b) && any(collect(b[2:end]) .!= '0')
+    if !isempty(b) && any(!isequal('0'), b[2:end])
         if mode == RoundThrows
             throw(InexactError(:parse, FD{T, f}, str))
         elseif mode == RoundNearest

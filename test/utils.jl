@@ -19,7 +19,7 @@ function integer_alt(::Type{T}, dp::Integer, val::AbstractFloat) where {T<:Integ
     # perform any rounding.
     str = float_string(val)
     sign = T(first(str) == '-' ? -1 : 1)
-    decimal = findfirst(equalto('.'), str)
+    decimal = coalesce(findfirst(==('.'), str), 0)
     int_start = sign < 0 ? 2 : 1
     int_end = decimal + dp
     v = parse(T, str[int_start:(decimal - 1)] * str[(decimal + 1):int_end])
@@ -40,4 +40,10 @@ end
 function ceil_alt(::Type{FD{T,f}}, val::AbstractFloat) where {T<:Integer, f}
     s, v, r = integer_alt(T, f, val)
     reinterpret(FD{T,f}, copysign(v + (s > 0 ? r : zero(T)), s))
+end
+
+if VERSION < v"0.7.0-DEV.4524"
+    sprintcompact(x...) = sprint(showcompact, x...)
+else
+    sprintcompact(x...) = sprint(show, x..., context=:compact=>true)
 end

@@ -1,10 +1,9 @@
 using FixedPointDecimals
 import FixedPointDecimals: FD, value
 using Compat
-VERSION < v"0.7.0-DEV.2047" && import Compat: Test
-import Compat.Printf: @sprintf
-using Test
-import Base.Checked: checked_mul
+using Compat.Test
+using Compat.Printf
+using Base.Checked: checked_mul
 
 include("utils.jl")
 
@@ -49,7 +48,7 @@ const keyvalues = Dict(
 # Floating point values written as integer strings. Useful for testing behaviours of
 # trunc, floor, and ceil.
 const INTS = Dict(
-    v => replace(@sprintf("%.200f", v), ".", "")
+    v => replace(@sprintf("%.200f", v), "." => "")
     for v in [
         1.22,
         1.23,
@@ -136,6 +135,7 @@ end
     @testset for x in keyvalues[FD2]
         @testset for T in [Rational{Int128}, WFD2, WFD4]
             @test convert(FD2, convert(T, x)) == x
+            @test T(x) == convert(T, x)
         end
         if 0 ≤ abs(x) < 2
             @testset for T in [SFD2, SFD4, FD4]
@@ -774,12 +774,12 @@ end
 
 @testset "show" begin
     @testset "compact" begin
-        @test sprint(showcompact, FD2(1.00)) == "1.0"
-        @test sprint(showcompact, FD2(1.23)) == "1.23"
-        @test sprint(showcompact, FD2(42.40)) == "42.4"
-        @test sprint(showcompact, FD2(-42.40)) == "-42.4"
-        @test sprint(showcompact, FD2(-0.01)) == "-0.01"
-        @test sprint(showcompact, FD2(0)) == "0.0"
+        @test sprintcompact(FD2(1.00)) == "1.0"
+        @test sprintcompact(FD2(1.23)) == "1.23"
+        @test sprintcompact(FD2(42.40)) == "42.4"
+        @test sprintcompact(FD2(-42.40)) == "-42.4"
+        @test sprintcompact(FD2(-0.01)) == "-0.01"
+        @test sprintcompact(FD2(0)) == "0.0"
 
         @test repr(typemin(FixedDecimal{Int64, 2})) ==
               "FixedDecimal{Int64,2}(-92233720368547758.08)"
@@ -795,7 +795,7 @@ end
 @testset "string" begin
     for x in keyvalues[FD2]
         if 0 ≤ abs(x) < 1000
-            @test eval(Meta.parse(string(x))) == x
+            @test Core.eval(@__MODULE__, Meta.parse(string(x))) == x
         end
     end
 end
