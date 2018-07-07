@@ -209,7 +209,7 @@ as a floating point number.
 This is equivalent to counting the number of bits needed to represent the
 integer, excluding any trailing zeros.
 """
-required_precision(n::Integer) = ndigits(n, 2) - trailing_zeros(n)
+required_precision(n::Integer) = ndigits(n, base=2) - trailing_zeros(n)
 
 """
     _apply_exact_float(f, T, x::Real, i::Integer)
@@ -387,7 +387,7 @@ function parse(::Type{FD{T, f}}, str::AbstractString, mode::RoundingMode=RoundNe
     end
 
     # Parse exponent information
-    exp_index = coalesce(findfirst(==('e'), str), 0)
+    exp_index = something(findfirst(==('e'), str), 0)
     if exp_index > 0
         exp = parse(Int, str[(exp_index + 1):end])
         sig_end = exp_index - 1
@@ -398,7 +398,7 @@ function parse(::Type{FD{T, f}}, str::AbstractString, mode::RoundingMode=RoundNe
 
     # Remove the decimal place from the string
     sign = T(first(str) == '-' ? -1 : 1)
-    dec_index = coalesce(findfirst(==('.'), str), 0)
+    dec_index = something(findfirst(==('.'), str), 0)
     sig_start = sign < 0 ? 2 : 1
     if dec_index > 0
         int_str = str[sig_start:(dec_index - 1)] * str[(dec_index + 1):sig_end]
