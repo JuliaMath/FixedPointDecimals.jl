@@ -27,8 +27,6 @@ module FixedPointDecimals
 
 export FixedDecimal, RoundThrows
 
-using Compat
-
 import Base: reinterpret, zero, one, abs, sign, ==, <, <=, +, -, /, *, div, rem, divrem,
              fld, mod, fldmod, fld1, mod1, fldmod1, isinteger, typemin, typemax,
              realmin, realmax, print, show, string, convert, parse, promote_rule, min, max,
