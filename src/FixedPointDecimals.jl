@@ -27,6 +27,8 @@ module FixedPointDecimals
 
 export FixedDecimal, RoundThrows
 
+using Compat: lastindex, something
+
 import Base: reinterpret, zero, one, abs, sign, ==, <, <=, +, -, /, *, div, rem, divrem,
              fld, mod, fldmod, fld1, mod1, fldmod1, isinteger, typemin, typemax,
              realmin, realmax, print, show, string, convert, parse, promote_rule, min, max,
@@ -207,7 +209,14 @@ as a floating point number.
 This is equivalent to counting the number of bits needed to represent the
 integer, excluding any trailing zeros.
 """
-required_precision(n::Integer) = ndigits(n, base=2) - trailing_zeros(n)
+required_precision(::Integer)
+
+# https://github.com/JuliaLang/julia/pull/27908
+if VERSION < v"0.7.0-beta.183"
+    required_precision(n::Integer) = ndigits(n, 2) - trailing_zeros(n)
+else
+    required_precision(n::Integer) = ndigits(n, base=2) - trailing_zeros(n)
+end
 
 """
     _apply_exact_float(f, T, x::Real, i::Integer)
