@@ -288,8 +288,8 @@ end
         @test FD2(42.42) * FD2(1) == FD2(42.42)
     end
 
-    @testset "eps, realmin, realmax" begin
-        @test realmin(FD2) == eps(FD2) == FD2(0.01)
+    @testset "eps, floatmin, floatmax" begin
+        @test floatmin(FD2) == eps(FD2) == FD2(0.01)
         @test eps(FD2(1.11)) == FD2(0.01)
         for x in keyvalues[FD2]
             if x ≠ typemax(FD2)
@@ -298,7 +298,7 @@ end
             if x ≠ typemin(FD2)
                 @test x - eps(x) < x
                 if x ≠ 0
-                    @test realmin(FD2) ≤ abs(x) ≤ realmax(FD2)
+                    @test floatmin(FD2) ≤ abs(x) ≤ floatmax(FD2)
                 end
             end
         end

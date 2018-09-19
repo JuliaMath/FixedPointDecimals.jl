@@ -29,9 +29,11 @@ export FixedDecimal, RoundThrows
 
 using Compat: lastindex, something
 
+import Compat: floatmin, floatmax
+
 import Base: reinterpret, zero, one, abs, sign, ==, <, <=, +, -, /, *, div, rem, divrem,
              fld, mod, fldmod, fld1, mod1, fldmod1, isinteger, typemin, typemax,
-             realmin, realmax, print, show, string, convert, parse, promote_rule, min, max,
+             print, show, string, convert, parse, promote_rule, min, max,
              trunc, round, floor, ceil, eps, float, widemul, decompose
 
 const BitInteger = Union{Int8, UInt8, Int16, UInt16, Int32, UInt32, Int64,
@@ -339,8 +341,8 @@ typemin(::Type{FD{T, f}}) where {T, f} = reinterpret(FD{T, f}, typemin(T))
 typemax(::Type{FD{T, f}}) where {T, f}= reinterpret(FD{T, f}, typemax(T))
 eps(::Type{T}) where {T <: FD} = reinterpret(T, 1)
 eps(x::FD) = eps(typeof(x))
-realmin(::Type{T}) where {T <: FD} = eps(T)
-realmax(::Type{T}) where {T <: FD} = typemax(T)
+floatmin(::Type{T}) where {T <: FD} = eps(T)
+floatmax(::Type{T}) where {T <: FD} = typemax(T)
 
 # printing
 function print(io::IO, x::FD{T, 0}) where T
