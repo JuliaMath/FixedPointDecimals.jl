@@ -460,7 +460,6 @@ The highest value of `x` which does not result in an overflow when evaluating `T
 types of `T` that do not overflow -1 will be returned.
 """
 function max_exp10(::Type{T}) where {T <: Integer}
-    applicable(typemax, T) || return -1
     W = widen(T)
     type_max = W(typemax(T))
 
@@ -474,6 +473,13 @@ function max_exp10(::Type{T}) where {T <: Integer}
     end
 
     exponent - 1
+end
+
+max_exp10(::Type{BigInt}) = -1
+
+# Pre-compute max_exp10 for the standard Integer types
+for T in Base.BitInteger_types
+    @eval max_exp10(::Type{$T}) = $(max_exp10(T))
 end
 
 """
