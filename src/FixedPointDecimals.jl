@@ -94,12 +94,18 @@ struct FixedDecimal{T <: Integer, f} <: Real
         if f >= 0 && (n < 0 || f <= n)
             new{T, f}(i % T)
         else
-            throw(ArgumentError(
-                "Requested number of decimal places $f exceeds the max allowed for the " *
-                "storage type $T: [0, $n]"
-            ))
+            # Note: introducing a function barrier to improve performance
+            # https://github.com/JuliaMath/FixedPointDecimals.jl/pull/30
+            _throw_storage_error(f, T, n)
         end
     end
+end
+
+@noinline function _throw_storage_error(f, T, n)
+    throw(ArgumentError(
+        "Requested number of decimal places $f exceeds the max allowed for the " *
+        "storage type $T: [0, $n]"
+    ))
 end
 
 const FD = FixedDecimal
@@ -476,11 +482,6 @@ function max_exp10(::Type{T}) where {T <: Integer}
 end
 
 max_exp10(::Type{BigInt}) = -1
-
-# Pre-compute max_exp10 for the standard Integer types
-for T in Base.BitInteger_types
-    @eval max_exp10(::Type{$T}) = $(max_exp10(T))
-end
 
 """
     coefficient(::Type{FD{T, f}}) -> T
