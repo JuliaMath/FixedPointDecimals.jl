@@ -109,6 +109,20 @@ end
         x = FixedPointDecimals.max_exp10(T)
         @test T(10)^x == widen(T(10))^x
     end
+
+    @testset "custom integer types" begin
+        @eval begin
+            primitive type Int24 <: Integer 24 end
+            Base.typemax(::Type{Int24}) = 2^24
+            Base.widen(::Type{Int24}) = Int32
+        end
+
+        @test FixedPointDecimals.max_exp10(Int24) == 7
+
+        # Note: we're just pretending that this is unbounded
+        @eval primitive type IntUnbounded <: Integer 256 end
+        @test_throws MethodError FixedPointDecimals.max_exp10(IntUnbounded)
+    end
 end
 
 # ensure that the coefficient multiplied by the highest and lowest representable values of
