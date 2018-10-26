@@ -459,8 +459,20 @@ end
 The highest value of `x` which does not result in an overflow when evaluating `T(10)^x`. For
 types of `T` that do not overflow -1 will be returned.
 """
-@generated function max_exp10(::Type{T}) where {T <: Integer}
-    applicable(typemax, T) || return :(return -1)
+function max_exp10 end
+
+abstract type IsBitIntegerType end
+struct BitIntegerType <: IsBitIntegerType end
+struct NonBitIntegerType <: IsBitIntegerType end
+
+is_bit_integer_type(::Type) = NonBitIntegerType
+is_bit_integer_type(::Type{T}) where {T <: BitInteger} = BitIntegerType()
+
+# max_exp10 only works for BitIntegerTypes
+max_exp10(::Type{T}) where {T} = max_exp10(is_bit_integer_type(T), T)
+max_exp10(::NonBitIntegerType, ::Type) = -1
+
+function max_exp10(::BitIntegerType, ::Type{T}) where {T}
     W = widen(T)
     type_max = W(typemax(T))
 
@@ -473,7 +485,7 @@ types of `T` that do not overflow -1 will be returned.
         exponent += 1
     end
 
-    return :(return $(exponent-1))
+    exponent - 1
 end
 
 """
