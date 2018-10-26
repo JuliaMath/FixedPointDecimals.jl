@@ -27,7 +27,7 @@ module FixedPointDecimals
 
 export FixedDecimal, RoundThrows
 
-using Compat: lastindex, something
+using Compat: lastindex, something, isbitstype
 
 import Compat: floatmin, floatmax
 
