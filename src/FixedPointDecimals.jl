@@ -99,6 +99,9 @@ struct FixedDecimal{T <: Integer, f} <: Real
             _throw_storage_error(f, T, n)
         end
     end
+
+    # Copy constructor -- prevents unneeded work to convert between the same types
+    FixedDecimal{T,f}(x::FixedDecimal{T,f}) where {T<:Integer,f} = new{T,f}(x.i)
 end
 
 @noinline function _throw_storage_error(f, T, n)
