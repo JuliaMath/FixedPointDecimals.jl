@@ -274,6 +274,8 @@ function round(::Type{FD{T, f}}, x::Rational, ::RoundingMode{:Nearest}=RoundNear
 end
 
 # conversions and promotions
+convert(::Type{FD{T, f}}, x::FD{T, f}) where {T, f} = x  # Converting an FD to itself is a no-op
+
 function convert(::Type{FD{T, f}}, x::Integer) where {T, f}
     reinterpret(FD{T, f}, T(widemul(x, coefficient(FD{T, f}))))
 end
