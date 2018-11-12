@@ -99,9 +99,6 @@ struct FixedDecimal{T <: Integer, f} <: Real
             _throw_storage_error(f, T, n)
         end
     end
-
-    # Copy constructor -- prevents unneeded work to convert between the same types
-    FixedDecimal{T,f}(x::FixedDecimal{T,f}) where {T<:Integer,f} = new{T,f}(x.i)
 end
 
 @noinline function _throw_storage_error(f, T, n)
@@ -274,6 +271,8 @@ function round(::Type{FD{T, f}}, x::Rational, ::RoundingMode{:Nearest}=RoundNear
 end
 
 # conversions and promotions
+convert(::Type{FD{T, f}}, x::FD{T, f}) where {T, f} = x  # Converting an FD to itself is a no-op
+
 function convert(::Type{FD{T, f}}, x::Integer) where {T, f}
     reinterpret(FD{T, f}, T(widemul(x, coefficient(FD{T, f}))))
 end
