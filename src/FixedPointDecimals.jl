@@ -305,7 +305,7 @@ for remfn in [:rem, :mod, :mod1, :min, :max]
     @eval $remfn(x::T, y::T) where {T <: FD} = reinterpret(T, $remfn(x.i, y.i))
 end
 for divfn in [:div, :fld, :fld1]
-    @eval $divfn(x::T, y::T) where {T <: FD} = $divfn(x.i, y.i)
+    @eval $divfn(x::T, y::T) where {T <: FD} = T($divfn(x.i, y.i))
 end
 
 convert(::Type{AbstractFloat}, x::FD) = convert(floattype(typeof(x)), x)
