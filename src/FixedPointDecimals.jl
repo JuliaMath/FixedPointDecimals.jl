@@ -36,7 +36,7 @@ import Base: reinterpret, zero, one, abs, sign, ==, <, <=, +, -, /, *, div, rem,
              print, show, string, convert, parse, promote_rule, min, max,
              trunc, round, floor, ceil, eps, float, widemul, decompose
 
-include("manual_fldmod.jl")
+include("fldmod_by_const.jl")
 
 const BitInteger = Union{Int8, UInt8, Int16, UInt16, Int32, UInt32, Int64,
                          UInt64, Int128, UInt128}
@@ -145,7 +145,7 @@ satisfied by the return value of `fldmod` in all cases, and the return value of
 `divrem` in cases where `divisor` is known to be positive.)
 """
 function _round_to_even(quotient::T, remainder::T, divisor::T) where {T <: Integer}
-    halfdivisor = divisor >> 1
+    halfdivisor = divisor >> 1  # This is optimized away when divisor is a const.
     if iseven(divisor) && remainder == halfdivisor
         ifelse(iseven(quotient), quotient, quotient + one(quotient))
     elseif abs(remainder) > abs(halfdivisor)
@@ -174,9 +174,10 @@ end
 @inline function custom_fldmod(x::T,y) where T
     # This check will be compiled away during specialization
     if sizeof(T) <= sizeof(Int) || T <: BigInt
-        return fldmodinline(x,y)
+        return fldmodinline(x, y)
     else
-        return manual_fldmod_by_const(x,Val(y))
+        # For large Ts LLVM doesn't optimize well, so use a custom implementation.
+        return fldmod_by_const(x, Val(y))
     end
 end
 
@@ -212,12 +213,12 @@ floor(x::FD{T, f}) where {T, f} = FD{T, f}(fld(x.i, coefficient(FD{T, f})))
 # TODO: round with number of digits; should be easy
 function round(x::FD{T, f}, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
     powt = coefficient(FD{T, f})
-    quotient, remainder = fldmodinline(x.i, powt)
+    quotient, remainder = custom_fldmod(x.i, powt)
     FD{T, f}(_round_to_even(quotient, remainder, powt))
 end
 function ceil(x::FD{T, f}) where {T, f}
     powt = coefficient(FD{T, f})
-    quotient, remainder = fldmodinline(x.i, powt)
+    quotient, remainder = custom_fldmod(x.i, powt)
     if remainder > 0
         FD{T, f}(quotient + one(quotient))
     else
@@ -484,6 +485,9 @@ end
 The highest value of `x` which does not result in an overflow when evaluating `T(10)^x`. For
 types of `T` that do not overflow -1 will be returned.
 """
+# This function is marked `@pure` because it has no side-effects and depends on no global
+# state. The value will never change for a given (type,precision) pair.
+# This allows its result to be const-folded away when called with Const values.
 Base.@pure function max_exp10(::Type{T}) where {T <: Integer}
     W = widen(T)
     type_max = W(typemax(T))
