@@ -36,6 +36,8 @@ import Base: reinterpret, zero, one, abs, sign, ==, <, <=, +, -, /, *, div, rem,
              print, show, string, convert, parse, promote_rule, min, max,
              trunc, round, floor, ceil, eps, float, widemul, decompose
 
+include("manual_fldmod.jl")
+
 const BitInteger = Union{Int8, UInt8, Int16, UInt16, Int32, UInt32, Int64,
                          UInt64, Int128, UInt128}
 
@@ -165,8 +167,17 @@ _round_to_even(q, r, d) = _round_to_even(promote(q, r, d)...)
 # correctness test suite.
 function *(x::FD{T, f}, y::FD{T, f}) where {T, f}
     powt = coefficient(FD{T, f})
-    quotient, remainder = fldmodinline(widemul(x.i, y.i), powt)
+    quotient, remainder = custom_fldmod(widemul(x.i, y.i), powt)
     reinterpret(FD{T, f}, _round_to_even(quotient, remainder, powt))
+end
+
+@inline function custom_fldmod(x::T,y) where T
+    # This check will be compiled away during specialization
+    if sizeof(T) <= sizeof(Int) || T <: BigInt
+        return fldmodinline(x,y)
+    else
+        return manual_fldmod_by_const(x,Val(y))
+    end
 end
 
 # these functions are needed to avoid InexactError when converting from the
@@ -473,7 +484,7 @@ end
 The highest value of `x` which does not result in an overflow when evaluating `T(10)^x`. For
 types of `T` that do not overflow -1 will be returned.
 """
-function max_exp10(::Type{T}) where {T <: Integer}
+Base.@pure function max_exp10(::Type{T}) where {T <: Integer}
     W = widen(T)
     type_max = W(typemax(T))
 
