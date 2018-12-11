@@ -7,16 +7,18 @@
 # It compares fixed-decimal types against the builtin Int and Float types of various sizes.
 # The output is written to a .csv file in the same directory as this file.
 
+# TODO: remove this file once BenchmarkTools has a built-in solution for diffing two
+# @benchmarkable runs
+using Pkg
+Pkg.activate(@__DIR__)
+
 using FixedPointDecimals
 using Random
 using BenchmarkTools, Statistics
 
-# # TODO: remove this file once BenchmarkTools has a built-in solution for diffing two
-# # @benchmarkable runs
-# include("subtract-benchmarks.jl")
-
 # Define a parent BenchmarkGroup to contain our suite
 const SUITE = BenchmarkGroup()
+const N = parse(Int, get(ENV, "BENCH_NUM_ITERS", "1000"))
 
 decimal_precision = 2
 
@@ -78,7 +80,7 @@ end
 for op in allops
     SUITE[opname(op)] = BenchmarkGroup()
     for T in alltypes
-        SUITE[opname(op)][type(T)] = BenchmarkGroup(["diff"])
+        SUITE[opname(op)][type(T)] = BenchmarkGroup(["base", "bench"])
     end
 end
 
@@ -88,7 +90,6 @@ for op in allops
     for T in alltypes
         print("$T ")
 
-        N = 1 # _000 #_000
         initial_value = zero(T)
         a = one(T)
 
@@ -98,10 +99,8 @@ for op in allops
 
         # Run the benchmark
         outbase = Ref(initial_value)
-        bbase = @benchmarkable $fbase($outbase) evals=1 setup=($outbase[]=$initial_value)
+        SUITE[opname(op)][type(T)]["base"] = @benchmarkable $fbase($outbase) evals=1 setup=($outbase[]=$initial_value)
         outbench = Ref(initial_value)
-        bbench = @benchmarkable $fbench($outbench) evals=1 setup=($outbench[]=$initial_value)
-        bdiff = bbench - bbase
-        SUITE[opname(op)][type(T)]["diff"] = bdiff
+        SUITE[opname(op)][type(T)]["bench"] = @benchmarkable $fbench($outbench) evals=1 setup=($outbench[]=$initial_value)
     end
 end
