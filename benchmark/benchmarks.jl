@@ -7,13 +7,16 @@
 # It compares fixed-decimal types against the builtin Int and Float types of various sizes.
 # The output is written to a .csv file in the same directory as this file.
 
-module DecimalRepresentationComparisons
-
 using FixedPointDecimals
 using Random
 using BenchmarkTools, Statistics
-using DataFrames
-using CSV
+
+# # TODO: remove this file once BenchmarkTools has a built-in solution for diffing two
+# # @benchmarkable runs
+# include("subtract-benchmarks.jl")
+
+# Define a parent BenchmarkGroup to contain our suite
+const SUITE = BenchmarkGroup()
 
 decimal_precision = 2
 
@@ -42,8 +45,8 @@ type(T::Type{<:Union{Int32, Int64}}) = "  $T"
 type(T::Type{Int128}) = " $T"
 type(::Type{FixedPointDecimals.FixedDecimal{T,f}}) where {T,f} = "FD{$T,$f}"
 type(::Type{FixedPointDecimals.FixedDecimal{T,f}}) where {T<:Union{Int32,Int64},f} = "FD{ $T,$f}"
-opname(f) = Symbol(f)
-opname(f::typeof(identity1)) = :identity
+opname(f) = string(Symbol(f))
+opname(f::typeof(identity1)) = "identity"
 
 # --------- Define benchmark functions -------------
 # Some care is taken here to prevent the compiler from optimizing away the operations:
@@ -71,52 +74,34 @@ end
     end
 end
 
-# ------------ Run the Benchmarks -------------------------
-function perform_benchmark()
-    # Collect the results
-    results = DataFrame(Operation=Symbol[], Category=String[], Type=String[],
-                        DurationNs=Float64[], Allocations=Int[], MinGcTime=Number[],
-                        Value=Number[])
-
-    # Run the benchmarks
-    for op in allops
-        println("$op")
-        for T in alltypes
-            print("$T ")
-
-            N = 1_000_000
-            initial_value = zero(T)
-            a = one(T)
-
-            # For some reason this is necessary to eliminate mysterious "1 allocation"
-            fbase = @eval (out::Ref{$T})->baseline($T, $a, $N, out)
-            fbench = @eval (out::Ref{$T})->benchmark($T, $op, $a, $N, out)
-
-            # Run the benchmark
-            outbase = Ref(initial_value)
-            bbase = median(@benchmark $fbase($outbase) evals=1 setup=($outbase[]=$initial_value))
-            outbench = Ref(initial_value)
-            bbench = median(@benchmark $fbench($outbench) evals=1 setup=($outbench[]=$initial_value))
-
-            # Compute results
-            difftime = (bbench.time - bbase.time)
-            println("$(round(difftime, digits=2)) ns ($(bbench.allocs) allocations)")
-            println(outbench[])
-            println(outbase[])
-            value = outbench
-
-            push!(results, Dict(:Operation=>opname(op), :Category=>category(T), :Type=>type(T),
-                                :DurationNs=>difftime/N, # average (b.times reports ns)
-                                :Allocations=>bbench.allocs, :MinGcTime=>bbench.gctime,
-                                :Value=>value[]))
-        end
+# Define the benchmark structure
+for op in allops
+    SUITE[opname(op)] = BenchmarkGroup()
+    for T in alltypes
+        SUITE[opname(op)][type(T)] = BenchmarkGroup(["diff"])
     end
-
-    println(results)
-    CSV.write("$(@__DIR__)/comparisons-benchmark-results.csv", results)
-    return results
 end
 
-results = perform_benchmark()
+for op in allops
+    println()
+    println("$op")
+    for T in alltypes
+        print("$T ")
 
+        N = 1 # _000 #_000
+        initial_value = zero(T)
+        a = one(T)
+
+        # For some reason this is necessary to eliminate mysterious "1 allocation"
+        fbase = @eval (out::Ref{$T})->baseline($T, $a, $N, out)
+        fbench = @eval (out::Ref{$T})->benchmark($T, $op, $a, $N, out)
+
+        # Run the benchmark
+        outbase = Ref(initial_value)
+        bbase = @benchmarkable $fbase($outbase) evals=1 setup=($outbase[]=$initial_value)
+        outbench = Ref(initial_value)
+        bbench = @benchmarkable $fbench($outbench) evals=1 setup=($outbench[]=$initial_value)
+        bdiff = bbench - bbase
+        SUITE[opname(op)][type(T)]["diff"] = bdiff
+    end
 end
