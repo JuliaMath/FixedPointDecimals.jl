@@ -484,7 +484,9 @@ function max_exp10(::Type{T}) where {T <: Integer}
 end
 
 max_exp10(::Type{BigInt}) = -1
-@eval max_exp10(::Type{Int128}) = $(max_exp10(Int128))  # Freeze this, since it's not getting Const folded.
+# Freeze the evaluation for Int128, since max_exp10(Int128) is too compilicated to get
+# optimized away by the compiler during const-folding.
+@eval max_exp10(::Type{Int128}) = $(max_exp10(Int128))
 
 """
     coefficient(::Type{FD{T, f}}) -> T
