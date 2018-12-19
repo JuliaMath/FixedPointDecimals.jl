@@ -485,10 +485,7 @@ end
 The highest value of `x` which does not result in an overflow when evaluating `T(10)^x`. For
 types of `T` that do not overflow -1 will be returned.
 """
-# This function is marked `@pure` because it has no side-effects and depends on no global
-# state. The value will never change for a given (type,precision) pair.
-# This allows its result to be const-folded away when called with Const values.
-Base.@pure function max_exp10(::Type{T}) where {T <: Integer}
+function max_exp10(::Type{T}) where {T <: Integer}
     W = widen(T)
     type_max = W(typemax(T))
 
