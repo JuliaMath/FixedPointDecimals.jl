@@ -55,23 +55,24 @@ narrow(::Type{UInt64}) = UInt32
 narrow(::Type{UInt32}) = UInt16
 narrow(::Type{UInt16}) = UInt8
 
-"""    nbits(x) = sizeof(x)*8 """
 nbits(x) = sizeof(x)*8
 
 # Implemenation based on umul32hi, from https://stackoverflow.com/a/22847373/751061
-# /* compute the upper half of the widened product of two unsigned integers */
+# Compute the upper half of the widened product of two unsigned integers.
+# Example: `widemul(0x0020,0x2002) == 0x0004_0040` vs
+#          `unsigned_splitmul_upper(0x0020,0x2002) == 0x0004`
 @inline function unsigned_splitmul_upper(a::T, b::T) where T<:Unsigned
-    # /* split operands into halves */
+    # Split operands into halves
     ah,al = splitint(a)
     bh,bl = splitint(b)
     halfT = typeof(ah)
     halfbits = nbits(al)
-    # /* compute partial products */
+    # Compute partial products
     p0 = widemul(al, bl);
     p1 = widemul(al, bh);
     p2 = widemul(ah, bl);
     p3 = widemul(ah, bh);
-    # /* sum partial products */
+    # Sum partial products
     carry = ((p0 >> halfbits) + (p1%halfT) + (p2%halfT)) >> halfbits;
     return p3 + (p2 >> halfbits) + (p1 >> halfbits) + carry;
 end
