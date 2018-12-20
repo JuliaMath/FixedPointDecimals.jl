@@ -1,36 +1,42 @@
 """
-    calculate_inv_coeff(::Type{T}, f)
+    calculate_inv_coeff(::Type{T}, C)
 
 Returns the magic numbers needed for `fldmod_by_const(x, Val(C))`: `2^N / C`, or the
 `inv_coeff`. That `inv_coeff` has all leading zeros shifted away to maximize precision, so
 this also returns how many bits need to be shifted back to undo that optimization, making
 the return value: `((2^N / C) << toshift, toshift)`.
+
+Note that for a given `FixedDecimal{T,f}`, `C` will be `10^f`.
 """
 # This function is marked `@pure` because it has no side-effects and depends on no global
 # state. The value will never change for a given (type,precision) pair.
 # This allows its result to be const-folded away when called with Const values.
-Base.@pure function calculate_inv_coeff(::Type{T}, f) where {T}
-    # First, calculate 2^nbits(T)/f
-    # We calculate it at double-precision and shift away leading zeros to preserve the most
-    # precision. Later, we will shift the final answer back to undo this operation.
+Base.@pure function calculate_inv_coeff(::Type{T}, C) where {T}
+    # First, calculate 2^nbits(T)/C
+    # We shift away leading zeros to preserve the most precision when we use it to multiply
+    # in the next step. At the end, we will shift the final answer back to undo this
+    # operation (which is why we need to return `toshift`).
+    # Note, also, that we calculate invceoff at double-precision so that the left-shift
+    # doesn't leave trailing zeros. We truncate to only the upper-half before returning.
     UT = unsigned(T)
-    invcoeff = twoToTheSizeOf(UT)÷f
+    invcoeff = two_to_the_size_of(widen(UT))÷C
     toshift = _leading_zeros(invcoeff)
     invcoeff = invcoeff << toshift
-    # Now, truncate the result to sizeof(T), rounding to maintain precision.
+    # Now, truncate to only the upper half of invcoeff, after we've shifted. Instead of
+    # bitshifting, we round to maintain precision. (This is needed to prevent off-by-ones.)
+    # -- This is equivalent to `invcoeff = T(invcoeff >> sizeof(T))`, except rounded. --
     invcoeff = _round_to_even(fldmod(invcoeff, typemax(UT))..., typemax(UT)) % T
     return invcoeff, toshift
 end
 # These are needed to handle Int128, which widens to BigInt, since BigInt doesn't have typemax
-twoToTheSizeOf(::Type{T}) where {T} = typemax(widen(unsigned(T)))
-twoToTheSizeOf(::Union{Type{Int128}, Type{UInt128}}) = BigInt(2)^256
-twoToTheSizeOf(::Type{BigInt}) = BigInt(2)^256
+two_to_the_size_of(::Type{T}) where {T} = typemax(unsigned(T))
+two_to_the_size_of(::Type{BigInt}) = BigInt(2)^256
 
 # This special-purpose leading_zeros is needed to handle Int128, which widens to BigInt
 _leading_zeros(x) = leading_zeros(x)
 # BigInt doesn't have a concept of "leading zeros", but since we _know_ the value being
-# passed here will fit in 256-bits (per twoToTheSizeOf), we can pretend this is a 256-bit
-# integer, take just the upper half as a UInt128, and count the leading zeros there.
+# passed here will fit in 256-bits (per two_to_the_size_of), we can pretend this is a
+# 256-bit integer, take just the upper half as a UInt128, and count the leading zeros there.
 _leading_zeros(x::BigInt) = leading_zeros((x >> 128) % UInt128)
 
 
