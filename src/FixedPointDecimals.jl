@@ -154,12 +154,18 @@ function _round_to_even(quotient::T, remainder::T, divisor::T) where {T <: Integ
 end
 _round_to_even(q, r, d) = _round_to_even(promote(q, r, d)...)
 
+# In many of our calls to fldmod, `y` is a constant (the coefficient, 10^f). However, since
+# `fldmod` is sometimes not being inlined, that constant information is not available to the
+# optimizer. We need an inlined version of fldmod so that the compiler can replace expensive
+# divide-by-power-of-ten instructions with the cheaper multiply-by-inverse-coefficient.
+@inline fldmodinline(x,y) = (fld(x,y), mod(x,y))
+
 # multiplication rounds to nearest even representation
 # TODO: can we use floating point to speed this up? after we build a
 # correctness test suite.
 function *(x::FD{T, f}, y::FD{T, f}) where {T, f}
     powt = coefficient(FD{T, f})
-    quotient, remainder = fldmod(widemul(x.i, y.i), powt)
+    quotient, remainder = fldmodinline(widemul(x.i, y.i), powt)
     reinterpret(FD{T, f}, _round_to_even(quotient, remainder, powt))
 end
 
@@ -195,12 +201,12 @@ floor(x::FD{T, f}) where {T, f} = FD{T, f}(fld(x.i, coefficient(FD{T, f})))
 # TODO: round with number of digits; should be easy
 function round(x::FD{T, f}, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
     powt = coefficient(FD{T, f})
-    quotient, remainder = fldmod(x.i, powt)
+    quotient, remainder = fldmodinline(x.i, powt)
     FD{T, f}(_round_to_even(quotient, remainder, powt))
 end
 function ceil(x::FD{T, f}) where {T, f}
     powt = coefficient(FD{T, f})
-    quotient, remainder = fldmod(x.i, powt)
+    quotient, remainder = fldmodinline(x.i, powt)
     if remainder > 0
         FD{T, f}(quotient + one(quotient))
     else
@@ -484,6 +490,9 @@ function max_exp10(::Type{T}) where {T <: Integer}
 end
 
 max_exp10(::Type{BigInt}) = -1
+# Freeze the evaluation for Int128, since max_exp10(Int128) is too compilicated to get
+# optimized away by the compiler during const-folding.
+@eval max_exp10(::Type{Int128}) = $(max_exp10(Int128))
 
 """
     coefficient(::Type{FD{T, f}}) -> T
