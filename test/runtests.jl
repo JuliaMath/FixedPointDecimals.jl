@@ -6,6 +6,7 @@ using Compat.Printf
 using Base.Checked: checked_mul
 
 include("utils.jl")
+include("fldmod_by_const.jl")
 
 const SFD2 = FixedDecimal{Int16, 2}
 const SFD4 = FixedDecimal{Int16, 4}
