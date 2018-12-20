@@ -50,8 +50,8 @@ deps = ["Dates", "LibGit2", "Markdown", "Printf", "REPL", "Random", "SHA", "UUID
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 
 [[PkgBenchmark]]
-deps = ["BenchmarkTools", "Dates", "InteractiveUtils", "JSON", "LibGit2", "Pkg", "Printf", "ProgressMeter", "Random", "Test"]
-git-tree-sha1 = "d15f09c1e4a8c1075db6025fed97b8a852d5738e"
+deps = ["BenchmarkTools", "Dates", "InteractiveUtils", "JSON", "LibGit2", "Pkg", "Printf", "ProgressMeter", "Random", "Statistics", "Test"]
+git-tree-sha1 = "717f93d4cfcbd5b5dadbbb74071541c725ba6552"
 repo-rev = "post-processing"
 repo-url = "https://github.com/NHDaly/PkgBenchmark.jl"
 uuid = "32113eaa-f34f-5b0d-bd6c-c81e245fc73d"

@@ -24,7 +24,6 @@ function /(a::BenchmarkTools.TrialEstimate, b::Int)
 end
 
 function postprocess(results::BenchmarkGroup)
-    global _results = deepcopy(results)
     for (op, op_group) in results.data
         op_results = op_group.data
         for (type, type_group) in op_results
@@ -39,8 +38,6 @@ function postprocess(results::BenchmarkGroup)
     end
     results
 end
-results = deepcopy(_results)
-((results)->(results["*"]["BigInt"]["bench"]=median(results["*"]["BigInt"]["bench"])/1000))(results)
 
 bench_results = withenv("BENCH_NUM_ITERS"=>string(N)) do
     benchmarkpkg("FixedPointDecimals"; postprocess=postprocess)
