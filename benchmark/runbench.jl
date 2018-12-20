@@ -43,6 +43,6 @@ bench_results = withenv("BENCH_NUM_ITERS"=>string(N)) do
     benchmarkpkg("FixedPointDecimals"; postprocess=postprocess)
 end
 
-export_markdown("results.md", bench_results)
+export_markdown(joinpath(@__DIR__, "results.md"), bench_results)
 
 end
