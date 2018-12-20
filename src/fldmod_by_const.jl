@@ -7,6 +7,12 @@ this also returns how many bits need to be shifted back to undo that optimizatio
 the return value: `((2^N / C) << toshift, toshift)`.
 
 Note that for a given `FixedDecimal{T,f}`, `C` will be `10^f`.
+
+# Examples
+```julia
+julia> calculate_inv_coeff(UInt, 100)
+(0xa3d70a3d70a3d70b, 6)
+```
 """
 # This function is marked `@pure` because it has no side-effects and depends on no global
 # state. The value will never change for a given (type,precision) pair.
