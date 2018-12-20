@@ -8,6 +8,9 @@ the return value: `((2^N / C) << toshift, toshift)`.
 
 Note that for a given `FixedDecimal{T,f}`, `C` will be `10^f`.
 
+REQUIRES:
+  - `C` must not be a power of 2.
+
 # Examples
 ```julia
 julia> calculate_inv_coeff(UInt, 100)
@@ -110,6 +113,8 @@ function div_by_const(x::T, ::Val{C}) where {T, C}
 # These checks will be compiled away during specialization.
     if C == 1
         return x
+    elseif ispow2(C)
+        return div(x,C)
     elseif (C <= 0)
         throw(DomainError("C must be > 0"))
     end
