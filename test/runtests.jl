@@ -6,7 +6,6 @@ using Compat.Printf
 using Base.Checked: checked_mul
 
 include("utils.jl")
-include("fldmod_by_const.jl")
 
 const SFD2 = FixedDecimal{Int16, 2}
 const SFD4 = FixedDecimal{Int16, 4}
@@ -73,6 +72,10 @@ function parse_int(::Type{FD{T, f}}, val::AbstractString; ceil::Bool=false) wher
 end
 
 @testset "FixedPointDecimals" begin
+
+@testset "fldmod_by_const" begin
+    include("fldmod_by_const.jl")
+end
 
 # Basic tests for the methods created above
 @testset "alt" begin
