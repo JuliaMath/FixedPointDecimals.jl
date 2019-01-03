@@ -25,6 +25,8 @@ REQUIRES:
 end
 
 # This is the custom implementation called when C is a type that LLVM can't optimize.
+# The bulk of the manual optimization is in the implementations of `div_by_const` and
+# `calculate_inverse_coeff` below.
 function fldmod_by_const(x, y::Val{C}) where {C}
     d = fld_by_const(x, y)
     return d, manual_mod(promote(x, C, d)...)
@@ -70,7 +72,7 @@ REQUIRES:
   - `C` _must be_ greater than `0`
 """
 function div_by_const(x::T, ::Val{C}) where {T, C}
-# These checks will be compiled away during specialization.
+    # These checks will be compiled away during specialization.
     if C == 1
         return x
     elseif ispow2(C)
@@ -78,31 +80,31 @@ function div_by_const(x::T, ::Val{C}) where {T, C}
     elseif (C <= 0)
         throw(DomainError("C must be > 0"))
     end
-    inv_coeff, toshift = calculate_inv_coeff(T, C)
-    up = splitmul_upper(x, inv_coeff)
+    inverse_coeff, toshift = calculate_inverse_coeff(T, C)
+    up = splitmul_upper(x, inverse_coeff)
     out = up    # By keeping only the upper half, we're essentially dividing by 2^nbits(T)
     # This condition will be compiled away during specialization.
     if T <: Signed
-        # Because our magic number has a leading one, the result is negative if it's Signed.
-        # We add x to give us the positive equivalent.
+        # Because our magic number has a leading one (since we shift all-the-way left), the
+        # result is negative if it's Signed. We add x to give us the positive equivalent.
         out += x
         signshift = (nbits(x)-1)
-        signed = T(unsigned(out) >> signshift)  # "unsigned" bitshift (to read top bit)
+        isnegative = T(out >>> signshift)  # 1 if < 0 else 0 (Unsigned bitshift to read top bit)
     end
     out = out >> toshift
     if T <: Signed
-        out =  out + signed
+        out =  out + isnegative
     end
     return T(out)
 end
 
 """
-    calculate_inv_coeff(::Type{T}, C)
+    calculate_inverse_coeff(::Type{T}, C)
 
 Returns the magic numbers needed for `fldmod_by_const(x, Val(C))`: `2^N / C`, or the
-`inv_coeff`. That `inv_coeff` has all leading zeros shifted away to maximize precision, so
-this also returns how many bits need to be shifted back to undo that optimization, making
-the return value: `((2^N / C) << toshift, toshift)`.
+`inverse_coeff`. That `inverse_coeff` has all leading zeros shifted away to maximize
+precision, so this also returns how many bits need to be shifted back to undo that
+optimization, making the return value: `((2^N / C) << toshift, toshift)`.
 
 Note that for a given `FixedDecimal{T,f}`, `C` will be `10^f`.
 
@@ -111,14 +113,14 @@ REQUIRES:
 
 # Examples
 ```julia
-julia> calculate_inv_coeff(UInt, 100)
+julia> calculate_inverse_coeff(UInt, 100)
 (0xa3d70a3d70a3d70b, 6)
 ```
 """
 # This function is marked `@pure` because it has no side-effects and depends on no global
 # state. The value will never change for a given (type,precision) pair.
 # This allows its result to be const-folded away when called with Const values.
-Base.@pure function calculate_inv_coeff(::Type{T}, C) where {T}
+Base.@pure function calculate_inverse_coeff(::Type{T}, C) where {T}
     # First, calculate 2^nbits(T)/C
     # We shift away leading zeros to preserve the most precision when we use it to multiply
     # in the next step. At the end, we will shift the final answer back to undo this
@@ -191,4 +193,4 @@ narrow(::Type{UInt64}) = UInt32
 narrow(::Type{UInt32}) = UInt16
 narrow(::Type{UInt16}) = UInt8
 
-nbits(x) = sizeof(x)*8
+nbits(x) = sizeof(x) * 8
