@@ -1,4 +1,102 @@
 """
+    fldmod_by_const(x, C)
+    fldmod_by_const(x, Val(C))
+
+Returns `fldmod(x,C)`, implemented efficiently when `C` is a (positive) static Const.
+
+This version of fldmod ensures that when `y` is a constant (the coefficient, 10^f), the
+division is optimized away, either automatically by LLVM or via a manual optimization.
+
+REQUIRES:
+  - `C` must be greater than `0`
+"""
+@inline function fldmod_by_const(x::T,y) where T
+    # This check will be compiled away during specialization
+    if sizeof(T) <= sizeof(Int) || T <: BigInt
+        # For small-to-normal integers, LLVM can correctly optimize away the division, if it
+        # knows it's dividing by a const. We cannot call `Base.fldmod` since it's not
+        # inlined, so here we have "manually inlined" it instead.
+        return (fld(x,y), mod(x,y))
+    else
+        # For Int types larger than word-size, or non-standard Ts, LLVM doesn't optimize
+        # well, so we use a custom implementation of fldmod.
+        return fldmod_by_const(x, Val(y))
+    end
+end
+
+# This is the custom implementation called when C is a type that LLVM can't optimize.
+function fldmod_by_const(x, y::Val{C}) where {C}
+    d = fld_by_const(x, y)
+    return d, manual_mod(promote(x, C, d)...)
+end
+
+"""
+    fld_by_const(x, Val(C))
+
+Like `div_by_const`, but for `fld`, not `div` -- fld rounds down for negative numbers.
+"""
+# This implementation was lifted directly from Base.fld(x,y)
+fld_by_const(x::T, y::Val{C}) where {T<:Unsigned, C} = div_by_const(x,y)
+function fld_by_const(x::T, y::Val{C}) where {T<:Integer, C}
+    d = div_by_const(x,y)
+    return d - (signbit(x ⊻ C) & (d * C != x))
+end
+
+"""
+    manual_mod(x, y, quotient)
+
+Calculate `mod(x,y)` after you've already acquired quotient, the result of `fld(x,y)`.
+
+REQUIRES:
+    - `y != -1`
+"""
+@inline function manual_mod(x::T, y::T, quotient::T) where T<:Integer
+    return x - quotient * y
+end
+
+
+"""
+    div_by_const(x, Val(C))
+
+The idea behind `div_by_const(x, Val(C))` is that we can avoid division entirely if
+instead of dividing by `C`, we multiply by `(2^N/C)`, then "divide by" `2^N`.
+
+And if we choose `N` to be `nbits(T)`, we can avoid the "divide by `2^N`" by just taking the
+_upper half_ of the result of the multiplication. And so, to do the multiplication, we use
+a `splitwidemul` which avoids widening by doing splitting x into upper and lower bits, doing
+several smaller multiplies, and then returning the result as two Ts, for the up and lo.
+
+REQUIRES:
+  - `C` _must be_ greater than `0`
+"""
+function div_by_const(x::T, ::Val{C}) where {T, C}
+# These checks will be compiled away during specialization.
+    if C == 1
+        return x
+    elseif ispow2(C)
+        return div(x,C)
+    elseif (C <= 0)
+        throw(DomainError("C must be > 0"))
+    end
+    inv_coeff, toshift = calculate_inv_coeff(T, C)
+    up = splitmul_upper(x, inv_coeff)
+    out = up    # By keeping only the upper half, we're essentially dividing by 2^nbits(T)
+    # This condition will be compiled away during specialization.
+    if T <: Signed
+        # Because our magic number has a leading one, the result is negative if it's Signed.
+        # We add x to give us the positive equivalent.
+        out += x
+        signshift = (nbits(x)-1)
+        signed = T(unsigned(out) >> signshift)  # "unsigned" bitshift (to read top bit)
+    end
+    out = out >> toshift
+    if T <: Signed
+        out =  out + signed
+    end
+    return T(out)
+end
+
+"""
     calculate_inv_coeff(::Type{T}, C)
 
 Returns the magic numbers needed for `fldmod_by_const(x, Val(C))`: `2^N / C`, or the
@@ -49,22 +147,14 @@ _leading_zeros(x) = leading_zeros(x)
 _leading_zeros(x::BigInt) = leading_zeros((x >> 128) % UInt128)
 
 
-# Splits `x` into `(hi,lo)` and returns them as the corresponding narrowed type
-function splitint(x::T) where {T<:Integer}
-    NT = narrow(T)
-    (x >> nbits(NT)) % NT, x % NT
+@inline function splitmul_upper(a::T, b::T) where T<:Unsigned
+    return unsigned_splitmul_upper(a,b)
 end
-
-narrow(::Type{Int128}) = Int64
-narrow(::Type{Int64}) = Int32
-narrow(::Type{Int32}) = Int16
-narrow(::Type{Int16}) = Int8
-narrow(::Type{UInt128}) = UInt64
-narrow(::Type{UInt64}) = UInt32
-narrow(::Type{UInt32}) = UInt16
-narrow(::Type{UInt16}) = UInt8
-
-nbits(x) = sizeof(x)*8
+@inline function splitmul_upper(a::T, b::T) where T<:Signed
+    uresult = unsigned_splitmul_upper(unsigned(a), unsigned(b))
+    return signed(uresult) - ((a < 0) ? b : 0) - ((b < 0) ? a : 0)
+end
+@inline splitmul_upper(a,b) = splitmul_upper(promote(a,b)...)
 
 # Implemenation based on umul32hi, from https://stackoverflow.com/a/22847373/751061
 # Compute the upper half of the widened product of two unsigned integers.
@@ -85,110 +175,20 @@ nbits(x) = sizeof(x)*8
     carry = ((p0 >> halfbits) + (p1%halfT) + (p2%halfT)) >> halfbits;
     return p3 + (p2 >> halfbits) + (p1 >> halfbits) + carry;
 end
-@inline function splitmul_upper(a::T, b::T) where T<:Unsigned
-    return unsigned_splitmul_upper(a,b)
-end
-@inline function splitmul_upper(a::T, b::T) where T<:Signed
-    uresult = unsigned_splitmul_upper(unsigned(a), unsigned(b))
-    return signed(uresult) - ((a < 0) ? b : 0) - ((b < 0) ? a : 0)
-end
-@inline splitmul_upper(a,b) = splitmul_upper(promote(a,b)...)
 
-
-"""
-    div_by_const(x, Val(C))
-
-The idea behind `div_by_const(x, Val(C))` is that we can avoid division entirely if
-instead of dividing by `C`, we multiply by `(2^N/C)`, then "divide by" `2^N`.
-
-And if we choose `N` to be `nbits(T)`, we can avoid the "divide by `2^N`" by just taking the
-_upper half_ of the result of the multiplication. And so, to do the multiplication, we use
-a `splitwidemul` which avoids widening by doing splitting x into upper and lower bits, doing
-several smaller multiplies, and then returning the result as two Ts, for the up and lo.
-
-REQUIRES:
-  - `C` _must be_ greater than `0`
-"""
-function div_by_const(x::T, ::Val{C}) where {T, C}
-# These checks will be compiled away during specialization.
-    if C == 1
-        return x
-    elseif ispow2(C)
-        return div(x,C)
-    elseif (C <= 0)
-        throw(DomainError("C must be > 0"))
-    end
-    inv_coeff, toshift = calculate_inv_coeff(T, C)
-    up = splitmul_upper(x, inv_coeff)
-    out = up    # By keeping only the upper half, we're essentially dividing by 2^nbits(T)
-    # This condition will be compiled away during specialization.
-    if T <: Signed
-        # Because our magic number has a leading one, the result is negative if it's Signed.
-        # We add x to give us the positive equivalent.
-        out += x
-        signshift = (nbits(x)-1)
-        signed = T(unsigned(out) >> signshift)  # "unsigned" bitshift (to read top bit)
-    end
-    out = out >> toshift
-    if T <: Signed
-        out =  out + signed
-    end
-    return T(out)
+# Splits `x` into `(hi,lo)` and returns them as the corresponding narrowed type
+function splitint(x::T) where {T<:Integer}
+    NT = narrow(T)
+    (x >> nbits(NT)) % NT, x % NT
 end
 
-"""
-    fld_by_const(x, Val(C))
+narrow(::Type{Int128}) = Int64
+narrow(::Type{Int64}) = Int32
+narrow(::Type{Int32}) = Int16
+narrow(::Type{Int16}) = Int8
+narrow(::Type{UInt128}) = UInt64
+narrow(::Type{UInt64}) = UInt32
+narrow(::Type{UInt32}) = UInt16
+narrow(::Type{UInt16}) = UInt8
 
-Like `div_by_const`, but for `fld`, not `div` -- fld rounds down for negative numbers.
-"""
-# This implementation was lifted directly from Base.fld(x,y)
-fld_by_const(x::T, y::Val{C}) where {T<:Unsigned, C} = div_by_const(x,y)
-function fld_by_const(x::T, y::Val{C}) where {T<:Integer, C}
-    d = div_by_const(x,y)
-    return d - (signbit(x ⊻ C) & (d * C != x))
-end
-
-"""
-    manual_mod(x, y, quotient)
-
-Calculate `mod(x,y)` after you've already acquired quotient, the result of `fld(x,y)`.
-
-REQUIRES:
-    - `y != -1`
-"""
-@inline function manual_mod(x::T, y::T, quotient::T) where T<:Integer
-    return x - quotient * y
-end
-
-
-# This is the custom implementation called when C is a type that LLVM can't optimize.
-function fldmod_by_const(x, y::Val{C}) where {C}
-    d = fld_by_const(x, y)
-    return d, manual_mod(promote(x, C, d)...)
-end
-
-"""
-    fldmod_by_const(x, C)
-    fldmod_by_const(x, Val(C))
-
-Returns `fldmod(x,C)`, implemented efficiently when `C` is a (positive) static Const.
-
-This version of fldmod ensures that when `y` is a constant (the coefficient, 10^f), the
-division is optimized away, either automatically by LLVM or via a manual optimization.
-
-REQUIRES:
-  - `C` must be greater than `0`
-"""
-@inline function fldmod_by_const(x::T,y) where T
-    # This check will be compiled away during specialization
-    if sizeof(T) <= sizeof(Int) || T <: BigInt
-        # For small-to-normal integers, LLVM can correctly optimize away the division, if it
-        # knows it's dividing by a const. We cannot call `Base.fldmod` since it's not
-        # inlined, so here we have "manually inlined" it instead.
-        return (fld(x,y), mod(x,y))
-    else
-        # For Int types larger than word-size, or non-standard Ts, LLVM doesn't optimize
-        # well, so we use a custom implementation of fldmod.
-        return fldmod_by_const(x, Val(y))
-    end
-end
+nbits(x) = sizeof(x)*8
