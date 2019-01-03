@@ -160,15 +160,35 @@ REQUIRES:
     return x - quotient * y
 end
 
+
+# This is the custom implementation called when C is a type that LLVM can't optimize.
+function fldmod_by_const(x, y::Val{C}) where {C}
+    d = fld_by_const(x, y)
+    return d, manual_mod(promote(x, C, d)...)
+end
+
 """
+    fldmod_by_const(x, C)
     fldmod_by_const(x, Val(C))
 
 Returns `fldmod(x,C)`, implemented efficiently when `C` is a (positive) static Const.
 
+This version of fldmod ensures that when `y` is a constant (the coefficient, 10^f), the
+division is optimized away, either automatically by LLVM or via a manual optimization.
+
 REQUIRES:
   - `C` must be greater than `0`
 """
-function fldmod_by_const(x, y::Val{C}) where {C}
-    d = fld_by_const(x, y)
-    return d, manual_mod(promote(x, C, d)...)
+@inline function fldmod_by_const(x::T,y) where T
+    # This check will be compiled away during specialization
+    if sizeof(T) <= sizeof(Int) || T <: BigInt
+        # For small-to-normal integers, LLVM can correctly optimize away the division, if it
+        # knows it's dividing by a const. We cannot call `Base.fldmod` since it's not
+        # inlined, so here we have "manually inlined" it instead.
+        return (fld(x,y), mod(x,y))
+    else
+        # For Int types larger than word-size, or non-standard Ts, LLVM doesn't optimize
+        # well, so we use a custom implementation of fldmod.
+        return fldmod_by_const(x, Val(y))
+    end
 end
