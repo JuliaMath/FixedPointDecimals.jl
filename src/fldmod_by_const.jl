@@ -10,7 +10,7 @@ division is optimized away, either automatically by LLVM or via a manual optimiz
 REQUIRES:
   - `C` must be greater than `0`
 """
-@inline function fldmod_by_const(x::T,y) where T
+@inline function fldmod_by_const(x::T, y) where T
     # This check will be compiled away during specialization
     if sizeof(T) <= sizeof(Int) || T <: BigInt
         # For small-to-normal integers, LLVM can correctly optimize away the division, if it
@@ -32,26 +32,18 @@ function fldmod_by_const(x, y::Val{C}) where {C}
     return d, manual_mod(promote(x, C, d)...)
 end
 
-"""
-    fld_by_const(x, Val(C))
-
-Like `div_by_const`, but for `fld`, not `div` -- fld rounds down for negative numbers.
-"""
-# This implementation was lifted directly from Base.fld(x,y)
-fld_by_const(x::T, y::Val{C}) where {T<:Unsigned, C} = div_by_const(x,y)
+# Calculate fld(x,y) when y is a Val constant.
+# The implementation for fld_by_const was lifted directly from Base.fld(x,y), except that
+# it uses `div_by_const` instead of `div`.
+fld_by_const(x::T, y::Val{C}) where {T<:Unsigned, C} = div_by_const(x, y)
 function fld_by_const(x::T, y::Val{C}) where {T<:Integer, C}
-    d = div_by_const(x,y)
+    d = div_by_const(x, y)
     return d - (signbit(x ⊻ C) & (d * C != x))
 end
 
-"""
-    manual_mod(x, y, quotient)
-
-Calculate `mod(x,y)` after you've already acquired quotient, the result of `fld(x,y)`.
-
-REQUIRES:
-    - `y != -1`
-"""
+# Calculate `mod(x,y)` after you've already acquired quotient, the result of `fld(x,y)`.
+# REQUIRES:
+#   - `y != -1`
 @inline function manual_mod(x::T, y::T, quotient::T) where T<:Integer
     return x - quotient * y
 end
@@ -76,7 +68,7 @@ function div_by_const(x::T, ::Val{C}) where {T, C}
     if C == 1
         return x
     elseif ispow2(C)
-        return div(x,C)
+        return div(x, C)
     elseif (C <= 0)
         throw(DomainError("C must be > 0"))
     end
@@ -88,7 +80,7 @@ function div_by_const(x::T, ::Val{C}) where {T, C}
         # Because our magic number has a leading one (since we shift all-the-way left), the
         # result is negative if it's Signed. We add x to give us the positive equivalent.
         out += x
-        signshift = (nbits(x)-1)
+        signshift = (nbits(x) - 1)
         isnegative = T(out >>> signshift)  # 1 if < 0 else 0 (Unsigned bitshift to read top bit)
     end
     out = out >> toshift
@@ -128,7 +120,7 @@ Base.@pure function calculate_inverse_coeff(::Type{T}, C) where {T}
     # Note, also, that we calculate invceoff at double-precision so that the left-shift
     # doesn't leave trailing zeros. We truncate to only the upper-half before returning.
     UT = unsigned(T)
-    invcoeff = two_to_the_size_of(widen(UT))÷C
+    invcoeff = two_to_the_size_of(widen(UT)) ÷ C
     toshift = _leading_zeros(invcoeff)
     invcoeff = invcoeff << toshift
     # Now, truncate to only the upper half of invcoeff, after we've shifted. Instead of
@@ -150,13 +142,13 @@ _leading_zeros(x::BigInt) = leading_zeros((x >> 128) % UInt128)
 
 
 @inline function splitmul_upper(a::T, b::T) where T<:Unsigned
-    return unsigned_splitmul_upper(a,b)
+    return unsigned_splitmul_upper(a, b)
 end
 @inline function splitmul_upper(a::T, b::T) where T<:Signed
     uresult = unsigned_splitmul_upper(unsigned(a), unsigned(b))
     return signed(uresult) - ((a < 0) ? b : 0) - ((b < 0) ? a : 0)
 end
-@inline splitmul_upper(a,b) = splitmul_upper(promote(a,b)...)
+@inline splitmul_upper(a, b) = splitmul_upper(promote(a, b)...)
 
 # Implemenation based on umul32hi, from https://stackoverflow.com/a/22847373/751061
 # Compute the upper half of the widened product of two unsigned integers.
@@ -164,8 +156,8 @@ end
 #          `unsigned_splitmul_upper(0x0020,0x2002) == 0x0004`
 @inline function unsigned_splitmul_upper(a::T, b::T) where T<:Unsigned
     # Split operands into halves
-    ah,al = splitint(a)
-    bh,bl = splitint(b)
+    ah, al = splitint(a)
+    bh, bl = splitint(b)
     halfT = typeof(ah)
     halfbits = nbits(al)
     # Compute partial products
@@ -174,7 +166,7 @@ end
     p2 = widemul(ah, bl);
     p3 = widemul(ah, bh);
     # Sum partial products
-    carry = ((p0 >> halfbits) + (p1%halfT) + (p2%halfT)) >> halfbits;
+    carry = ((p0 >> halfbits) + (p1 % halfT) + (p2 % halfT)) >> halfbits;
     return p3 + (p2 >> halfbits) + (p1 >> halfbits) + carry;
 end
 
