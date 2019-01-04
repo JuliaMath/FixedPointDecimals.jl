@@ -20,7 +20,7 @@ function /(a::BenchmarkTools.TrialEstimate, b::Int)
     mtol = params(a).memory_tolerance / b
     p = BenchmarkTools.Parameters(params(a); time_tolerance = ttol, memory_tolerance = mtol)
     return BenchmarkTools.TrialEstimate(p, time(a)/b, gctime(a)/b,
-                                        memory(a)/b, allocs(a)/b)
+                                        round(memory(a)/b), round(allocs(a)/b))
 end
 
 function postprocess(results::BenchmarkGroup)
