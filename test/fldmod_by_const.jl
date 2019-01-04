@@ -29,8 +29,15 @@ end
     vals = [0xA3D70A3D70A3D70B, 0x6666666666666666, typemax(Int16), typemax(Int16),
             typemax(Int64), typemax(Int64)]
     @testset for (a, b, f) in Iterators.product(vals, vals, (unsigned, signed))
-        a,b = promote(f(a),f(b))
+        a,b = f(a),f(b)
         @test (FixedPointDecimals.splitmul_upper(a,b) ==
                FixedPointDecimals.splitint(widemul(a,b))[1])
+    end
+end
+
+@testset "narrow(::Type{T})" begin
+    @testset for T in (Int8,Int16,Int32,Int64)
+        @test FixedPointDecimals.narrow(widen(T)) == T
+        @test FixedPointDecimals.narrow(widen(unsigned(T))) == unsigned(T)
     end
 end
