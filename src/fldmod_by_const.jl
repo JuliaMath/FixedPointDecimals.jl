@@ -57,8 +57,11 @@ instead of dividing by `C`, we multiply by `(2^N/C)`, then "divide by" `2^N`.
 
 And if we choose `N` to be `nbits(T)`, we can avoid the "divide by `2^N`" by just taking the
 _upper half_ of the result of the multiplication. And so, to do the multiplication, we use
-a `splitwidemul` which avoids widening by doing splitting x into upper and lower bits, doing
-several smaller multiplies, and then returning the result as two Ts, for the up and lo.
+`splitmul_upper` which avoids widening by splitting `a` and `b` into two halves, and avoids
+extra work by only calculating the upper-half of `widemul(a,b)`.
+
+This function is inspired by the LLVM-generated assembly for `div100(x::Int64) = x ÷ 10`,
+which can be seen by running e.g. `@code_native div100(5)`.
 
 REQUIRES:
   - `C` _must be_ greater than `0`
@@ -74,9 +77,14 @@ function div_by_const(x::T, ::Val{C}) where {T, C}
     elseif C <= 0
         throw(DomainError("C must be > 0"))
     end
+    # Calculate the magic number 2^N/C. Note that this is computed statically, not at runtime.
     inverse_coeff, toshift = calculate_inverse_coeff(T, C)
-    up = splitmul_upper(x, inverse_coeff)
-    out = up    # By keeping only the upper half, we're essentially dividing by 2^nbits(T)
+    # Compute the upper-half of widemul(x, 2^nbits(T)/C). We need to widen in case
+    # of overflow, but widemul can be expensive without hardware support. `splitmul_upper`
+    # will compute just the upper half of the result, without ever widening beyond T.
+    # By keeping only the upper half, we're essentially dividing by 2^nbits(T), undoing the
+    # numerator of the multiplication, so that the result is equal to x/C.
+    out = splitmul_upper(x, inverse_coeff)
     # This condition will be compiled away during specialization.
     if T <: Signed
         # Because our magic number has a leading one (since we shift all-the-way left), the
@@ -85,6 +93,7 @@ function div_by_const(x::T, ::Val{C}) where {T, C}
         signshift = (nbits(x) - 1)
         isnegative = T(out >>> signshift)  # 1 if < 0 else 0 (Unsigned bitshift to read top bit)
     end
+    # Undo the bitshifts used to calculate the invoeff magic number with maximum precision.
     out = out >> toshift
     if T <: Signed
         out =  out + isnegative
@@ -146,21 +155,34 @@ _leading_zeros(x::BigInt) = leading_zeros((x >> 128) % UInt128)
     uresult = splitmul_upper(unsigned(a), unsigned(b))
     return signed(uresult) - ((a < 0) ? b : 0) - ((b < 0) ? a : 0)
 end
-# Implemenation based on umul32hi, from https://stackoverflow.com/a/22847373/751061
+
 # Compute the upper half of the widened product of two unsigned integers.
-# Example: `widemul(0x0020,0x2002) == 0x0004_0040` vs
+# We need the _widened_ product in case a*b would overflow, but widening can make
+# multiplication significantly more expensive if there isn't hardware support for the
+# widened result (eg `widemul(a::Int128, b::Int128)->BigInt)`. It is cheaper to emulate the
+# `widemul` by first splitting `a` and `b` into two halves, and then doing several smaller
+# multiplications and additions (like long-multiplication) to compute the result.
+#
+# Additionally, since in `div_by_const` the next step is to shift away the bottom half of
+# the result (effectively dividing by `2^nbits(T)`), we only need to compute the upper-half
+# of `widemul(a,b)`.
+#
+# To clarify, this function is equivalent to `(widemul(a,b) >> nbits(a))`.
+# Example: `widemul(0x0020,0x2002) == 0x0004_0040`,
 #          `unsigned_splitmul_upper(0x0020,0x2002) == 0x0004`
+#
+# This implemenation is based on umul32hi, from https://stackoverflow.com/a/22847373/751061
 @inline function splitmul_upper(a::T, b::T) where T<:Unsigned
     # Split operands into halves
     ah, al = splitint(a)
     bh, bl = splitint(b)
     halfT = typeof(ah)
     halfbits = nbits(al)
-    # Compute partial products
-    p0 = widemul(al, bl)
-    p1 = widemul(al, bh)
-    p2 = widemul(ah, bl)
-    p3 = widemul(ah, bh)
+    # Compute partial products. Must use widemul because these could also overflow.
+    p0 = widemul(al, bl)  # Bottom two quarters
+    p1 = widemul(al, bh)  # Middle two quarters
+    p2 = widemul(ah, bl)  # Middle two quarters
+    p3 = widemul(ah, bh)  # Upper two quarters
     # Sum partial products
     carry = ((p0 >> halfbits) + (p1 % halfT) + (p2 % halfT)) >> halfbits
     return p3 + (p2 >> halfbits) + (p1 >> halfbits) + carry
