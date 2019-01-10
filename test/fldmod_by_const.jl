@@ -6,9 +6,8 @@ using FixedPointDecimals
     for a_base in vals
         # Only test negative numbers on `a`, since fldmod_by_const requires b > 0.
         @testset for (a, b, f) in Iterators.product((a_base, -a_base), vals, (unsigned, signed))
-            a,b = promote(f(a),f(b))
-            @test (FixedPointDecimals.fldmod_by_const(a,Val(b)) ==
-                    fldmod(a, b))
+            a, b = promote(f(a), f(b))
+            @test FixedPointDecimals.fldmod_by_const(a, Val(b)) == fldmod(a, b)
         end
     end
 end
@@ -18,9 +17,8 @@ end
     for a_base in vals
         # Only test negative numbers on `a`, since div_by_const requires b > 0.
         @testset for (a, b, f) in Iterators.product((a_base, -a_base), vals, (unsigned, signed))
-            a,b = promote(f(a),f(b))
-            @test (FixedPointDecimals.div_by_const(a,Val(b)) ==
-                    a ÷ b)
+            a, b = promote(f(a), f(b))
+            @test FixedPointDecimals.div_by_const(a, Val(b)) == a ÷ b
         end
     end
 end
@@ -29,9 +27,9 @@ end
     vals = [0xA3D70A3D70A3D70B, 0x6666666666666666, typemax(Int16), typemax(Int16),
             typemax(Int64), typemax(Int64)]
     @testset for (a, b, f) in Iterators.product(vals, vals, (unsigned, signed))
-        a,b = f(a),f(b)
-        @test (FixedPointDecimals.splitmul_upper(a,b) ==
-               FixedPointDecimals.splitint(widemul(a,b))[1])
+        a, b = promote(f(a), f(b))
+        @test (FixedPointDecimals.splitmul_upper(a, b) ==
+               FixedPointDecimals.splitint(widemul(a, b))[1])
     end
 end
 

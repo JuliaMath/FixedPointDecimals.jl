@@ -65,11 +65,13 @@ REQUIRES:
 """
 function div_by_const(x::T, ::Val{C}) where {T, C}
     # These checks will be compiled away during specialization.
+    # While for `*(FixedDecimal, FixedDecimal)`, C will always be a power of 10, these checks
+    # allow this function to work for any `C > 0`.
     if C == 1
         return x
     elseif ispow2(C)
         return div(x, C)
-    elseif (C <= 0)
+    elseif C <= 0
         throw(DomainError("C must be > 0"))
     end
     inverse_coeff, toshift = calculate_inverse_coeff(T, C)
@@ -140,34 +142,28 @@ _leading_zeros(x) = leading_zeros(x)
 # 256-bit integer, take just the upper half as a UInt128, and count the leading zeros there.
 _leading_zeros(x::BigInt) = leading_zeros((x >> 128) % UInt128)
 
-
-@inline function splitmul_upper(a::T, b::T) where T<:Unsigned
-    return unsigned_splitmul_upper(a, b)
-end
 @inline function splitmul_upper(a::T, b::T) where T<:Signed
-    uresult = unsigned_splitmul_upper(unsigned(a), unsigned(b))
+    uresult = splitmul_upper(unsigned(a), unsigned(b))
     return signed(uresult) - ((a < 0) ? b : 0) - ((b < 0) ? a : 0)
 end
-@inline splitmul_upper(a, b) = splitmul_upper(promote(a, b)...)
-
 # Implemenation based on umul32hi, from https://stackoverflow.com/a/22847373/751061
 # Compute the upper half of the widened product of two unsigned integers.
 # Example: `widemul(0x0020,0x2002) == 0x0004_0040` vs
 #          `unsigned_splitmul_upper(0x0020,0x2002) == 0x0004`
-@inline function unsigned_splitmul_upper(a::T, b::T) where T<:Unsigned
+@inline function splitmul_upper(a::T, b::T) where T<:Unsigned
     # Split operands into halves
     ah, al = splitint(a)
     bh, bl = splitint(b)
     halfT = typeof(ah)
     halfbits = nbits(al)
     # Compute partial products
-    p0 = widemul(al, bl);
-    p1 = widemul(al, bh);
-    p2 = widemul(ah, bl);
-    p3 = widemul(ah, bh);
+    p0 = widemul(al, bl)
+    p1 = widemul(al, bh)
+    p2 = widemul(ah, bl)
+    p3 = widemul(ah, bh)
     # Sum partial products
-    carry = ((p0 >> halfbits) + (p1 % halfT) + (p2 % halfT)) >> halfbits;
-    return p3 + (p2 >> halfbits) + (p1 >> halfbits) + carry;
+    carry = ((p0 >> halfbits) + (p1 % halfT) + (p2 % halfT)) >> halfbits
+    return p3 + (p2 >> halfbits) + (p1 >> halfbits) + carry
 end
 
 # Splits `x` into `(hi,lo)` and returns them as the corresponding narrowed type
