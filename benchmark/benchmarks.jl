@@ -30,9 +30,9 @@ fd_FixedPointDecimal_types = [
 ]
 inttypes = [Int32,Int64,Int128]
 floattypes = [Float32,Float64]
-bigtypes = [BigInt, BigFloat]
+#bigtypes = [BigInt, BigFloat]
 
-alltypes = (inttypes..., bigtypes..., floattypes..., fd_FixedPointDecimal_types...,)
+alltypes = (inttypes..., floattypes..., fd_FixedPointDecimal_types...,)
 
 identity1(a,_) = a
 allops = (*, /, +, ÷, identity1)
@@ -40,7 +40,7 @@ allops = (*, /, +, ÷, identity1)
 # Category for the results output CSV
 category(::Type{<:Union{inttypes...}}) = "Int"
 category(::Type{<:Union{floattypes...}}) = "Float"
-category(::Type{<:Union{bigtypes...}}) = "Big"
+#category(::Type{<:Union{bigtypes...}}) = "Big"
 category(::Type{<:FixedPointDecimals.FixedDecimal}) = "FixedDecimal"
 type(T::Type) = "$T"
 type(T::Type{<:Union{Int32, Int64}}) = "  $T"
