@@ -36,8 +36,10 @@ end
 end
 
 @testset "narrow(::Type{T})" begin
-    @testset for T in (Int8,Int16,Int32,Int64)
-        @test FixedPointDecimals.narrow(widen(T)) == T
-        @test FixedPointDecimals.narrow(widen(unsigned(T))) == unsigned(T)
+    types = (Int128, Int64, Int32, Int16)
+    narrowed = (Int64, Int32, Int16, Int8)
+    @testset for (T,N) in zip(types, narrowed)
+        @test FixedPointDecimals.narrow(T) == N
+        @test FixedPointDecimals.narrow(unsigned(T)) == unsigned(N)
     end
 end
