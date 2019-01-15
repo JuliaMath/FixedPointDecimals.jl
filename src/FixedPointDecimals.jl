@@ -89,7 +89,8 @@ struct FixedDecimal{T <: Integer, f} <: Real
     i::T
 
     # inner constructor
-    function Base.reinterpret(::Type{FixedDecimal{T, f}}, i::Integer) where {T, f}
+    # This function is marked as `Base.@pure`. It does not have or depend on any side-effects.
+    Base.@pure function Base.reinterpret(::Type{FixedDecimal{T, f}}, i::Integer) where {T, f}
         n = max_exp10(T)
         if f >= 0 && (n < 0 || f <= n)
             new{T, f}(i % T)
@@ -344,6 +345,8 @@ Base.@pure function promote_rule(::Type{FD{T, f}}, ::Type{FD{U, g}}) where {T, f
     FD{promote_type(T, U), max(f, g)}
 end
 
+Base.zero(::Type{FD{T, f}}) where {T, f} = reinterpret(FD{T,f}, zero(T))
+
 # comparison
 ==(x::T, y::T) where {T <: FD} = x.i == y.i
  <(x::T, y::T) where {T <: FD} = x.i  < y.i
@@ -473,7 +476,11 @@ end
 The highest value of `x` which does not result in an overflow when evaluating `T(10)^x`. For
 types of `T` that do not overflow -1 will be returned.
 """
-function max_exp10(::Type{T}) where {T <: Integer}
+Base.@pure function max_exp10(::Type{T}) where {T <: Integer}
+    # This function is marked as `Base.@pure`. Even though it does call some generic
+    # functions, they are all simple methods that should be able to be evaluated as
+    # constants. This function does not have or depend on any side-effects.
+
     W = widen(T)
     type_max = W(typemax(T))
 
