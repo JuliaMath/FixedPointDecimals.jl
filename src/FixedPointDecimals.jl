@@ -345,6 +345,7 @@ Base.@pure function promote_rule(::Type{FD{T, f}}, ::Type{FD{U, g}}) where {T, f
     FD{promote_type(T, U), max(f, g)}
 end
 
+# The default `Base.zero` calls `convert`, which is expensive, so we call reinterpret.
 Base.zero(::Type{FD{T, f}}) where {T, f} = reinterpret(FD{T,f}, zero(T))
 
 # comparison
