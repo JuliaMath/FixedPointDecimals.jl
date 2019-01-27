@@ -5,7 +5,7 @@ using Pkg
 Pkg.activate(@__DIR__)
 using PkgBenchmark, BenchmarkTools, Statistics
 
-const N = 1 #_000
+const N = 1_000
 
 import Base: -, /
 function -(a::BenchmarkTools.TrialEstimate, b::BenchmarkTools.TrialEstimate)
@@ -38,6 +38,22 @@ function postprocess(results::BenchmarkGroup)
     end
     results
 end
+function postprocess_no_div(results::BenchmarkGroup)
+    for (op, op_group) in results.data
+        op_results = op_group.data
+        for (type, type_group) in op_results
+            benchresults = type_group.data
+            if op == "identity"
+                # For :identity, bench and base are identical so we don't want to subtract.
+                op_results[type] = median(benchresults["bench"])
+            else
+                op_results[type] = median(benchresults["bench"]) - median(benchresults["base"])
+            end
+        end
+    end
+    results
+end
+
 
 function runbench()
     bench_results = withenv("BENCH_NUM_ITERS"=>string(N)) do
@@ -49,7 +65,7 @@ end
 
 function judgebench(target::Union{String, BenchmarkConfig}, baseline::Union{String, BenchmarkConfig})
     bench_results = withenv("BENCH_NUM_ITERS"=>string(N)) do
-        judge("FixedPointDecimals", target, baseline; f=identity, postprocess=postprocess)
+        judge("FixedPointDecimals", target, baseline; f=identity, postprocess=postprocess_no_div)
     end
 end
 function judgebench(baseline::Union{String, BenchmarkConfig})
