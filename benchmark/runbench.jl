@@ -5,7 +5,7 @@ using Pkg
 Pkg.activate(@__DIR__)
 using PkgBenchmark, BenchmarkTools, Statistics
 
-const N = 1_000
+const N = 1 #_000
 
 import Base: -, /
 function -(a::BenchmarkTools.TrialEstimate, b::BenchmarkTools.TrialEstimate)
@@ -47,11 +47,9 @@ function runbench()
     export_markdown(joinpath(@__DIR__, "results.md"), bench_results)
 end
 
-# For judging the difference between two commits, we don't need to divide by N. Keeping the
-# numbers larger like this helps the signal-to-noise ratio for comparing small changes.
 function judgebench(target::Union{String, BenchmarkConfig}, baseline::Union{String, BenchmarkConfig})
     bench_results = withenv("BENCH_NUM_ITERS"=>string(N)) do
-        judge("FixedPointDecimals", target, baseline)
+        judge("FixedPointDecimals", target, baseline; f=identity, postprocess=postprocess)
     end
 end
 function judgebench(baseline::Union{String, BenchmarkConfig})
