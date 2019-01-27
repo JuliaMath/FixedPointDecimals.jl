@@ -39,10 +39,21 @@ function postprocess(results::BenchmarkGroup)
     results
 end
 
-bench_results = withenv("BENCH_NUM_ITERS"=>string(N)) do
-    benchmarkpkg("FixedPointDecimals"; postprocess=postprocess)
+function runbench()
+    bench_results = withenv("BENCH_NUM_ITERS"=>string(N)) do
+        benchmarkpkg("FixedPointDecimals"; postprocess=postprocess)
+    end
+
+    export_markdown(joinpath(@__DIR__, "results.md"), bench_results)
 end
 
-export_markdown(joinpath(@__DIR__, "results.md"), bench_results)
+function judgebench(target::Union{String, BenchmarkConfig}, baseline::Union{String, BenchmarkConfig})
+    bench_results = withenv("BENCH_NUM_ITERS"=>string(N)) do
+        judge("FixedPointDecimals", target, baseline; f=identity, postprocess=postprocess)
+    end
+end
+function judgebench(baseline::Union{String, BenchmarkConfig})
+    judgebench(BenchmarkConfig(), baseline)
+end
 
 end
