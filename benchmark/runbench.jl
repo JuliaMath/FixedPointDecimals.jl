@@ -56,17 +56,27 @@ end
 
 
 function runbench()
+    rm(joinpath(@__DIR__, "tune.json"))  # Remove the existing tune.json file.
     bench_results = withenv("BENCH_NUM_ITERS"=>string(N)) do
         benchmarkpkg("FixedPointDecimals"; postprocess=postprocess)
     end
 
     export_markdown(joinpath(@__DIR__, "results.md"), bench_results)
+    return bench_results
 end
 
-function judgebench(target::Union{String, BenchmarkConfig}, baseline::Union{String, BenchmarkConfig})
+function judgebench(target::Union{String, BenchmarkConfig}, baseline::Union{String, BenchmarkConfig},
+            postprocess_fn=postprocess_no_div)
+    try rm(joinpath(@__DIR__, "tune.json")) catch end  # Remove the existing tune.json file.
     bench_results = withenv("BENCH_NUM_ITERS"=>string(N)) do
-        judge("FixedPointDecimals", target, baseline; f=identity, postprocess=postprocess_no_div)
+        if postprocess_fn != nothing
+            judge("FixedPointDecimals", target, baseline; f=identity, postprocess=postprocess_fn)
+        else
+            judge("FixedPointDecimals", target, baseline)
+        end
     end
+    export_markdown(joinpath(@__DIR__, "judge.md"), bench_results)
+    return bench_results
 end
 function judgebench(baseline::Union{String, BenchmarkConfig})
     judgebench(BenchmarkConfig(), baseline)
