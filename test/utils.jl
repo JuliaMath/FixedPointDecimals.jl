@@ -41,5 +41,3 @@ function ceil_alt(::Type{FD{T,f}}, val::AbstractFloat) where {T<:Integer, f}
     s, v, r = integer_alt(T, f, val)
     reinterpret(FD{T,f}, copysign(v + (s > 0 ? r : zero(T)), s))
 end
-
-sprintcompact(x...) = sprint(show, x..., context=:compact=>true)

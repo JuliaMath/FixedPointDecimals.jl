@@ -787,12 +787,12 @@ end
 
 @testset "show" begin
     @testset "compact" begin
-        @test sprintcompact(FD2(1.00)) == "1.0"
-        @test sprintcompact(FD2(1.23)) == "1.23"
-        @test sprintcompact(FD2(42.40)) == "42.4"
-        @test sprintcompact(FD2(-42.40)) == "-42.4"
-        @test sprintcompact(FD2(-0.01)) == "-0.01"
-        @test sprintcompact(FD2(0)) == "0.0"
+        @test sprint(show, FD2(1.00), context=:compact=>true) == "1.0"
+        @test sprint(show, FD2(1.23), context=:compact=>true) == "1.23"
+        @test sprint(show, FD2(42.40), context=:compact=>true) == "42.4"
+        @test sprint(show, FD2(-42.40), context=:compact=>true) == "-42.4"
+        @test sprint(show, FD2(-0.01), context=:compact=>true) == "-0.01"
+        @test sprint(show, FD2(0), context=:compact=>true) == "0.0"
 
         @test repr(typemin(FixedDecimal{Int64, 2})) ==
               "FixedDecimal{Int64,2}(-92233720368547758.08)"
