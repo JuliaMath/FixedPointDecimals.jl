@@ -1,8 +1,7 @@
 using FixedPointDecimals
-import FixedPointDecimals: FD, value
-using Compat
-using Compat.Test
-using Compat.Printf
+using FixedPointDecimals: FD, value
+using Test
+using Printf
 using Base.Checked: checked_mul
 
 include("utils.jl")
