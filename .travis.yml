@@ -9,10 +9,16 @@ julia:
   - nightly
 notifications:
   email: false
-# uncomment the following lines to override the default test script
-#script:
-#  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-#  - julia -e 'Pkg.clone(pwd()); Pkg.build("FixedPointDecimals"); Pkg.test("FixedPointDecimals"; coverage=true)'
 after_success:
-  - julia -e 'cd(Pkg.dir("FixedPointDecimals")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
-  - julia -e 'cd(Pkg.dir("FixedPointDecimals")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
+  - |
+    julia -e '
+      VERSION >= v"0.7.0-DEV.3656" && using Pkg
+      VERSION >= v"0.7.0-DEV.5183" || cd(Pkg.dir("FixedPointDecimals"))
+      Pkg.add("Coverage"); using Coverage
+      Coveralls.submit(process_folder())'
+  - |
+    julia -e '
+      VERSION >= v"0.7.0-DEV.3656" && using Pkg
+      VERSION >= v"0.7.0-DEV.5183" || cd(Pkg.dir("FixedPointDecimals"))
+      Pkg.add("Coverage"); using Coverage
+      Codecov.submit(process_folder())'
