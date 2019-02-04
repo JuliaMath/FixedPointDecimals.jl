@@ -1,0 +1,13 @@
+name = "FixedPointDecimals"
+uuid = "fb4d412d-6eee-574d-9565-ede6634db7b0"
+authors = ["Fengyang Wang <fengyang.wang.0@gmail.com>", "Curtis Vogt <curtis.vogt@gmail.com>"]
+
+[compat]
+julia = "0.7, 1.0"
+
+[extras]
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Printf", "Test"]
