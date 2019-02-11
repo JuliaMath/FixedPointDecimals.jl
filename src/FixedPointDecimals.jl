@@ -346,7 +346,7 @@ Base.@pure function promote_rule(::Type{FD{T, f}}, ::Type{FD{U, g}}) where {T, f
 end
 
 # The default `Base.zero` calls `convert`, which is expensive, so we call reinterpret.
-Base.zero(::Type{FD{T, f}}) where {T, f} = reinterpret(FD{T,f}, zero(T))
+Base.zero(::Type{FD{T, f}}) where {T, f} = reinterpret(FD{T, f}, zero(T))
 
 # comparison
 ==(x::T, y::T) where {T <: FD} = x.i == y.i
