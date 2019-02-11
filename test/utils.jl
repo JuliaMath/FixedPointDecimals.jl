@@ -41,9 +41,3 @@ function ceil_alt(::Type{FD{T,f}}, val::AbstractFloat) where {T<:Integer, f}
     s, v, r = integer_alt(T, f, val)
     reinterpret(FD{T,f}, copysign(v + (s > 0 ? r : zero(T)), s))
 end
-
-if VERSION < v"0.7.0-DEV.4524"
-    sprintcompact(x...) = sprint(showcompact, x...)
-else
-    sprintcompact(x...) = sprint(show, x..., context=:compact=>true)
-end
