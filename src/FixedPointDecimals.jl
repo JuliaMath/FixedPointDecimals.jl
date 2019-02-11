@@ -345,8 +345,9 @@ Base.@pure function promote_rule(::Type{FD{T, f}}, ::Type{FD{U, g}}) where {T, f
     FD{promote_type(T, U), max(f, g)}
 end
 
-# The default `Base.zero` calls `convert`, which is expensive, so we call reinterpret.
+# The default `zero` and `one` call `convert`, which is expensive, so we call reinterpret.
 Base.zero(::Type{FD{T, f}}) where {T, f} = reinterpret(FD{T, f}, zero(T))
+Base.one(::Type{FD{T, f}}) where {T, f} = reinterpret(FD{T, f}, coefficient(FD{T, f}))
 
 # comparison
 ==(x::T, y::T) where {T <: FD} = x.i == y.i
@@ -508,7 +509,7 @@ max_exp10(::Type{BigInt}) = -1
 Compute `10^f` as an Integer without overflow. Note that overflow will not occur for any
 constructable `FD{T, f}`.
 """
-coefficient(::Type{FD{T, f}}) where {T, f} = T(10)^f
+Base.@pure coefficient(::Type{FD{T, f}}) where {T, f} = T(10)^f
 coefficient(fd::FD{T, f}) where {T, f} = coefficient(FD{T, f})
 value(fd::FD) = fd.i
 
