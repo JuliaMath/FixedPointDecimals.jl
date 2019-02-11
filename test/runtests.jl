@@ -512,19 +512,19 @@ end
 @testset "truncating div" begin
     @testset "div by 1" begin
         @testset for x in keyvalues[FD2]
-            @test x ÷ one(x) == trunc(x)
+            @test x ÷ one(x) === trunc(x)
 
             # signed integers using two's complement have one additional negative value
-            if x < 0 && trunc(x) == typemin(x)
+            if x < 0 && trunc(x) === typemin(x)
                 @test_throws InexactError x ÷ -one(x)
             else
-                @test x ÷ -one(x) == -trunc(x)
+                @test x ÷ -one(x) === -trunc(x)
             end
         end
     end
     @testset "div by 2" begin
         @testset for x in keyvalues[FD2]
-            @test x ÷ 2one(x) == x ÷ 2 == x.i ÷ FD2(2).i
+            @test x ÷ 2one(x) === x ÷ 2 === FD2(x.i ÷ FD2(2).i)
         end
     end
 end
