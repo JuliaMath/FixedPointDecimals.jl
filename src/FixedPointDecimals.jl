@@ -479,14 +479,17 @@ max_exp10(::Type{BigInt}) = -1
 # optimized away by the compiler during const-folding.
 @eval max_exp10(::Type{Int128}) = $(max_exp10(Int128))
 
+# coefficient is marked pure. This is needed to ensure that the result is always available
+# at compile time, and can therefore be used when optimizing mathematical operations.
+# In particular, computing this at runtime, can cause type-instability in fldmod_by_const.
 """
     coefficient(::Type{FD{T, f}}) -> T
 
 Compute `10^f` as an Integer without overflow. Note that overflow will not occur for any
 constructable `FD{T, f}`.
 """
-coefficient(::Type{FD{T, f}}) where {T, f} = T(10)^f
-coefficient(fd::FD{T, f}) where {T, f} = coefficient(FD{T, f})
+Base.@pure coefficient(::Type{FD{T, f}}) where {T, f} = T(10)^f
+Base.@pure coefficient(fd::FD{T, f}) where {T, f} = coefficient(FD{T, f})
 value(fd::FD) = fd.i
 
 # for generic hashing
