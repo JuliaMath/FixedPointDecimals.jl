@@ -27,14 +27,10 @@ module FixedPointDecimals
 
 export FixedDecimal, RoundThrows
 
-using Compat: lastindex, something
-
-import Compat: floatmin, floatmax
-
 import Base: reinterpret, zero, one, abs, sign, ==, <, <=, +, -, /, *, div, rem, divrem,
              fld, mod, fldmod, fld1, mod1, fldmod1, isinteger, typemin, typemax,
              print, show, string, convert, parse, promote_rule, min, max,
-             trunc, round, floor, ceil, eps, float, widemul, decompose
+             floatmin, floatmax, trunc, round, floor, ceil, eps, float, widemul, decompose
 
 include("fldmod_by_const.jl")
 
@@ -217,14 +213,7 @@ as a floating point number.
 This is equivalent to counting the number of bits needed to represent the
 integer, excluding any trailing zeros.
 """
-required_precision(::Integer)
-
-# https://github.com/JuliaLang/julia/pull/27908
-if VERSION < v"0.7.0-beta.183"
-    required_precision(n::Integer) = ndigits(n, 2) - trailing_zeros(n)
-else
-    required_precision(n::Integer) = ndigits(n, base=2) - trailing_zeros(n)
-end
+required_precision(n::Integer) = ndigits(n, base=2) - trailing_zeros(n)
 
 """
     _apply_exact_float(f, T, x::Real, i::Integer)
@@ -305,7 +294,9 @@ for remfn in [:rem, :mod, :mod1, :min, :max]
     @eval $remfn(x::T, y::T) where {T <: FD} = reinterpret(T, $remfn(x.i, y.i))
 end
 for divfn in [:div, :fld, :fld1]
-    @eval $divfn(x::T, y::T) where {T <: FD} = $divfn(x.i, y.i)
+    # div(x.i, y.i) eliminates the scaling coefficient, so we call the FD constructor.
+    # We don't need any widening logic, since we won't be multiplying by the coefficient.
+    @eval $divfn(x::T, y::T) where {T <: FD} = T($divfn(x.i, y.i))
 end
 
 convert(::Type{AbstractFloat}, x::FD) = convert(floattype(typeof(x)), x)
