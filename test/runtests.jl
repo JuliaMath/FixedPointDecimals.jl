@@ -508,6 +508,36 @@ end
     end
 end
 
+@testset "truncating div" begin
+    @testset "div by 1" begin
+        @testset for x in keyvalues[FD2]
+            @test x ÷ one(x) === trunc(x)
+
+            # signed integers using two's complement have one additional negative value
+            if x < 0 && trunc(x) === typemin(x)
+                @test_throws InexactError x ÷ -one(x)
+            else
+                @test x ÷ -one(x) === -trunc(x)
+            end
+        end
+    end
+    @testset "div by 2" begin
+        @testset for x in keyvalues[FD2]
+            @test x ÷ 2one(x) === x ÷ 2 === FD2(x.i ÷ FD2(2).i)
+        end
+    end
+    @testset "return types" begin
+        @test div(2one(FD2), 3) isa FD2
+        @test one(FD2) ÷ one(FD2) isa FD2
+
+        # Promotion to bigger type
+        @test one(FD4) ÷ one(FD2) isa FD4
+        @test one(FD2) ÷ one(FD4) isa FD4
+
+        @test one(FD{Int32, 2}) ÷ one(FD{Int64, 6}) isa FD{Int64, 6}
+    end
+end
+
 @testset "abs, sign" begin
     @testset for T in [FD2, WFD4]
         for x in keyvalues[T]
