@@ -1,4 +1,4 @@
-using Compat.Test
+using Test
 using FixedPointDecimals
 
 @testset "fldmod_by_const" begin
