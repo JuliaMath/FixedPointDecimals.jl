@@ -786,6 +786,36 @@ epsi(::Type{T}) where T = eps(T)
     end
 end
 
+@testset "type stability" begin
+    # Test that basic operations are type stable for all the basic integer types.
+    fs = [0, 1, 2, 7, 16, 38]  # To save time, don't test all possible combinations.
+    @testset for T in (CONTAINER_TYPES..., BigInt,)
+        maxF = FixedPointDecimals.max_exp10(T)
+        frange = filter(f->f<=maxF, fs)
+        # Unary operations
+        @testset for f in frange
+            @test @inferred(zero(FD{T,f}(1))) == FD{T,f}(0)
+            @test @inferred(one(FD{T,f}(1))) == FD{T,f}(1)
+            @test @inferred(ceil(FD{T,f}(1))) == FD{T,f}(1)
+            @test @inferred(round(FD{T,f}(1))) == FD{T,f}(1)
+            @test @inferred(abs(FD{T,f}(1))) == FD{T,f}(1)
+            @test @inferred(FD{T,f}(1)^2) == FD{T,f}(1)
+            @test (@inferred(typemax(FD{T,f})); true)
+        end
+        # Binary operations
+        @testset for (f1,f2) in Iterators.product(frange, frange)
+            fmax = max(f1,f2)
+            @test @inferred(FD{T,f1}(1) + FD{T,f2}(0)) == FD{T,fmax}(1)
+            @test @inferred(FD{T,f1}(1) - FD{T,f2}(0)) == FD{T,fmax}(1)
+            @test @inferred(FD{T,f1}(1) * FD{T,f2}(1)) == FD{T,fmax}(1)
+            @test @inferred(FD{T,f1}(1) / FD{T,f2}(1)) == FD{T,fmax}(1)
+            @test @inferred(FD{T,f1}(1) ÷ FD{T,f2}(1)) == FD{T,fmax}(1)
+            @test @inferred(max(FD{T,f1}(1), FD{T,f2}(0))) == FD{T,fmax}(1)
+            @test @inferred(min(FD{T,f1}(1), FD{T,f2}(0))) == FD{T,fmax}(0)
+        end
+    end
+end
+
 @testset "print" begin
     @test string(FD2(1.00)) == "1.00"
     @test string(FD2(1.23)) == "1.23"
