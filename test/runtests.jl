@@ -390,6 +390,19 @@ end
         @test reinterpret(FD{T,f}, min_int) * scalar ==
             reinterpret(FD{T,f}, div(min_int, 10))
     end
+
+    # Test that multiplication is type stable for all the basic integer types.
+    @testset "type stable" begin
+        fs = [0, 1, 2, 4, 8, 16, 38]  # To save time, don't test all possible combinations.
+        @testset for T in CONTAINER_TYPES
+            maxF = FixedPointDecimals.max_exp10(T)
+            frange = filter(f->f<=maxF, fs)
+            @testset for (f1,f2) in Iterators.product(frange, frange)
+                fmax = max(f1,f2)
+                @test @inferred(FD{T,f1}(1) * FD{T,f2}(1)) == FD{T,fmax}(1)
+            end
+        end
+    end
 end
 
 @testset "division" begin
