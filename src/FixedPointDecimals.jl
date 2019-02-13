@@ -32,6 +32,8 @@ import Base: reinterpret, zero, one, abs, sign, ==, <, <=, +, -, /, *, div, rem,
              print, show, string, convert, parse, promote_rule, min, max,
              floatmin, floatmax, trunc, round, floor, ceil, eps, float, widemul, decompose
 
+include("fldmod_by_const.jl")
+
 const BitInteger = Union{Int8, UInt8, Int16, UInt16, Int32, UInt32, Int64,
                          UInt64, Int128, UInt128}
 
@@ -139,7 +141,7 @@ satisfied by the return value of `fldmod` in all cases, and the return value of
 `divrem` in cases where `divisor` is known to be positive.)
 """
 function _round_to_even(quotient::T, remainder::T, divisor::T) where {T <: Integer}
-    halfdivisor = divisor >> 1
+    halfdivisor = divisor >> 1  # This is optimized away when divisor is a const.
     if iseven(divisor) && remainder == halfdivisor
         ifelse(iseven(quotient), quotient, quotient + one(quotient))
     elseif abs(remainder) > abs(halfdivisor)
@@ -150,18 +152,10 @@ function _round_to_even(quotient::T, remainder::T, divisor::T) where {T <: Integ
 end
 _round_to_even(q, r, d) = _round_to_even(promote(q, r, d)...)
 
-# In many of our calls to fldmod, `y` is a constant (the coefficient, 10^f). However, since
-# `fldmod` is sometimes not being inlined, that constant information is not available to the
-# optimizer. We need an inlined version of fldmod so that the compiler can replace expensive
-# divide-by-power-of-ten instructions with the cheaper multiply-by-inverse-coefficient.
-@inline fldmodinline(x,y) = (fld(x,y), mod(x,y))
-
 # multiplication rounds to nearest even representation
-# TODO: can we use floating point to speed this up? after we build a
-# correctness test suite.
 function *(x::FD{T, f}, y::FD{T, f}) where {T, f}
     powt = coefficient(FD{T, f})
-    quotient, remainder = fldmodinline(widemul(x.i, y.i), powt)
+    quotient, remainder = fldmod_by_const(widemul(x.i, y.i), powt)
     reinterpret(FD{T, f}, _round_to_even(quotient, remainder, powt))
 end
 
@@ -197,12 +191,12 @@ floor(x::FD{T, f}) where {T, f} = FD{T, f}(fld(x.i, coefficient(FD{T, f})))
 # TODO: round with number of digits; should be easy
 function round(x::FD{T, f}, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
     powt = coefficient(FD{T, f})
-    quotient, remainder = fldmodinline(x.i, powt)
+    quotient, remainder = fldmod_by_const(x.i, powt)
     FD{T, f}(_round_to_even(quotient, remainder, powt))
 end
 function ceil(x::FD{T, f}) where {T, f}
     powt = coefficient(FD{T, f})
-    quotient, remainder = fldmodinline(x.i, powt)
+    quotient, remainder = fldmod_by_const(x.i, powt)
     if remainder > 0
         FD{T, f}(quotient + one(quotient))
     else
@@ -485,14 +479,17 @@ max_exp10(::Type{BigInt}) = -1
 # optimized away by the compiler during const-folding.
 @eval max_exp10(::Type{Int128}) = $(max_exp10(Int128))
 
+# coefficient is marked pure. This is needed to ensure that the result is always available
+# at compile time, and can therefore be used when optimizing mathematical operations.
+# In particular, computing this at runtime, can cause type-instability in fldmod_by_const.
 """
     coefficient(::Type{FD{T, f}}) -> T
 
 Compute `10^f` as an Integer without overflow. Note that overflow will not occur for any
 constructable `FD{T, f}`.
 """
-coefficient(::Type{FD{T, f}}) where {T, f} = T(10)^f
-coefficient(fd::FD{T, f}) where {T, f} = coefficient(FD{T, f})
+Base.@pure coefficient(::Type{FD{T, f}}) where {T, f} = T(10)^f
+Base.@pure coefficient(fd::FD{T, f}) where {T, f} = coefficient(FD{T, f})
 value(fd::FD) = fd.i
 
 # for generic hashing
