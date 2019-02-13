@@ -794,24 +794,24 @@ end
         frange = filter(f->f<=maxF, fs)
         # Unary operations
         @testset for f in frange
-            @test @inferred(zero(FD{T,f}(1))) == FD{T,f}(0)
-            @test @inferred(one(FD{T,f}(1))) == FD{T,f}(1)
-            @test @inferred(ceil(FD{T,f}(1))) == FD{T,f}(1)
-            @test @inferred(round(FD{T,f}(1))) == FD{T,f}(1)
-            @test @inferred(abs(FD{T,f}(1))) == FD{T,f}(1)
-            @test @inferred(FD{T,f}(1)^2) == FD{T,f}(1)
-            @test (@inferred(typemax(FD{T,f})); true)
+            @test @inferred(zero(FD{T,f}(1))) === FD{T,f}(0)
+            @test @inferred(one(FD{T,f}(1))) === FD{T,f}(1)
+            @test @inferred(ceil(FD{T,f}(1))) === FD{T,f}(1)
+            @test @inferred(round(FD{T,f}(1))) === FD{T,f}(1)
+            @test @inferred(abs(FD{T,f}(1))) === FD{T,f}(1)
+            @test @inferred(FD{T,f}(1)^2) === FD{T,f}(1)
+            @test @inferred(typemax(FD{T,f})) isa FD{T,f}
         end
         # Binary operations
         @testset for (f1,f2) in Iterators.product(frange, frange)
             fmax = max(f1,f2)
-            @test @inferred(FD{T,f1}(1) + FD{T,f2}(0)) == FD{T,fmax}(1)
-            @test @inferred(FD{T,f1}(1) - FD{T,f2}(0)) == FD{T,fmax}(1)
-            @test @inferred(FD{T,f1}(1) * FD{T,f2}(1)) == FD{T,fmax}(1)
-            @test @inferred(FD{T,f1}(1) / FD{T,f2}(1)) == FD{T,fmax}(1)
-            @test @inferred(FD{T,f1}(1) ÷ FD{T,f2}(1)) == FD{T,fmax}(1)
-            @test @inferred(max(FD{T,f1}(1), FD{T,f2}(0))) == FD{T,fmax}(1)
-            @test @inferred(min(FD{T,f1}(1), FD{T,f2}(0))) == FD{T,fmax}(0)
+            @test @inferred(FD{T,f1}(1) + FD{T,f2}(0)) === FD{T,fmax}(1)
+            @test @inferred(FD{T,f1}(1) - FD{T,f2}(0)) === FD{T,fmax}(1)
+            @test @inferred(FD{T,f1}(1) * FD{T,f2}(1)) === FD{T,fmax}(1)
+            @test @inferred(FD{T,f1}(1) / FD{T,f2}(1)) === FD{T,fmax}(1)
+            @test @inferred(FD{T,f1}(1) ÷ FD{T,f2}(1)) === FD{T,fmax}(1)
+            @test @inferred(max(FD{T,f1}(1), FD{T,f2}(0))) === FD{T,fmax}(1)
+            @test @inferred(min(FD{T,f1}(1), FD{T,f2}(0))) === FD{T,fmax}(0)
         end
     end
 end
