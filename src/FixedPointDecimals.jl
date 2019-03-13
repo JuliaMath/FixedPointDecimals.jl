@@ -479,7 +479,7 @@ max_exp10(::Type{BigInt}) = -1
 # optimized away by the compiler during const-folding.
 @eval max_exp10(::Type{Int128}) = $(max_exp10(Int128))
 
-# coefficient is marked pure. This is needed to ensure that the result is always available
+# NOTE: coefficient is marked pure. This is needed to ensure that the result is always available
 # at compile time, and can therefore be used when optimizing mathematical operations.
 # In particular, computing this at runtime, can cause type-instability in fldmod_by_const.
 """

@@ -101,6 +101,9 @@ function div_by_const(x::T, ::Val{C}) where {T, C}
     return T(out)
 end
 
+# NOTE: This function is marked `@pure` because it has no side-effects and depends on no global
+# state. The value will never change for a given (type,precision) pair.
+# This allows its result to be const-folded away when called with Const values.
 """
     calculate_inverse_coeff(::Type{T}, C)
 
@@ -120,9 +123,6 @@ julia> calculate_inverse_coeff(UInt, 100)
 (0xa3d70a3d70a3d70b, 6)
 ```
 """
-# This function is marked `@pure` because it has no side-effects and depends on no global
-# state. The value will never change for a given (type,precision) pair.
-# This allows its result to be const-folded away when called with Const values.
 Base.@pure function calculate_inverse_coeff(::Type{T}, C) where {T}
     # First, calculate 2^nbits(T)/C
     # We shift away leading zeros to preserve the most precision when we use it to multiply
