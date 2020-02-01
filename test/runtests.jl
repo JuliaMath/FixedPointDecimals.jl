@@ -540,7 +540,8 @@ end
     @testset "div with rounding modes" begin
         if VERSION >= v"1.4.0-"
             @testset for x in keyvalues[FD2]
-                for R in (RoundUp, RoundDown, RoundNearest, RoundNearestTiesAway)
+                # TODO: Test RoundFromZero -- https://github.com/JuliaLang/julia/issues/34519
+                for R in (RoundToZero, RoundUp, RoundDown, RoundNearest, RoundNearestTiesAway)
                     @test div(x, 2one(x), R) === div(x, 2, R) === FD2(div(x.i, FD2(2).i, R))
                 end
             end
