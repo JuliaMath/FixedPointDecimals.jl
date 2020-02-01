@@ -545,6 +545,9 @@ end
                 end
             end
         end
+        @testset for x in keyvalues[FD2], f in (fld, cld, fld1, div)
+            @test f(x, 2one(x)) === f(x, 2) === FD2(f(x.i, FD2(2).i))
+        end
     end
 end
 
