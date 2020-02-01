@@ -536,6 +536,20 @@ end
 
         @test one(FD{Int32, 2}) ÷ one(FD{Int64, 6}) isa FD{Int64, 6}
     end
+
+    @testset "div with rounding modes" begin
+        if VERSION >= v"1.4.0-"
+            @testset for x in keyvalues[FD2]
+                # TODO: Test RoundFromZero -- https://github.com/JuliaLang/julia/issues/34519
+                for R in (RoundToZero, RoundUp, RoundDown, RoundNearest, RoundNearestTiesAway)
+                    @test div(x, 2one(x), R) === div(x, 2, R) === FD2(div(x.i, FD2(2).i, R))
+                end
+            end
+        end
+        @testset for x in keyvalues[FD2], f in (fld, cld, fld1, div)
+            @test f(x, 2one(x)) === f(x, 2) === FD2(f(x.i, FD2(2).i))
+        end
+    end
 end
 
 @testset "abs, sign" begin
