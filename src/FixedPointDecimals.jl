@@ -27,10 +27,7 @@ module FixedPointDecimals
 
 export FixedDecimal, RoundThrows
 
-using Base: decompose
-
-const BitInteger = Union{Int8, UInt8, Int16, UInt16, Int32, UInt32, Int64,
-                         UInt64, Int128, UInt128}
+using Base: decompose, BitInteger
 
 # floats that support fma and are roughly IEEE-like
 const FMAFloat = Union{Float16, Float32, Float64, BigFloat}
@@ -472,8 +469,17 @@ end
 
 The highest value of `x` which does not result in an overflow when evaluating `T(10)^x`. For
 types of `T` that do not overflow -1 will be returned.
+
+NOTE: This function is expensive, since it contains a while-loop, but it is actually
+      computing a constant value for types, so it really only needs to be run once per type.
+      We achieve this by `@eval`ing new methods in a loop, below. Users can do this
+      themselves to add more "frozen" methods for custom Integer types:
+      ```julia
+      @eval FixedPointDecimals.max_exp10(::Type{CustomIntType}) = \$(max_exp10(CustomIntType))
+      ```
+      This function does not have or depend on any side-effects.
 """
-Base.@pure function max_exp10(::Type{T}) where {T <: Integer}
+function max_exp10(::Type{T}) where {T <: Integer}
     # This function is marked as `Base.@pure`. Even though it does call some generic
     # functions, they are all simple methods that should be able to be evaluated as
     # constants. This function does not have or depend on any side-effects.
@@ -494,9 +500,12 @@ Base.@pure function max_exp10(::Type{T}) where {T <: Integer}
 end
 
 max_exp10(::Type{BigInt}) = -1
-# Freeze the evaluation for Int128, since max_exp10(Int128) is too compilicated to get
-# optimized away by the compiler during const-folding.
-@eval max_exp10(::Type{Int128}) = $(max_exp10(Int128))
+# Freeze the evaluation for BitInteger types, since max_exp10() is too compilicated to get
+# optimized away by the compiler during const-folding. (We can't freeze for user-defined
+# types because we don't know what they are yet.)
+for T in Base.BitInteger_types
+    @eval max_exp10(::Type{$T}) = $(max_exp10(T))
+end
 
 # coefficient is marked pure. This is needed to ensure that the result is always available
 # at compile time, and can therefore be used when optimizing mathematical operations.
