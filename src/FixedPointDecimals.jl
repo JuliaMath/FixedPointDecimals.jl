@@ -305,6 +305,9 @@ for divfn in [:div, :fld, :fld1]
     # We don't need any widening logic, since we won't be multiplying by the coefficient.
     @eval $divfn(x::T, y::T) where {T <: FD} = T($divfn(x.i, y.i))
 end
+if VERSION >= v"1.4.0-"
+    Base.div(x::T, y::T, r::RoundingMode) where {T <: FD} = T(div(x.i, y.i, r))
+end
 
 convert(::Type{AbstractFloat}, x::FD) = convert(floattype(typeof(x)), x)
 function convert(::Type{TF}, x::FD{T, f}) where {TF <: AbstractFloat, T, f}
