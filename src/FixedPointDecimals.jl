@@ -300,6 +300,8 @@ end
 for remfn in [:rem, :mod, :mod1, :min, :max]
     @eval $remfn(x::T, y::T) where {T <: FD} = reinterpret(T, $remfn(x.i, y.i))
 end
+# TODO: When we upgrade to a min julia version >=1.4 (i.e Julia 2.0), this block can be
+# dropped in favor of three-argument `div`, below.
 for divfn in [:div, :fld, :fld1, :cld]
     # div(x.i, y.i) eliminates the scaling coefficient, so we call the FD constructor.
     # We don't need any widening logic, since we won't be multiplying by the coefficient.
