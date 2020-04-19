@@ -500,6 +500,7 @@ function max_exp10(::Type{T}) where {T <: Integer}
 end
 
 max_exp10(::Type{BigInt}) = -1
+
 # Freeze the evaluation for BitInteger types, since max_exp10() is too compilicated to get
 # optimized away by the compiler during const-folding. (We can't freeze for user-defined
 # types because we don't know what they are yet.)
