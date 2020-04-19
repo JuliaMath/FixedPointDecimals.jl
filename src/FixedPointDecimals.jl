@@ -27,13 +27,7 @@ module FixedPointDecimals
 
 export FixedDecimal, RoundThrows
 
-import Base: reinterpret, zero, one, abs, sign, ==, <, <=, +, -, /, *, div, rem, divrem,
-             fld, mod, fldmod, fld1, mod1, fldmod1, isinteger, typemin, typemax,
-             print, show, string, convert, parse, promote_rule, min, max,
-             floatmin, floatmax, trunc, round, floor, ceil, eps, float, widemul, decompose
-
-const BitInteger = Union{Int8, UInt8, Int16, UInt16, Int32, UInt32, Int64,
-                         UInt64, Int128, UInt128}
+using Base: decompose, BitInteger, @pure
 
 # floats that support fma and are roughly IEEE-like
 const FMAFloat = Union{Float16, Float32, Float64, BigFloat}
@@ -85,8 +79,8 @@ struct FixedDecimal{T <: Integer, f} <: Real
     i::T
 
     # inner constructor
-    # This function is marked as `Base.@pure`. It does not have or depend on any side-effects.
-    Base.@pure function Base.reinterpret(::Type{FixedDecimal{T, f}}, i::Integer) where {T, f}
+    # This function is marked as `@pure`. It does not have or depend on any side-effects.
+    @pure function Base.reinterpret(::Type{FixedDecimal{T, f}}, i::Integer) where {T, f}
         n = max_exp10(T)
         if f >= 0 && (n < 0 || f <= n)
             new{T, f}(i % T)
@@ -114,22 +108,22 @@ floattype(::Type{<:FD{T}}) where {T<:Integer} = Float64
 floattype(::Type{<:FD{BigInt}}) = BigFloat
 
 # basic operators
--(x::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, -x.i)
-abs(x::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, abs(x.i))
+Base.:-(x::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, -x.i)
+Base.abs(x::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, abs(x.i))
 
-+(x::FD{T, f}, y::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, x.i+y.i)
--(x::FD{T, f}, y::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, x.i-y.i)
+Base.:+(x::FD{T, f}, y::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, x.i+y.i)
+Base.:-(x::FD{T, f}, y::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, x.i-y.i)
 
 # wide multiplication
-Base.@pure function widemul(x::FD{<:Any, f}, y::FD{<:Any, g}) where {f, g}
+@pure function Base.widemul(x::FD{<:Any, f}, y::FD{<:Any, g}) where {f, g}
     i = widemul(x.i, y.i)
     reinterpret(FD{typeof(i), f + g}, i)
 end
-Base.@pure function widemul(x::FD{T, f}, y::Integer) where {T, f}
+@pure function Base.widemul(x::FD{T, f}, y::Integer) where {T, f}
     i = widemul(x.i, y)
     reinterpret(FD{typeof(i), f}, i)
 end
-Base.@pure widemul(x::Integer, y::FD) = widemul(y, x)
+@pure Base.widemul(x::Integer, y::FD) = widemul(y, x)
 
 """
     _round_to_even(quotient, remainder, divisor)
@@ -160,7 +154,7 @@ _round_to_even(q, r, d) = _round_to_even(promote(q, r, d)...)
 # multiplication rounds to nearest even representation
 # TODO: can we use floating point to speed this up? after we build a
 # correctness test suite.
-function *(x::FD{T, f}, y::FD{T, f}) where {T, f}
+function Base.:*(x::FD{T, f}, y::FD{T, f}) where {T, f}
     powt = coefficient(FD{T, f})
     quotient, remainder = fldmodinline(widemul(x.i, y.i), powt)
     reinterpret(FD{T, f}, _round_to_even(quotient, remainder, powt))
@@ -168,10 +162,10 @@ end
 
 # these functions are needed to avoid InexactError when converting from the
 # integer type
-*(x::Integer, y::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, T(x * y.i))
-*(x::FD{T, f}, y::Integer) where {T, f} = reinterpret(FD{T, f}, T(x.i * y))
+Base.:*(x::Integer, y::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, T(x * y.i))
+Base.:*(x::FD{T, f}, y::Integer) where {T, f} = reinterpret(FD{T, f}, T(x.i * y))
 
-function /(x::FD{T, f}, y::FD{T, f}) where {T, f}
+function Base.:/(x::FD{T, f}, y::FD{T, f}) where {T, f}
     powt = coefficient(FD{T, f})
     quotient, remainder = fldmod(widemul(x.i, powt), y.i)
     reinterpret(FD{T, f}, T(_round_to_even(quotient, remainder, y.i)))
@@ -179,29 +173,29 @@ end
 
 # These functions allow us to perform division with integers outside of the range of the
 # FixedDecimal.
-function /(x::Integer, y::FD{T, f}) where {T, f}
+function Base.:/(x::Integer, y::FD{T, f}) where {T, f}
     powt = coefficient(FD{T, f})
     powtsq = widemul(powt, powt)
     quotient, remainder = fldmod(widemul(x, powtsq), y.i)
     reinterpret(FD{T, f}, T(_round_to_even(quotient, remainder, y.i)))
 end
 
-function /(x::FD{T, f}, y::Integer) where {T, f}
+function Base.:/(x::FD{T, f}, y::Integer) where {T, f}
     quotient, remainder = fldmod(x.i, y)
     reinterpret(FD{T, f}, T(_round_to_even(quotient, remainder, y)))
 end
 
 # integerification
-trunc(x::FD{T, f}) where {T, f} = FD{T, f}(div(x.i, coefficient(FD{T, f})))
-floor(x::FD{T, f}) where {T, f} = FD{T, f}(fld(x.i, coefficient(FD{T, f})))
+Base.trunc(x::FD{T, f}) where {T, f} = FD{T, f}(div(x.i, coefficient(FD{T, f})))
+Base.floor(x::FD{T, f}) where {T, f} = FD{T, f}(fld(x.i, coefficient(FD{T, f})))
 
 # TODO: round with number of digits; should be easy
-function round(x::FD{T, f}, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
+function Base.round(x::FD{T, f}, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
     powt = coefficient(FD{T, f})
     quotient, remainder = fldmodinline(x.i, powt)
     FD{T, f}(_round_to_even(quotient, remainder, powt))
 end
-function ceil(x::FD{T, f}) where {T, f}
+function Base.ceil(x::FD{T, f}) where {T, f}
     powt = coefficient(FD{T, f})
     quotient, remainder = fldmodinline(x.i, powt)
     if remainder > 0
@@ -243,10 +237,10 @@ end
 _apply_exact_float(f, ::Type{T}, x::Real, i::Integer) where T = f(T, x, i)
 
 for fn in [:trunc, :floor, :ceil]
-    @eval ($fn(::Type{TI}, x::FD)::TI) where {TI <: Integer} = $fn(x)
+    @eval (Base.$fn(::Type{TI}, x::FD)::TI) where {TI <: Integer} = $fn(x)
 
     # round/trunc/ceil/flooring to FD; generic
-    @eval function $fn(::Type{FD{T, f}}, x::Real) where {T, f}
+    @eval function Base.$fn(::Type{FD{T, f}}, x::Real) where {T, f}
         powt = coefficient(FD{T, f})
         # Use machine Float64 if possible, but fall back to BigFloat if we need
         # more precision. 4f bits suffices.
@@ -254,33 +248,33 @@ for fn in [:trunc, :floor, :ceil]
         reinterpret(FD{T, f}, val)
     end
 end
-function round(::Type{TI}, x::FD, ::RoundingMode{:Nearest}=RoundNearest) where {TI <: Integer}
+function Base.round(::Type{TI}, x::FD, ::RoundingMode{:Nearest}=RoundNearest) where {TI <: Integer}
     convert(TI, round(x))::TI
 end
-function round(::Type{FD{T, f}}, x::Real, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
+function Base.round(::Type{FD{T, f}}, x::Real, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
     reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
 end
 
 # needed to avoid ambiguity
-function round(::Type{FD{T, f}}, x::Rational, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
+function Base.round(::Type{FD{T, f}}, x::Rational, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
     reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
 end
 
 # conversions and promotions
-convert(::Type{FD{T, f}}, x::FD{T, f}) where {T, f} = x  # Converting an FD to itself is a no-op
+Base.convert(::Type{FD{T, f}}, x::FD{T, f}) where {T, f} = x  # Converting an FD to itself is a no-op
 
-function convert(::Type{FD{T, f}}, x::Integer) where {T, f}
+function Base.convert(::Type{FD{T, f}}, x::Integer) where {T, f}
     reinterpret(FD{T, f}, T(widemul(x, coefficient(FD{T, f}))))
 end
 
-convert(::Type{T}, x::AbstractFloat) where {T <: FD} = round(T, x)
+Base.convert(::Type{T}, x::AbstractFloat) where {T <: FD} = round(T, x)
 
-function convert(::Type{FD{T, f}}, x::Rational) where {T, f}
+function Base.convert(::Type{FD{T, f}}, x::Rational) where {T, f}
     powt = coefficient(FD{T, f})
     reinterpret(FD{T, f}, T(x * powt))::FD{T, f}
 end
 
-function convert(::Type{FD{T, f}}, x::FD{U, g}) where {T, f, U, g}
+function Base.convert(::Type{FD{T, f}}, x::FD{U, g}) where {T, f, U, g}
     if f ≥ g
         # Compute `10^(f - g)` without overflow
         powt = div(coefficient(FD{T, f}), coefficient(FD{U, g}))
@@ -298,7 +292,7 @@ function convert(::Type{FD{T, f}}, x::FD{U, g}) where {T, f, U, g}
 end
 
 for remfn in [:rem, :mod, :mod1, :min, :max]
-    @eval $remfn(x::T, y::T) where {T <: FD} = reinterpret(T, $remfn(x.i, y.i))
+    @eval Base.$remfn(x::T, y::T) where {T <: FD} = reinterpret(T, $remfn(x.i, y.i))
 end
 # TODO: When we upgrade to a min julia version >=1.4 (i.e Julia 2.0), this block can be
 # dropped in favor of three-argument `div`, below.
@@ -313,33 +307,33 @@ if VERSION >= v"1.4.0-"
     Base.div(x::T, y::T, r::RoundingMode) where {T <: FD} = T(div(x.i, y.i, r))
 end
 
-convert(::Type{AbstractFloat}, x::FD) = convert(floattype(typeof(x)), x)
-function convert(::Type{TF}, x::FD{T, f}) where {TF <: AbstractFloat, T, f}
+Base.convert(::Type{AbstractFloat}, x::FD) = convert(floattype(typeof(x)), x)
+function Base.convert(::Type{TF}, x::FD{T, f}) where {TF <: AbstractFloat, T, f}
     convert(TF, x.i / coefficient(FD{T, f}))::TF
 end
 
-function convert(::Type{TF}, x::FD{T, f}) where {TF <: BigFloat, T, f}
+function Base.convert(::Type{TF}, x::FD{T, f}) where {TF <: BigFloat, T, f}
     convert(TF, BigInt(x.i) / BigInt(coefficient(FD{T, f})))::TF
 end
 
-function convert(::Type{TI}, x::FD{T, f}) where {TI <: Integer, T, f}
+function Base.convert(::Type{TI}, x::FD{T, f}) where {TI <: Integer, T, f}
     isinteger(x) || throw(InexactError(:convert, TI, x))
     convert(TI, div(x.i, coefficient(FD{T, f})))::TI
 end
 
-function convert(::Type{TR}, x::FD{T, f}) where {TR <: Rational, T, f}
+function Base.convert(::Type{TR}, x::FD{T, f}) where {TR <: Rational, T, f}
     convert(TR, x.i // coefficient(FD{T, f}))::TR
 end
 
 (::Type{T})(x::FD) where {T<:Union{AbstractFloat,Integer,Rational}} = convert(T, x)
 
-promote_rule(::Type{FD{T, f}}, ::Type{<:Integer}) where {T, f} = FD{T, f}
-promote_rule(::Type{<:FD}, ::Type{TF}) where {TF <: AbstractFloat} = TF
-promote_rule(::Type{<:FD}, ::Type{Rational{TR}}) where {TR} = Rational{TR}
+Base.promote_rule(::Type{FD{T, f}}, ::Type{<:Integer}) where {T, f} = FD{T, f}
+Base.promote_rule(::Type{<:FD}, ::Type{TF}) where {TF <: AbstractFloat} = TF
+Base.promote_rule(::Type{<:FD}, ::Type{Rational{TR}}) where {TR} = Rational{TR}
 
 # TODO: decide if these are the right semantics;
 # right now we pick the bigger int type and the bigger decimal point
-Base.@pure function promote_rule(::Type{FD{T, f}}, ::Type{FD{U, g}}) where {T, f, U, g}
+@pure function Base.promote_rule(::Type{FD{T, f}}, ::Type{FD{U, g}}) where {T, f, U, g}
     FD{promote_type(T, U), max(f, g)}
 end
 
@@ -348,24 +342,24 @@ Base.zero(::Type{FD{T, f}}) where {T, f} = reinterpret(FD{T, f}, zero(T))
 Base.one(::Type{FD{T, f}}) where {T, f} = reinterpret(FD{T, f}, coefficient(FD{T, f}))
 
 # comparison
-==(x::T, y::T) where {T <: FD} = x.i == y.i
- <(x::T, y::T) where {T <: FD} = x.i  < y.i
-<=(x::T, y::T) where {T <: FD} = x.i <= y.i
+Base.:(==)(x::T, y::T) where {T <: FD} = x.i == y.i
+Base.:(<)(x::T, y::T) where {T <: FD} = x.i < y.i
+Base.:(<=)(x::T, y::T) where {T <: FD} = x.i <= y.i
 
 # predicates and traits
-isinteger(x::FD{T, f}) where {T, f} = rem(x.i, coefficient(FD{T, f})) == 0
-typemin(::Type{FD{T, f}}) where {T, f} = reinterpret(FD{T, f}, typemin(T))
-typemax(::Type{FD{T, f}}) where {T, f}= reinterpret(FD{T, f}, typemax(T))
-eps(::Type{T}) where {T <: FD} = reinterpret(T, 1)
-eps(x::FD) = eps(typeof(x))
-floatmin(::Type{T}) where {T <: FD} = eps(T)
-floatmax(::Type{T}) where {T <: FD} = typemax(T)
+Base.isinteger(x::FD{T, f}) where {T, f} = rem(x.i, coefficient(FD{T, f})) == 0
+Base.typemin(::Type{FD{T, f}}) where {T, f} = reinterpret(FD{T, f}, typemin(T))
+Base.typemax(::Type{FD{T, f}}) where {T, f}= reinterpret(FD{T, f}, typemax(T))
+Base.eps(::Type{T}) where {T <: FD} = reinterpret(T, 1)
+Base.eps(x::FD) = eps(typeof(x))
+Base.floatmin(::Type{T}) where {T <: FD} = eps(T)
+Base.floatmax(::Type{T}) where {T <: FD} = typemax(T)
 
 # printing
-function print(io::IO, x::FD{T, 0}) where T
+function Base.print(io::IO, x::FD{T, 0}) where T
     print(io, x.i)
 end
-function print(io::IO, x::FD{T, f}) where {T, f}
+function Base.print(io::IO, x::FD{T, f}) where {T, f}
     iscompact = get(io, :compact, false)
 
     # note: a is negative if x.i == typemin(x.i)
@@ -387,7 +381,7 @@ function print(io::IO, x::FD{T, f}) where {T, f}
     print(io, integer, '.', fractionchars)
 end
 
-function show(io::IO, x::FD{T, f}) where {T, f}
+function Base.show(io::IO, x::FD{T, f}) where {T, f}
     iscompact = get(io, :compact, false)
     if !iscompact
         print(io, "FixedDecimal{$T,$f}(")
@@ -407,7 +401,7 @@ Raises an `InexactError` if any rounding is necessary.
 """
 const RoundThrows = RoundingMode{:Throw}()
 
-function parse(::Type{FD{T, f}}, str::AbstractString, mode::RoundingMode=RoundNearest) where {T, f}
+function Base.parse(::Type{FD{T, f}}, str::AbstractString, mode::RoundingMode=RoundNearest) where {T, f}
     if !(mode in [RoundThrows, RoundNearest, RoundToZero])
         throw(ArgumentError("Unhandled rounding mode $mode"))
     end
@@ -475,12 +469,17 @@ end
 
 The highest value of `x` which does not result in an overflow when evaluating `T(10)^x`. For
 types of `T` that do not overflow -1 will be returned.
-"""
-Base.@pure function max_exp10(::Type{T}) where {T <: Integer}
-    # This function is marked as `Base.@pure`. Even though it does call some generic
-    # functions, they are all simple methods that should be able to be evaluated as
-    # constants. This function does not have or depend on any side-effects.
 
+NOTE: This function is expensive, since it contains a while-loop, but it is actually
+      computing a constant value for types, so it really only needs to be run once per type.
+      We achieve this by `@eval`ing new methods in a loop, below. Users can do this
+      themselves to add more "frozen" methods for custom Integer types:
+      ```julia
+      @eval FixedPointDecimals.max_exp10(::Type{CustomIntType}) = \$(max_exp10(CustomIntType))
+      ```
+      This function does not have or depend on any side-effects.
+"""
+function max_exp10(::Type{T}) where {T <: Integer}
     W = widen(T)
     type_max = W(typemax(T))
 
@@ -497,9 +496,13 @@ Base.@pure function max_exp10(::Type{T}) where {T <: Integer}
 end
 
 max_exp10(::Type{BigInt}) = -1
-# Freeze the evaluation for Int128, since max_exp10(Int128) is too compilicated to get
-# optimized away by the compiler during const-folding.
-@eval max_exp10(::Type{Int128}) = $(max_exp10(Int128))
+
+# Freeze the evaluation for BitInteger types, since max_exp10() is too compilicated to get
+# optimized away by the compiler during const-folding. (We can't freeze for user-defined
+# types because we don't know what they are yet.)
+for T in Base.BitInteger_types
+    @eval max_exp10(::Type{$T}) = $(max_exp10(T))
+end
 
 # coefficient is marked pure. This is needed to ensure that the result is always available
 # at compile time, and can therefore be used when optimizing mathematical operations.
@@ -509,11 +512,11 @@ max_exp10(::Type{BigInt}) = -1
 Compute `10^f` as an Integer without overflow. Note that overflow will not occur for any
 constructable `FD{T, f}`.
 """
-Base.@pure coefficient(::Type{FD{T, f}}) where {T, f} = T(10)^f
-Base.@pure coefficient(fd::FD{T, f}) where {T, f} = coefficient(FD{T, f})
+@pure coefficient(::Type{FD{T, f}}) where {T, f} = T(10)^f
+@pure coefficient(fd::FD{T, f}) where {T, f} = coefficient(FD{T, f})
 value(fd::FD) = fd.i
 
 # for generic hashing
-decompose(fd::FD) = decompose(Rational(fd))
+Base.decompose(fd::FD) = decompose(Rational(fd))
 
 end
