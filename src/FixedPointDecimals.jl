@@ -27,7 +27,7 @@ module FixedPointDecimals
 
 export FixedDecimal, RoundThrows
 
-using Base: decompose, BitInteger
+using Base: decompose, BitInteger, @pure
 
 # floats that support fma and are roughly IEEE-like
 const FMAFloat = Union{Float16, Float32, Float64, BigFloat}
@@ -79,8 +79,8 @@ struct FixedDecimal{T <: Integer, f} <: Real
     i::T
 
     # inner constructor
-    # This function is marked as `Base.@pure`. It does not have or depend on any side-effects.
-    Base.@pure function Base.reinterpret(::Type{FixedDecimal{T, f}}, i::Integer) where {T, f}
+    # This function is marked as `@pure`. It does not have or depend on any side-effects.
+    @pure function Base.reinterpret(::Type{FixedDecimal{T, f}}, i::Integer) where {T, f}
         n = max_exp10(T)
         if f >= 0 && (n < 0 || f <= n)
             new{T, f}(i % T)
@@ -115,15 +115,15 @@ Base.:+(x::FD{T, f}, y::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, x.i+y.i)
 Base.:-(x::FD{T, f}, y::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, x.i-y.i)
 
 # wide multiplication
-Base.@pure function Base.widemul(x::FD{<:Any, f}, y::FD{<:Any, g}) where {f, g}
+@pure function Base.widemul(x::FD{<:Any, f}, y::FD{<:Any, g}) where {f, g}
     i = widemul(x.i, y.i)
     reinterpret(FD{typeof(i), f + g}, i)
 end
-Base.@pure function Base.widemul(x::FD{T, f}, y::Integer) where {T, f}
+@pure function Base.widemul(x::FD{T, f}, y::Integer) where {T, f}
     i = widemul(x.i, y)
     reinterpret(FD{typeof(i), f}, i)
 end
-Base.@pure Base.widemul(x::Integer, y::FD) = widemul(y, x)
+@pure Base.widemul(x::Integer, y::FD) = widemul(y, x)
 
 """
     _round_to_even(quotient, remainder, divisor)
@@ -333,7 +333,7 @@ Base.promote_rule(::Type{<:FD}, ::Type{Rational{TR}}) where {TR} = Rational{TR}
 
 # TODO: decide if these are the right semantics;
 # right now we pick the bigger int type and the bigger decimal point
-Base.@pure function Base.promote_rule(::Type{FD{T, f}}, ::Type{FD{U, g}}) where {T, f, U, g}
+@pure function Base.promote_rule(::Type{FD{T, f}}, ::Type{FD{U, g}}) where {T, f, U, g}
     FD{promote_type(T, U), max(f, g)}
 end
 
@@ -480,7 +480,7 @@ NOTE: This function is expensive, since it contains a while-loop, but it is actu
       This function does not have or depend on any side-effects.
 """
 function max_exp10(::Type{T}) where {T <: Integer}
-    # This function is marked as `Base.@pure`. Even though it does call some generic
+    # This function is marked as `@pure`. Even though it does call some generic
     # functions, they are all simple methods that should be able to be evaluated as
     # constants. This function does not have or depend on any side-effects.
 
@@ -516,8 +516,8 @@ end
 Compute `10^f` as an Integer without overflow. Note that overflow will not occur for any
 constructable `FD{T, f}`.
 """
-Base.@pure coefficient(::Type{FD{T, f}}) where {T, f} = T(10)^f
-Base.@pure coefficient(fd::FD{T, f}) where {T, f} = coefficient(FD{T, f})
+@pure coefficient(::Type{FD{T, f}}) where {T, f} = T(10)^f
+@pure coefficient(fd::FD{T, f}) where {T, f} = coefficient(FD{T, f})
 value(fd::FD) = fd.i
 
 # for generic hashing
