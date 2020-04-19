@@ -343,7 +343,7 @@ Base.one(::Type{FD{T, f}}) where {T, f} = reinterpret(FD{T, f}, coefficient(FD{T
 
 # comparison
 Base.:(==)(x::T, y::T) where {T <: FD} = x.i == y.i
-Base.:( <)(x::T, y::T) where {T <: FD} = x.i  < y.i
+Base.:(<)(x::T, y::T) where {T <: FD} = x.i < y.i
 Base.:(<=)(x::T, y::T) where {T <: FD} = x.i <= y.i
 
 # predicates and traits
@@ -480,10 +480,6 @@ NOTE: This function is expensive, since it contains a while-loop, but it is actu
       This function does not have or depend on any side-effects.
 """
 function max_exp10(::Type{T}) where {T <: Integer}
-    # This function is marked as `@pure`. Even though it does call some generic
-    # functions, they are all simple methods that should be able to be evaluated as
-    # constants. This function does not have or depend on any side-effects.
-
     W = widen(T)
     type_max = W(typemax(T))
 
