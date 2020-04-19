@@ -294,6 +294,14 @@ end
 for remfn in [:rem, :mod, :mod1, :min, :max]
     @eval Base.$remfn(x::T, y::T) where {T <: FD} = reinterpret(T, $remfn(x.i, y.i))
 end
+if VERSION >= v"1.4.0-"
+    # TODO: Add support for (RoundFromZero, RoundNearest, RoundNearestTiesAway), which
+    #       aren't supported for Ints.
+    for R in (RoundToZero, RoundUp, RoundDown)
+        Base.rem(x::T, y::T, r::typeof(R)) where {T <: FD} = reinterpret(T, rem(x.i, y.i, r))
+    end
+end
+
 # TODO: When we upgrade to a min julia version >=1.4 (i.e Julia 2.0), this block can be
 # dropped in favor of three-argument `div`, below.
 for divfn in [:div, :fld, :fld1, :cld]
