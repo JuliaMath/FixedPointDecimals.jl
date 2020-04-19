@@ -298,8 +298,7 @@ if VERSION >= v"1.4.0-"
     # TODO: Add support for (RoundFromZero, RoundNearest, RoundNearestTiesAway), which
     #       aren't supported for Ints.
     for R in (RoundToZero, RoundUp, RoundDown)
-        RType = typeof(R)
-        Base.rem(x::T, y::T, r::RType) where {T <: FD} = reinterpret(T, rem(x.i, y.i, r))
+        Base.rem(x::T, y::T, r::typeof(R)) where {T <: FD} = reinterpret(T, rem(x.i, y.i, r))
     end
 end
 
