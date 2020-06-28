@@ -176,6 +176,12 @@ end
         @test convert(Rational, fd) == 1//4
     end
 
+    @testset "get numerator and denominator" begin
+        fd = reinterpret(FD2, 25)
+        @test denominator(fd) == 4
+        @test numerator(fd) == 1
+    end
+
     @testset "invalid" begin
         @test_throws InexactError convert(FD2, FD4(0.0001))
         @test_throws InexactError convert(FD4, typemax(FD2))
