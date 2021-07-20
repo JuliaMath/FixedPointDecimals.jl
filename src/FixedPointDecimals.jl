@@ -402,7 +402,7 @@ Raises an `InexactError` if any rounding is necessary.
 const RoundThrows = RoundingMode{:Throw}()
 
 function Base.parse(::Type{FD{T, f}}, str::AbstractString, mode::RoundingMode=RoundNearest) where {T, f}
-    if !(mode in [RoundThrows, RoundNearest, RoundToZero])
+    if !(mode in (RoundThrows, RoundNearest, RoundToZero))
         throw(ArgumentError("Unhandled rounding mode $mode"))
     end
 
