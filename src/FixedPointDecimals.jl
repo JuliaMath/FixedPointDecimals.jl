@@ -118,15 +118,15 @@ abs(x::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, abs(x.i))
 -(x::FD{T, f}, y::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, x.i-y.i)
 
 # wide multiplication
-Base.@pure function widemul(x::FD{<:Any, f}, y::FD{<:Any, g}) where {f, g}
+function widemul(x::FD{<:Any, f}, y::FD{<:Any, g}) where {f, g}
     i = widemul(x.i, y.i)
     reinterpret(FD{typeof(i), f + g}, i)
 end
-Base.@pure function widemul(x::FD{T, f}, y::Integer) where {T, f}
+function widemul(x::FD{T, f}, y::Integer) where {T, f}
     i = widemul(x.i, y)
     reinterpret(FD{typeof(i), f}, i)
 end
-Base.@pure widemul(x::Integer, y::FD) = widemul(y, x)
+widemul(x::Integer, y::FD) = widemul(y, x)
 
 """
     _round_to_even(quotient, remainder, divisor)
@@ -326,7 +326,7 @@ promote_rule(::Type{<:FD}, ::Type{Rational{TR}}) where {TR} = Rational{TR}
 
 # TODO: decide if these are the right semantics;
 # right now we pick the bigger int type and the bigger decimal point
-Base.@pure function promote_rule(::Type{FD{T, f}}, ::Type{FD{U, g}}) where {T, f, U, g}
+function promote_rule(::Type{FD{T, f}}, ::Type{FD{U, g}}) where {T, f, U, g}
     FD{promote_type(T, U), max(f, g)}
 end
 
