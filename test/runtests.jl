@@ -1,6 +1,5 @@
 using FixedPointDecimals
-import FixedPointDecimals: FD, value
-using Compat
+using FixedPointDecimals: FD, value
 using Test
 using Printf
 using Base.Checked: checked_mul
@@ -108,6 +107,20 @@ end
     for T in CONTAINER_TYPES
         x = FixedPointDecimals.max_exp10(T)
         @test T(10)^x == widen(T(10))^x
+    end
+
+    @testset "custom integer types" begin
+        @eval begin
+            primitive type Int24 <: Integer 24 end
+            Base.typemax(::Type{Int24}) = 2^24
+            Base.widen(::Type{Int24}) = Int32
+        end
+
+        @test FixedPointDecimals.max_exp10(Int24) == 7
+
+        # Note: we're just pretending that this is unbounded
+        @eval primitive type IntUnbounded <: Integer 256 end
+        @test_throws MethodError FixedPointDecimals.max_exp10(IntUnbounded)
     end
 end
 
@@ -495,6 +508,50 @@ end
     end
 end
 
+@testset "truncating div" begin
+    @testset "div by 1" begin
+        @testset for x in keyvalues[FD2]
+            @test x ÷ one(x) === trunc(x)
+
+            # signed integers using two's complement have one additional negative value
+            if x < 0 && trunc(x) === typemin(x)
+                @test_throws InexactError x ÷ -one(x)
+            else
+                @test x ÷ -one(x) === -trunc(x)
+            end
+        end
+    end
+    @testset "div by 2" begin
+        @testset for x in keyvalues[FD2]
+            @test x ÷ 2one(x) === x ÷ 2 === FD2(x.i ÷ FD2(2).i)
+        end
+    end
+    @testset "return types" begin
+        @test div(2one(FD2), 3) isa FD2
+        @test one(FD2) ÷ one(FD2) isa FD2
+
+        # Promotion to bigger type
+        @test one(FD4) ÷ one(FD2) isa FD4
+        @test one(FD2) ÷ one(FD4) isa FD4
+
+        @test one(FD{Int32, 2}) ÷ one(FD{Int64, 6}) isa FD{Int64, 6}
+    end
+
+    @testset "div with rounding modes" begin
+        if VERSION >= v"1.4.0-"
+            @testset for x in keyvalues[FD2]
+                # TODO: Test RoundFromZero -- https://github.com/JuliaLang/julia/issues/34519
+                for R in (RoundToZero, RoundUp, RoundDown, RoundNearest, RoundNearestTiesAway)
+                    @test div(x, 2one(x), R) === div(x, 2, R) === FD2(div(x.i, FD2(2).i, R))
+                end
+            end
+        end
+        @testset for x in keyvalues[FD2], f in (fld, cld, fld1, div)
+            @test f(x, 2one(x)) === f(x, 2) === FD2(f(x.i, FD2(2).i))
+        end
+    end
+end
+
 @testset "abs, sign" begin
     @testset for T in [FD2, WFD4]
         for x in keyvalues[T]
@@ -743,6 +800,36 @@ epsi(::Type{T}) where T = eps(T)
     end
 end
 
+@testset "type stability" begin
+    # Test that basic operations are type stable for all the basic integer types.
+    fs = [0, 1, 2, 7, 16, 38]  # To save time, don't test all possible combinations.
+    @testset for T in (CONTAINER_TYPES..., BigInt,)
+        maxF = FixedPointDecimals.max_exp10(T)
+        frange = filter(f->f<=maxF, fs)
+        # Unary operations
+        @testset for f in frange
+            @test @inferred(zero(FD{T,f}(1))) === FD{T,f}(0)
+            @test @inferred(one(FD{T,f}(1))) === FD{T,f}(1)
+            @test @inferred(ceil(FD{T,f}(1))) === FD{T,f}(1)
+            @test @inferred(round(FD{T,f}(1))) === FD{T,f}(1)
+            @test @inferred(abs(FD{T,f}(1))) === FD{T,f}(1)
+            @test @inferred(FD{T,f}(1)^2) === FD{T,f}(1)
+            @test @inferred(typemax(FD{T,f})) isa FD{T,f}
+        end
+        # Binary operations
+        @testset for (f1,f2) in Iterators.product(frange, frange)
+            fmax = max(f1,f2)
+            @test @inferred(FD{T,f1}(1) + FD{T,f2}(0)) === FD{T,fmax}(1)
+            @test @inferred(FD{T,f1}(1) - FD{T,f2}(0)) === FD{T,fmax}(1)
+            @test @inferred(FD{T,f1}(1) * FD{T,f2}(1)) === FD{T,fmax}(1)
+            @test @inferred(FD{T,f1}(1) / FD{T,f2}(1)) === FD{T,fmax}(1)
+            @test @inferred(FD{T,f1}(1) ÷ FD{T,f2}(1)) === FD{T,fmax}(1)
+            @test @inferred(max(FD{T,f1}(1), FD{T,f2}(0))) === FD{T,fmax}(1)
+            @test @inferred(min(FD{T,f1}(1), FD{T,f2}(0))) === FD{T,fmax}(0)
+        end
+    end
+end
+
 @testset "print" begin
     @test string(FD2(1.00)) == "1.00"
     @test string(FD2(1.23)) == "1.23"
@@ -774,12 +861,12 @@ end
 
 @testset "show" begin
     @testset "compact" begin
-        @test sprintcompact(FD2(1.00)) == "1.0"
-        @test sprintcompact(FD2(1.23)) == "1.23"
-        @test sprintcompact(FD2(42.40)) == "42.4"
-        @test sprintcompact(FD2(-42.40)) == "-42.4"
-        @test sprintcompact(FD2(-0.01)) == "-0.01"
-        @test sprintcompact(FD2(0)) == "0.0"
+        @test sprint(show, FD2(1.00), context=:compact=>true) == "1.0"
+        @test sprint(show, FD2(1.23), context=:compact=>true) == "1.23"
+        @test sprint(show, FD2(42.40), context=:compact=>true) == "42.4"
+        @test sprint(show, FD2(-42.40), context=:compact=>true) == "-42.4"
+        @test sprint(show, FD2(-0.01), context=:compact=>true) == "-0.01"
+        @test sprint(show, FD2(0), context=:compact=>true) == "0.0"
 
         @test repr(typemin(FixedDecimal{Int64, 2})) ==
               "FixedDecimal{Int64,2}(-92233720368547758.08)"

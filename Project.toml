@@ -1,11 +1,15 @@
 name = "FixedPointDecimals"
-uuid = "e2b91e31-9e3c-47fb-aabc-0aa7355aa839"
+uuid = "fb4d412d-6eee-574d-9565-ede6634db7b0"
+authors = ["Fengyang Wang <fengyang.wang.0@gmail.com>", "Curtis Vogt <curtis.vogt@gmail.com>"]
 version = "0.3.1"
 
-[deps]
-Compat = "34da2185-b29b-5c13-b0c7-acf172513d20"
+[compat]
+julia = "0.7, 1.0"
+
+[extras]
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
-[compat]
-julia = "1"
+[targets]
+test = ["Printf", "Test"]
+
