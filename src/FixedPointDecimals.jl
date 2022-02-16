@@ -27,7 +27,7 @@ module FixedPointDecimals
 
 export FixedDecimal, RoundThrows
 
-using Base: decompose, BitInteger, @pure
+using Base: decompose, BitInteger
 
 # floats that support fma and are roughly IEEE-like
 const FMAFloat = Union{Float16, Float32, Float64, BigFloat}
@@ -79,8 +79,7 @@ struct FixedDecimal{T <: Integer, f} <: Real
     i::T
 
     # inner constructor
-    # This function is marked as `@pure`. It does not have or depend on any side-effects.
-    @pure function Base.reinterpret(::Type{FixedDecimal{T, f}}, i::Integer) where {T, f}
+    function Base.reinterpret(::Type{FixedDecimal{T, f}}, i::Integer) where {T, f}
         n = max_exp10(T)
         if f >= 0 && (n < 0 || f <= n)
             new{T, f}(i % T)
@@ -115,15 +114,15 @@ Base.:+(x::FD{T, f}, y::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, x.i+y.i)
 Base.:-(x::FD{T, f}, y::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, x.i-y.i)
 
 # wide multiplication
-@pure function Base.widemul(x::FD{<:Any, f}, y::FD{<:Any, g}) where {f, g}
+function Base.widemul(x::FD{<:Any, f}, y::FD{<:Any, g}) where {f, g}
     i = widemul(x.i, y.i)
     reinterpret(FD{typeof(i), f + g}, i)
 end
-@pure function Base.widemul(x::FD{T, f}, y::Integer) where {T, f}
+function Base.widemul(x::FD{T, f}, y::Integer) where {T, f}
     i = widemul(x.i, y)
     reinterpret(FD{typeof(i), f}, i)
 end
-@pure Base.widemul(x::Integer, y::FD) = widemul(y, x)
+Base.widemul(x::Integer, y::FD) = widemul(y, x)
 
 """
     _round_to_even(quotient, remainder, divisor)
@@ -333,7 +332,7 @@ Base.promote_rule(::Type{<:FD}, ::Type{Rational{TR}}) where {TR} = Rational{TR}
 
 # TODO: decide if these are the right semantics;
 # right now we pick the bigger int type and the bigger decimal point
-@pure function Base.promote_rule(::Type{FD{T, f}}, ::Type{FD{U, g}}) where {T, f, U, g}
+function Base.promote_rule(::Type{FD{T, f}}, ::Type{FD{U, g}}) where {T, f, U, g}
     FD{promote_type(T, U), max(f, g)}
 end
 
@@ -504,16 +503,14 @@ for T in Base.BitInteger_types
     @eval max_exp10(::Type{$T}) = $(max_exp10(T))
 end
 
-# coefficient is marked pure. This is needed to ensure that the result is always available
-# at compile time, and can therefore be used when optimizing mathematical operations.
 """
     coefficient(::Type{FD{T, f}}) -> T
 
 Compute `10^f` as an Integer without overflow. Note that overflow will not occur for any
 constructable `FD{T, f}`.
 """
-@pure coefficient(::Type{FD{T, f}}) where {T, f} = T(10)^f
-@pure coefficient(fd::FD{T, f}) where {T, f} = coefficient(FD{T, f})
+coefficient(::Type{FD{T, f}}) where {T, f} = T(10)^f
+coefficient(fd::FD{T, f}) where {T, f} = coefficient(FD{T, f})
 value(fd::FD) = fd.i
 
 # for generic hashing
