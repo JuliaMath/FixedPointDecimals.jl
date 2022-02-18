@@ -324,6 +324,13 @@ function Base.convert(::Type{TR}, x::FD{T, f}) where {TR <: Rational, T, f}
     convert(TR, x.i // coefficient(FD{T, f}))::TR
 end
 
+function Base.numerator(x::FixedDecimal{T,f})::T where {T, f}
+    return convert(Rational, x).num
+end
+function Base.denominator(x::FixedDecimal{T,f})::T where {T, f}
+    return convert(Rational, x).den
+end
+
 (::Type{T})(x::FD) where {T<:Union{AbstractFloat,Integer,Rational}} = convert(T, x)
 
 Base.promote_rule(::Type{FD{T, f}}, ::Type{<:Integer}) where {T, f} = FD{T, f}
