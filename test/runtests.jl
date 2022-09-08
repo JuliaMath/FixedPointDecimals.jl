@@ -266,6 +266,12 @@ end
     @test 1 + FD2(0.1) === FD2(1.1)
     @test FD2(0.1) + FD4(0.0001) === FD4(0.1001)
     @test WFD2(0.1) + FD4(0.0001) === WFD4(0.1001)
+
+    # promotion with Rational
+    # see https://github.com/JuliaMath/FixedPointDecimals.jl/issues/73
+    r = Rational{Int8}(1//1)
+    fd = FixedDecimal{Int128,4}(2.5806)
+    @test (r + fd) isa Rational{Int128}
 end
 
 @testset "float" begin
