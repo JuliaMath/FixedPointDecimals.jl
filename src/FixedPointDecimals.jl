@@ -328,7 +328,7 @@ end
 
 Base.promote_rule(::Type{FD{T, f}}, ::Type{<:Integer}) where {T, f} = FD{T, f}
 Base.promote_rule(::Type{<:FD}, ::Type{TF}) where {TF <: AbstractFloat} = TF
-Base.promote_rule(::Type{<:FD}, ::Type{Rational{TR}}) where {TR} = Rational{TR}
+Base.promote_rule(::Type{<:FD{T}}, ::Type{Rational{TR}}) where {T, TR} = Rational{promote_type(T, TR)}
 
 # TODO: decide if these are the right semantics;
 # right now we pick the bigger int type and the bigger decimal point
