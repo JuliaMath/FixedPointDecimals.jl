@@ -1058,4 +1058,11 @@ end
     @test_throws InexactError Bool(fd1)
 end
 
+@static if Base.VERSION >= v"1.6"
+    using Aqua
+    @testset "Aqua.jl" begin
+        Aqua.test_all(FixedPointDecimals)
+    end
+end
+
 end  # global testset
