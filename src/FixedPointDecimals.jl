@@ -123,6 +123,12 @@ function Base.widemul(x::FD{T, f}, y::Integer) where {T, f}
     reinterpret(FD{typeof(i), f}, i)
 end
 Base.widemul(x::Integer, y::FD) = widemul(y, x)
+# needed to avoid ambiguities
+function Base.widemul(x::FD{T, f}, y::Bool) where {T, f}
+    i = widemul(x.i, y)
+    reinterpret(FD{typeof(i), f}, i)
+end
+Base.widemul(x::Bool, y::FD) = widemul(y, x)
 
 """
     _round_to_even(quotient, remainder, divisor)
@@ -239,12 +245,19 @@ for fn in [:trunc, :floor, :ceil]
     @eval (Base.$fn(::Type{TI}, x::FD)::TI) where {TI <: Integer} = $fn(x)
 
     # round/trunc/ceil/flooring to FD; generic
-    @eval function Base.$fn(::Type{FD{T, f}}, x::Real) where {T, f}
+    @eval function $(Symbol(:_, fn))(::Type{FD{T, f}}, x::Real) where {T, f}
         powt = coefficient(FD{T, f})
         # Use machine Float64 if possible, but fall back to BigFloat if we need
         # more precision. 4f bits suffices.
         val = _apply_exact_float($(Symbol(fn, "mul")), T, x, powt)
         reinterpret(FD{T, f}, val)
+    end
+    @eval function Base.$fn(::Type{FD{T, f}}, x::Real) where {T, f}
+        $(Symbol(:_, fn))(FD{T, f}, x)
+    end
+    # needed to avoid ambiguities
+    @eval function Base.$fn(::Type{FD{T, f}}, x::Rational) where {T, f}
+        $(Symbol(:_, fn))(FD{T, f}, x)
     end
 end
 function Base.round(::Type{TI}, x::FD, ::RoundingMode{:Nearest}=RoundNearest) where {TI <: Integer}
@@ -254,8 +267,17 @@ function Base.round(::Type{FD{T, f}}, x::Real, ::RoundingMode{:Nearest}=RoundNea
     reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
 end
 
-# needed to avoid ambiguity
-function Base.round(::Type{FD{T, f}}, x::Rational, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
+# needed to avoid ambiguities
+@static if Base.VERSION >= v"1.6"
+    function Base.round(::Type{FD{T, f}}, x::Rational{Tr}, ::RoundingMode{:Nearest}=RoundNearest) where {T, Tr, f}
+        reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
+    end
+else  # COV_EXCL_START
+    function Base.round(::Type{FD{T, f}}, x::Rational, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
+        reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
+    end
+end  # COV_EXCL_STOP
+function Base.round(::Type{FD{T, f}}, x::Rational{Bool}, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
     reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
 end
 
@@ -325,6 +347,8 @@ function Base.convert(::Type{TR}, x::FD{T, f}) where {TR <: Rational, T, f}
 end
 
 (::Type{T})(x::FD) where {T<:Union{AbstractFloat,Integer,Rational}} = convert(T, x)
+# needed to avoid ambiguities
+Bool(x::FD) = x == 0 ? false : (x == 1 ? true : throw(InexactError(:Bool, Bool, x)))
 
 Base.promote_rule(::Type{FD{T, f}}, ::Type{<:Integer}) where {T, f} = FD{T, f}
 Base.promote_rule(::Type{<:FD}, ::Type{TF}) where {TF <: AbstractFloat} = TF
