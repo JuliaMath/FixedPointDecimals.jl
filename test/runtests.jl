@@ -605,6 +605,54 @@ end
         @test round(Int, FD2(1.50)) === 2
     end
 
+    # Is alias for `ceil`. 
+    @testset "up" begin
+        @test round(Int, FD2(-0.51), RoundUp) === 0
+        @test round(Int, FD2(-0.50), RoundUp) === 0
+        @test round(Int, FD2(-0.49), RoundUp) === 0
+        @test round(Int, FD2(0.50), RoundUp) === 1
+        @test round(Int, FD2(0.51), RoundUp) === 1
+        @test round(Int, FD2(1.50), RoundUp) === 2
+    end
+
+    # Is alias for `floor`. 
+    @testset "down" begin
+        @test round(Int, FD2(-0.51), RoundDown) === -1
+        @test round(Int, FD2(-0.50), RoundDown) === -1
+        @test round(Int, FD2(-0.49), RoundDown) === -1
+        @test round(Int, FD2(0.50), RoundDown) === 0
+        @test round(Int, FD2(0.51), RoundDown) === 0
+        @test round(Int, FD2(1.50), RoundDown) === 1
+    end
+
+    # Is alias for `trunc`. 
+    @testset "to zero" begin
+        @test round(Int, FD2(-0.51), RoundToZero) === 0
+        @test round(Int, FD2(-0.50), RoundToZero) === 0
+        @test round(Int, FD2(-0.49), RoundToZero) === 0
+        @test round(Int, FD2(0.50), RoundToZero) === 0 
+        @test round(Int, FD2(0.51), RoundToZero) === 0
+        @test round(Int, FD2(1.50), RoundToZero) === 1
+    end
+
+    @testset "tie away" begin
+        @test round(Int, FD2(-0.51), RoundNearestTiesAway) === -1
+        @test round(Int, FD2(-0.50), RoundNearestTiesAway) === -1
+        @test round(Int, FD2(-0.49), RoundNearestTiesAway) === 0
+        @test round(Int, FD2(0.50), RoundNearestTiesAway) === 1
+        @test round(Int, FD2(0.51), RoundNearestTiesAway) === 1
+        @test round(Int, FD2(1.50), RoundNearestTiesAway) === 2
+    end
+
+    @testset "tie up" begin
+        @test round(Int, FD2(-0.51), RoundNearestTiesUp) === -1
+        @test round(Int, FD2(-0.50), RoundNearestTiesUp) === 0
+        @test round(Int, FD2(-0.49), RoundNearestTiesUp) === 0
+        @test round(Int, FD2(0.50), RoundNearestTiesUp) === 1
+        @test round(Int, FD2(0.51), RoundNearestTiesUp) === 1
+        @test round(Int, FD2(1.50), RoundNearestTiesUp) === 2
+    end
+
     @testset "rounding invariant $x" for x in filter(!islarge, keyvalues[FD2])
         @test isinteger(round(x))
         @test x - FD2(1//2) ≤ round(x) ≤ x + FD2(1//2)
