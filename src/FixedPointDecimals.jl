@@ -141,10 +141,10 @@ function _round_to_even(quotient::T, remainder::T, divisor::T, ::RoundingMode{M}
         # -9. `:NearestTiesUp` will always ties towards positive
         # infinity. `:Nearest` will tie towards the nearest even
         # integer.
-        if M == :NearestTiesAway && quotient < zero(quotient)
-            quotient
-        elseif M == :Nearest && iseven(quotient)
-            quotient
+        if M == :NearestTiesAway
+            ifelse(quotient < zero(quotient), quotient, quotient + one(quotient))
+        elseif M == :Nearest
+            ifelse(iseven(quotient), quotient, quotient + one(quotient))
         else
             quotient + one(quotient)
         end
