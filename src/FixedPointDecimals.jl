@@ -125,24 +125,39 @@ end
 Base.widemul(x::Integer, y::FD) = widemul(y, x)
 
 """
-    _round_to_even(quotient, remainder, divisor)
+    _round_to_nearest(quotient, remainder, divisor, ::RoundingMode{M})
 
-Round `quotient + remainder / divisor` to the nearest even integer, given that
-`0 ≤ remainder < divisor` or `0 ≥ remainder > divisor`. (This assumption is
-satisfied by the return value of `fldmod` in all cases, and the return value of
-`divrem` in cases where `divisor` is known to be positive.)
+Round `quotient + remainder / divisor` to the nearest integer,
+given that `0 ≤ remainder < divisor` or `0 ≥ remainder >
+divisor`. (This assumption is satisfied by the return value of
+`fldmod` in all cases, and the return value of `divrem` in cases where
+`divisor` is known to be positive.) The tie is decided depending on
+the `RoundingMode`.
 """
-function _round_to_even(quotient::T, remainder::T, divisor::T) where {T <: Integer}
+function _round_to_nearest(quotient::T,
+                           remainder::T,
+                           divisor::T,
+                           ::RoundingMode{M}=RoundNearest) where {T <: Integer, M}
     halfdivisor = divisor >> 1
     if iseven(divisor) && remainder == halfdivisor
-        ifelse(iseven(quotient), quotient, quotient + one(quotient))
+        # `:NearestTiesAway` will tie away from zero, e.g. -8.5 ->
+        # -9. `:NearestTiesUp` will always ties towards positive
+        # infinity. `:Nearest` will tie towards the nearest even
+        # integer.
+        if M == :NearestTiesAway
+            ifelse(quotient < zero(quotient), quotient, quotient + one(quotient))
+        elseif M == :Nearest
+            ifelse(iseven(quotient), quotient, quotient + one(quotient))
+        else
+            quotient + one(quotient)
+        end
     elseif abs(remainder) > abs(halfdivisor)
         quotient + one(quotient)
     else
         quotient
     end
 end
-_round_to_even(q, r, d) = _round_to_even(promote(q, r, d)...)
+_round_to_nearest(q, r, d, m=RoundNearest) = _round_to_nearest(promote(q, r, d)..., m)
 
 # In many of our calls to fldmod, `y` is a constant (the coefficient, 10^f). However, since
 # `fldmod` is sometimes not being inlined, that constant information is not available to the
@@ -156,7 +171,7 @@ _round_to_even(q, r, d) = _round_to_even(promote(q, r, d)...)
 function Base.:*(x::FD{T, f}, y::FD{T, f}) where {T, f}
     powt = coefficient(FD{T, f})
     quotient, remainder = fldmodinline(widemul(x.i, y.i), powt)
-    reinterpret(FD{T, f}, _round_to_even(quotient, remainder, powt))
+    reinterpret(FD{T, f}, _round_to_nearest(quotient, remainder, powt))
 end
 
 # these functions are needed to avoid InexactError when converting from the
@@ -167,7 +182,7 @@ Base.:*(x::FD{T, f}, y::Integer) where {T, f} = reinterpret(FD{T, f}, T(x.i * y)
 function Base.:/(x::FD{T, f}, y::FD{T, f}) where {T, f}
     powt = coefficient(FD{T, f})
     quotient, remainder = fldmod(widemul(x.i, powt), y.i)
-    reinterpret(FD{T, f}, T(_round_to_even(quotient, remainder, y.i)))
+    reinterpret(FD{T, f}, T(_round_to_nearest(quotient, remainder, y.i)))
 end
 
 # These functions allow us to perform division with integers outside of the range of the
@@ -176,23 +191,30 @@ function Base.:/(x::Integer, y::FD{T, f}) where {T, f}
     powt = coefficient(FD{T, f})
     powtsq = widemul(powt, powt)
     quotient, remainder = fldmod(widemul(x, powtsq), y.i)
-    reinterpret(FD{T, f}, T(_round_to_even(quotient, remainder, y.i)))
+    reinterpret(FD{T, f}, T(_round_to_nearest(quotient, remainder, y.i)))
 end
 
 function Base.:/(x::FD{T, f}, y::Integer) where {T, f}
     quotient, remainder = fldmod(x.i, y)
-    reinterpret(FD{T, f}, T(_round_to_even(quotient, remainder, y)))
+    reinterpret(FD{T, f}, T(_round_to_nearest(quotient, remainder, y)))
 end
 
 # integerification
 Base.trunc(x::FD{T, f}) where {T, f} = FD{T, f}(div(x.i, coefficient(FD{T, f})))
 Base.floor(x::FD{T, f}) where {T, f} = FD{T, f}(fld(x.i, coefficient(FD{T, f})))
 
+Base.round(fd::FD, ::RoundingMode{:Up}) = ceil(fd)
+Base.round(fd::FD, ::RoundingMode{:Down}) = floor(fd)
+Base.round(fd::FD, ::RoundingMode{:ToZero}) = trunc(fd)
+
 # TODO: round with number of digits; should be easy
-function Base.round(x::FD{T, f}, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
+function Base.round(x::FD{T, f},
+                    m::Union{RoundingMode{:Nearest},
+                             RoundingMode{:NearestTiesUp},
+                             RoundingMode{:NearestTiesAway}}=RoundNearest) where {T, f}
     powt = coefficient(FD{T, f})
     quotient, remainder = fldmodinline(x.i, powt)
-    FD{T, f}(_round_to_even(quotient, remainder, powt))
+    FD{T, f}(_round_to_nearest(quotient, remainder, powt, m))
 end
 function Base.ceil(x::FD{T, f}) where {T, f}
     powt = coefficient(FD{T, f})
@@ -247,8 +269,8 @@ for fn in [:trunc, :floor, :ceil]
         reinterpret(FD{T, f}, val)
     end
 end
-function Base.round(::Type{TI}, x::FD, ::RoundingMode{:Nearest}=RoundNearest) where {TI <: Integer}
-    convert(TI, round(x))::TI
+function Base.round(::Type{TI}, x::FD, m::RoundingMode=RoundNearest) where {TI <: Integer}
+    convert(TI, round(x,m))::TI
 end
 function Base.round(::Type{FD{T, f}}, x::Real, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
     reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
