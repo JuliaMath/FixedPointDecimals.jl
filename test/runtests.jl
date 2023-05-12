@@ -1093,4 +1093,24 @@ end
     end
 end
 
+@testset "method ambiguities" begin
+    fd1 = FD{Int8, 1}(0.1)
+    fd2 = FD{Int, 1}(1.0)
+
+    @test widemul(fd1, false) == widemul(false, fd1) == FD{Int8, 1}(0.0)
+    @test ceil(FD{Int, 1}, 99 // 100) == fd2
+    @test round(FD{Int, 1}, true // true) == fd2
+    @test invoke(round, Tuple{Type{FD{Int, 1}}, Rational}, FD{Int, 1}, 99 // 100) == fd2
+
+    @test Bool(fd2)
+    @test_throws InexactError Bool(fd1)
+end
+
+@static if Base.VERSION >= v"1.6"
+    using Aqua
+    @testset "Aqua.jl" begin
+        Aqua.test_all(FixedPointDecimals)
+    end
+end
+
 end  # global testset
