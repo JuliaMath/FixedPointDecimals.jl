@@ -3,8 +3,10 @@ using FixedPointDecimals: FD, value
 using Test
 using Printf
 using Base.Checked: checked_mul
+using Parsers
 
-include("utils.jl")
+pkg_path = pkgdir(FixedPointDecimals)
+include(joinpath(pkg_path, "test", "utils.jl"))
 
 const SFD2 = FixedDecimal{Int16, 2}
 const SFD4 = FixedDecimal{Int16, 4}
@@ -605,7 +607,7 @@ end
         @test round(Int, FD2(1.50)) === 2
     end
 
-    # Is alias for `ceil`. 
+    # Is alias for `ceil`.
     @testset "up" begin
         @test round(Int, FD2(-0.51), RoundUp) === 0
         @test round(Int, FD2(-0.50), RoundUp) === 0
@@ -615,7 +617,7 @@ end
         @test round(Int, FD2(1.50), RoundUp) === 2
     end
 
-    # Is alias for `floor`. 
+    # Is alias for `floor`.
     @testset "down" begin
         @test round(Int, FD2(-0.51), RoundDown) === -1
         @test round(Int, FD2(-0.50), RoundDown) === -1
@@ -625,12 +627,12 @@ end
         @test round(Int, FD2(1.50), RoundDown) === 1
     end
 
-    # Is alias for `trunc`. 
+    # Is alias for `trunc`.
     @testset "to zero" begin
         @test round(Int, FD2(-0.51), RoundToZero) === 0
         @test round(Int, FD2(-0.50), RoundToZero) === 0
         @test round(Int, FD2(-0.49), RoundToZero) === 0
-        @test round(Int, FD2(0.50), RoundToZero) === 0 
+        @test round(Int, FD2(0.50), RoundToZero) === 0
         @test round(Int, FD2(0.51), RoundToZero) === 0
         @test round(Int, FD2(1.50), RoundToZero) === 1
     end
@@ -941,16 +943,8 @@ end
     end
 end
 
-@testset "parse_round" begin
-    @test FixedPointDecimals.parse_round(Int, "44", RoundNearest) == 0
-    @test FixedPointDecimals.parse_round(Int, "45", RoundNearest) == 0
-    @test FixedPointDecimals.parse_round(Int, "46", RoundNearest) == 1
-    @test FixedPointDecimals.parse_round(Int, "54", RoundNearest) == 0
-    @test FixedPointDecimals.parse_round(Int, "55", RoundNearest) == 1
-    @test FixedPointDecimals.parse_round(Int, "56", RoundNearest) == 1
-
-    # Handle a number of digits that exceeds the storage capacity of Int128
-    @test FixedPointDecimals.parse_round(Int8, "9"^40, RoundNearest) == 1
+@testset "xparse" begin
+    @time include(joinpath(pkg_path, "test", "parse_tests.jl"))
 end
 
 @testset "parse" begin
@@ -1069,7 +1063,6 @@ end
 
         @test_throws InexactError parse(FD2, "0.009", RoundThrows)
         @test_throws InexactError parse(FD2, "-0.009", RoundThrows)
-
         @test_throws InexactError parse(FD4, "1.5e-4", RoundThrows)
     end
 
