@@ -104,8 +104,10 @@ const FD = FixedDecimal
 include("parse.jl")
 
 function __init__()
-    append!(_BIGINT_10s, [BigInt(0) for i in 0:Threads.nthreads()])
-    append!(_BIGINT_Rs, [BigInt(0) for i in 0:Threads.nthreads()])
+    nt = isdefined(Base.Threads, :maxthreadid) ? Threads.maxthreadid() : Threads.nthreads()
+    resize!(empty!(_BIGINT_10s), nt)
+    resize!(empty!(_BIGINT_Rs), nt)
+    return
 end
 
 (::Type{T})(x::Real) where {T <: FD} = convert(T, x)
@@ -420,7 +422,6 @@ function Base.show(io::IO, x::FD{T, f}) where {T, f}
         print(io, ')')
     end
 end
-
 
 """
     max_exp10(T)
