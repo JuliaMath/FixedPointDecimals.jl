@@ -100,12 +100,15 @@ end
 end
 
 const FD = FixedDecimal
+const RoundThrows = RoundingMode{:Throw}()
 
 include("parse.jl")
 
 function __init__()
-    append!(_BIGINT_10s, [BigInt(0) for i in 0:Threads.nthreads()])
-    append!(_BIGINT_Rs, [BigInt(0) for i in 0:Threads.nthreads()])
+    nt = isdefined(Base.Threads, :maxthreadid) ? Threads.maxthreadid() : Threads.nthreads()
+    # Buffers used in parsing when dealing with BigInts, see _divpow10! in parse.jl
+    resize!(empty!(_BIGINT_10s), nt)
+    resize!(empty!(_BIGINT_Rs), nt)
 end
 
 (::Type{T})(x::Real) where {T <: FD} = convert(T, x)
