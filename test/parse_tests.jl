@@ -402,8 +402,8 @@ end
     end
 
     @test Parsers.xparse(FixedDecimal{Int,8}, "2", groupmark=',', delim=',', decimal='.', quoted=true).val == FixedDecimal{Int,8}(2)
-    @test Parsers.xparse(FixedDecimal{Int,8}, "\" 2000.0 \"", groupmark=',', delim=',', decimal='.', quoted=true).val == FixedDecimal{Int,8}(2000)
-    @test Parsers.xparse(FixedDecimal{Int,8}, "\" 2,000.0 \"", groupmark=',', delim=',', decimal='.', quoted=true).val == FixedDecimal{Int,8}(2000)
+    @test Parsers.xparse(FixedDecimal{Int,4}, "\" 2000.0 \"", groupmark=',', delim=',', decimal='.', quoted=true).val == FixedDecimal{Int,4}(2000)
+    @test Parsers.xparse(FixedDecimal{Int,4}, "\" 2,000.0 \"", groupmark=',', delim=',', decimal='.', quoted=true).val == FixedDecimal{Int,4}(2000)
 end
 
 @testset "misc options" begin
