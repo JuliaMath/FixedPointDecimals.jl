@@ -109,6 +109,7 @@ function __init__()
     # Buffers used in parsing when dealing with BigInts, see _divpow10! in parse.jl
     resize!(empty!(_BIGINT_10s), nt)
     resize!(empty!(_BIGINT_Rs), nt)
+    return
 end
 
 (::Type{T})(x::Real) where {T <: FD} = convert(T, x)
@@ -423,7 +424,6 @@ function Base.show(io::IO, x::FD{T, f}) where {T, f}
         print(io, ')')
     end
 end
-
 
 """
     max_exp10(T)

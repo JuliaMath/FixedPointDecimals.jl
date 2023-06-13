@@ -1,127 +1,28 @@
 using Parsers
 using Parsers: AbstractConf, SourceType, XOPTIONS, Result
 
+"""
+    RoundThrows
+
+Raises an `InexactError` if any rounding is necessary.
+"""
+const RoundThrows = RoundingMode{:Throw}()
+
 struct FixedDecimalConf{T<:Integer} <: AbstractConf{T}
     f::Int
 end
 Parsers.conf(::Type{FixedDecimal{T,f}}, opts::Parsers.Options, kw...) where {T<:Integer,f} = FixedDecimalConf{T}(f)
+Parsers.returntype(::Type{FixedDecimal{T,f}}) where {T,f} = T
+function Parsers.result(FD::Type{FixedDecimal{T,f}}, res::Parsers.Result{T}) where {T,f}
+    return Parsers.invalid(res.code) ? Result{FD}(res.code, res.tlen) :
+        Result{FD}(res.code, res.tlen, reinterpret(FD, res.val))
+end
 
 const OPTIONS_ROUND_NEAREST = Parsers.Options(rounding=RoundNearest)
 const OPTIONS_ROUND_TO_ZERO = Parsers.Options(rounding=RoundToZero)
 const OPTIONS_ROUND_THROWS = Parsers.Options(rounding=nothing)
 
-# like n * 10^decpos, but faster
-@inline function _shift(n::T, decpos) where {T<:Union{UInt128,Int128}}
-    if     decpos ==  0 && return n
-    elseif decpos ==  1 && return T(10) * n
-    elseif decpos ==  2 && return T(100) * n
-    elseif decpos ==  3 && return T(1000) * n
-    elseif decpos ==  4 && return T(10000) * n
-    elseif decpos ==  5 && return T(100000) * n
-    elseif decpos ==  6 && return T(1000000) * n
-    elseif decpos ==  7 && return T(10000000) * n
-    elseif decpos ==  8 && return T(100000000) * n
-    elseif decpos ==  9 && return T(1000000000) * n
-    elseif decpos == 10 && return T(10000000000) * n
-    elseif decpos == 11 && return T(100000000000) * n
-    elseif decpos == 12 && return T(1000000000000) * n
-    elseif decpos == 13 && return T(10000000000000) * n
-    elseif decpos == 14 && return T(100000000000000) * n
-    elseif decpos == 15 && return T(1000000000000000) * n
-    elseif decpos == 16 && return T(10000000000000000) * n
-    elseif decpos == 17 && return T(100000000000000000) * n
-    elseif decpos == 18 && return T(1000000000000000000) * n
-    elseif decpos == 19 && return T(10000000000000000000) * n
-    elseif decpos == 20 && return T(100000000000000000000) * n
-    elseif decpos == 21 && return T(1000000000000000000000) * n
-    elseif decpos == 22 && return T(10000000000000000000000) * n
-    elseif decpos == 23 && return T(100000000000000000000000) * n
-    elseif decpos == 24 && return T(1000000000000000000000000) * n
-    elseif decpos == 25 && return T(10000000000000000000000000) * n
-    elseif decpos == 26 && return T(100000000000000000000000000) * n
-    elseif decpos == 27 && return T(1000000000000000000000000000) * n
-    elseif decpos == 28 && return T(10000000000000000000000000000) * n
-    elseif decpos == 29 && return T(100000000000000000000000000000) * n
-    elseif decpos == 30 && return T(1000000000000000000000000000000) * n
-    elseif decpos == 31 && return T(10000000000000000000000000000000) * n
-    elseif decpos == 32 && return T(100000000000000000000000000000000) * n
-    elseif decpos == 33 && return T(1000000000000000000000000000000000) * n
-    elseif decpos == 34 && return T(10000000000000000000000000000000000) * n
-    elseif decpos == 35 && return T(100000000000000000000000000000000000) * n
-    elseif decpos == 36 && return T(1000000000000000000000000000000000000) * n
-    elseif decpos == 37 && return T(10000000000000000000000000000000000000) * n
-    elseif decpos == 38 && return T(100000000000000000000000000000000000000) * n
-    elseif decpos == 39 && return T(1000000000000000000000000000000000000000) * n
-    else
-        @assert false # unreachable
-    end
-end
-
-@inline function _shift(n::T, decpos) where {T<:Union{UInt64,Int64}}
-    if     decpos ==  0 && return n
-    elseif decpos ==  1 && return T(10) * n
-    elseif decpos ==  2 && return T(100) * n
-    elseif decpos ==  3 && return T(1000) * n
-    elseif decpos ==  4 && return T(10000) * n
-    elseif decpos ==  5 && return T(100000) * n
-    elseif decpos ==  6 && return T(1000000) * n
-    elseif decpos ==  7 && return T(10000000) * n
-    elseif decpos ==  8 && return T(100000000) * n
-    elseif decpos ==  9 && return T(1000000000) * n
-    elseif decpos == 10 && return T(10000000000) * n
-    elseif decpos == 11 && return T(100000000000) * n
-    elseif decpos == 12 && return T(1000000000000) * n
-    elseif decpos == 13 && return T(10000000000000) * n
-    elseif decpos == 14 && return T(100000000000000) * n
-    elseif decpos == 15 && return T(1000000000000000) * n
-    elseif decpos == 16 && return T(10000000000000000) * n
-    elseif decpos == 17 && return T(100000000000000000) * n
-    elseif decpos == 18 && return T(1000000000000000000) * n
-    elseif decpos == 19 && return T(10000000000000000000) * n
-    elseif decpos == 20 && return T(100000000000000000000) * n
-    else
-        @assert false # unreachable
-    end
-end
-
-@inline function _shift(n::T, decpos) where {T<:Union{UInt32,Int32}}
-    if     decpos ==  0 && return n
-    elseif decpos ==  1 && return T(10) * n
-    elseif decpos ==  2 && return T(100) * n
-    elseif decpos ==  3 && return T(1000) * n
-    elseif decpos ==  4 && return T(10000) * n
-    elseif decpos ==  5 && return T(100000) * n
-    elseif decpos ==  6 && return T(1000000) * n
-    elseif decpos ==  7 && return T(10000000) * n
-    elseif decpos ==  8 && return T(100000000) * n
-    elseif decpos ==  9 && return T(1000000000) * n
-    elseif decpos == 10 && return T(10000000000) * n
-    else
-        @assert false # unreachable
-    end
-end
-
-@inline function _shift(n::T, decpos) where {T<:Union{UInt16,Int16}}
-    if     decpos == 0 && return n
-    elseif decpos == 1 && return T(10) * n
-    elseif decpos == 2 && return T(100) * n
-    elseif decpos == 3 && return T(1000) * n
-    elseif decpos == 4 && return T(10000) * n
-    elseif decpos == 5 && return T(100000) * n
-    else
-        @assert false # unreachable
-    end
-end
-
-@inline function _shift(n::T, decpos) where {T<:Union{UInt8,Int8}}
-    if     decpos == 0 && return n
-    elseif decpos == 1 && return T(10) * n
-    elseif decpos == 2 && return T(100) * n
-    elseif decpos == 3 && return T(1000) * n
-    else
-        @assert false # unreachable
-    end
-end
+@inline _shift(n::T, decpos) where {T} = T(10)^decpos * n
 
 const _BIGINT1 = BigInt(1)
 const _BIGINT2 = BigInt(2)
@@ -263,8 +164,6 @@ end
     end
 
     startpos = pos
-    code = Parsers.SUCCESS
-
     # begin parsing
     neg = b == UInt8('-')
     if neg || b == UInt8('+')
@@ -295,21 +194,7 @@ end
     return pos, code, Parsers.PosLen(pl.pos, pos - pl.pos), x
 end
 
-Parsers.supportedtype(::Type{FixedDecimal{T,f}}) where {T<:Integer,f} = true
-
-function Parsers.xparse(::Type{FixedDecimal{T,f}}, source::SourceType, pos, len, options=XOPTIONS, ::Type{S}=FixedDecimal{T,f}) where {T<:Integer,f,S}
-    buf = source isa AbstractString ? codeunits(source) : source
-    # TODO: remove @noinline after Parsers is updated
-    res = @noinline Parsers._xparse(FixedDecimalConf{T}(f), buf, pos, len, options, T)
-    return Result{S}(res.code, res.tlen, reinterpret(S, res.val))
-end
-
-function Parsers.xparse2(::Type{FixedDecimal{T,f}}, source::SourceType, pos, len, options=XOPTIONS, ::Type{S}=FixedDecimal{T,f}) where {T<:Integer,f,S}
-    buf = source isa AbstractString ? codeunits(source) : source
-    # TODO: remove @noinline after Parsers is updated
-    res = @noinline Parsers._xparse2(FixedDecimalConf{T}(f), buf, pos, len, options, T)
-    return Result{S}(res.code, res.tlen, reinterpret(S, res.val))
-end
+Parsers.supportedtype(::Type{<:FixedDecimal}) = true
 
 function _base_parse(::Type{FD{T, f}}, source::AbstractString, mode::RoundingMode=RoundNearest) where {T, f}
     if !(mode in (RoundThrows, RoundNearest, RoundToZero))
