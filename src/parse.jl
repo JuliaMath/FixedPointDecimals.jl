@@ -22,6 +22,7 @@ const OPTIONS_ROUND_NEAREST = Parsers.Options(rounding=RoundNearest)
 const OPTIONS_ROUND_TO_ZERO = Parsers.Options(rounding=RoundToZero)
 const OPTIONS_ROUND_THROWS = Parsers.Options(rounding=nothing)
 
+# TODO: a lookup table per type would be faster
 @inline _shift(n::T, decpos) where {T} = T(10)^decpos * n
 
 const _BIGINT1 = BigInt(1)
@@ -37,7 +38,7 @@ for T in (Base.BitSigned_types..., Base.BitUnsigned_types...)
     end
 end
 
-# All `v`s either UInt64, UInt128 and positive Integers
+# All `v`s are non-negative
 function _unsafe_convert_int(::Type{T}, v::V) where {T<:Integer,V<:Integer}
     return sizeof(T) > sizeof(V) ? T(v) :
            sizeof(T) < sizeof(V) ? unsafe_trunc(T, v) :
