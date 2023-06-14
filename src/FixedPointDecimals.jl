@@ -28,6 +28,7 @@ module FixedPointDecimals
 export FixedDecimal, RoundThrows
 
 using Base: decompose, BitInteger
+import Parsers
 
 # floats that support fma and are roughly IEEE-like
 const FMAFloat = Union{Float16, Float32, Float64, BigFloat}
@@ -99,6 +100,16 @@ end
 end
 
 const FD = FixedDecimal
+
+include("parse.jl")
+
+function __init__()
+    nt = isdefined(Base.Threads, :maxthreadid) ? Threads.maxthreadid() : Threads.nthreads()
+    # Buffers used in parsing when dealing with BigInts, see _divpow10! in parse.jl
+    resize!(empty!(_BIGINT_10s), nt)
+    resize!(empty!(_BIGINT_Rs), nt)
+    return
+end
 
 (::Type{T})(x::Real) where {T <: FD} = convert(T, x)
 
@@ -412,78 +423,6 @@ function Base.show(io::IO, x::FD{T, f}) where {T, f}
         print(io, ')')
     end
 end
-
-# parsing
-
-"""
-    RoundThrows
-
-Raises an `InexactError` if any rounding is necessary.
-"""
-const RoundThrows = RoundingMode{:Throw}()
-
-function Base.parse(::Type{FD{T, f}}, str::AbstractString, mode::RoundingMode=RoundNearest) where {T, f}
-    if !(mode in (RoundThrows, RoundNearest, RoundToZero))
-        throw(ArgumentError("Unhandled rounding mode $mode"))
-    end
-
-    # Parse exponent information
-    exp_index = something(findfirst(==('e'), str), 0)
-    if exp_index > 0
-        exp = parse(Int, str[(exp_index + 1):end])
-        sig_end = exp_index - 1
-    else
-        exp = 0
-        sig_end = lastindex(str)
-    end
-
-    # Remove the decimal place from the string
-    sign = T(first(str) == '-' ? -1 : 1)
-    dec_index = something(findfirst(==('.'), str), 0)
-    sig_start = sign < 0 ? 2 : 1
-    if dec_index > 0
-        int_str = str[sig_start:(dec_index - 1)] * str[(dec_index + 1):sig_end]
-        exp -= sig_end - dec_index
-    else
-        int_str = str[sig_start:sig_end]
-    end
-
-    # Split the integer string into the value we can represent inside the FixedDecimal and
-    # the remaining digits we'll use during rounding
-    int_end = lastindex(int_str)
-    pivot = int_end + exp - (-f)
-
-    a = rpad(int_str[1:min(pivot, int_end)], pivot, '0')
-    b = lpad(int_str[max(pivot, 1):int_end], int_end - pivot + 1, '0')
-
-    # Parse the strings
-    val = isempty(a) ? T(0) : sign * parse(T, a)
-    if !isempty(b) && any(!isequal('0'), b[2:end])
-        if mode == RoundThrows
-            throw(InexactError(:parse, FD{T, f}, str))
-        elseif mode == RoundNearest
-            val += sign * parse_round(T, b, mode)
-        end
-    end
-
-    reinterpret(FD{T, f}, val)
-end
-
-function parse_round(::Type{T}, fractional::AbstractString, ::RoundingMode{:Nearest}) where T
-    # Note: parsing each digit individually ensures we don't run into an OverflowError
-    digits = Int8[parse(Int8, d) for d in fractional]
-    for i in length(digits):-1:2
-        if digits[i] > 5 || digits[i] == 5 && isodd(digits[i - 1])
-            if i - 1 == 1
-                return T(1)
-            else
-                digits[i - 1] += 1
-            end
-        end
-    end
-    return T(0)
-end
-
 
 """
     max_exp10(T)
