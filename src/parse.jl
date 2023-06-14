@@ -213,7 +213,6 @@ function _base_parse(::Type{FD{T, f}}, source::AbstractString, mode::RoundingMod
         throw(ArgumentError("Unhandled rounding mode $mode"))
     end
 
-    isempty(source) && throw(("Empty input is not allowed"))
     bytes = codeunits(source)
     options = mode === RoundNearest ? OPTIONS_ROUND_NEAREST :
         mode === RoundToZero ? OPTIONS_ROUND_TO_ZERO :
@@ -223,12 +222,14 @@ function _base_parse(::Type{FD{T, f}}, source::AbstractString, mode::RoundingMod
 end
 
 function Base.tryparse(::Type{FD{T, f}}, source::AbstractString, mode::RoundingMode=RoundNearest) where {T, f}
+    isempty(source) && return nothing
     res = _base_parse(FD{T, f}, source, mode)
     # If we didn't reach eof, there was some garbage at the end of the string after something that looked like a number
     return (Parsers.eof(res.code) && Parsers.ok(res.code)) ? res.val : nothing
 end
 
 function Base.parse(::Type{FD{T, f}}, source::AbstractString, mode::RoundingMode=RoundNearest) where {T, f}
+    isempty(source) && throw(ArgumentError("Empty input is not allowed"))
     res = _base_parse(FD{T, f}, source, mode)
     Parsers.inexact(res.code) && throw(InexactError(:parse, FD{T, f}, source))
     Parsers.overflow(res.code) && throw(OverflowError("overflow parsing $(repr(source)) as $(FD{T, f})"))
