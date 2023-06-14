@@ -100,7 +100,6 @@ end
 end
 
 const FD = FixedDecimal
-const RoundThrows = RoundingMode{:Throw}()
 
 include("parse.jl")
 
