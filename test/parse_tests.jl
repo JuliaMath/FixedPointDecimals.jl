@@ -91,6 +91,36 @@ const IntegerTypes = (SignedIntegerTypes..., UnsignedIntegerTypes...)
             end
         end
     end
+
+    @testset "$T" for T in UnsignedIntegerTypes
+        @testset "$V" for V in (UInt64, UInt128, BigInt)
+            @test !FixedPointDecimals._check_overflows(T, V(0), true)
+            @test !FixedPointDecimals._check_overflows(T, V(0), false)
+            @test !FixedPointDecimals._check_overflows(T, V(1), false)
+
+            if V === BigInt
+                @test FixedPointDecimals._check_overflows(T, V(1), true)
+                @test FixedPointDecimals._check_overflows(T, V(typemax(T) - 1), true)
+                @test FixedPointDecimals._check_overflows(T, V(typemax(T)), true)
+                @test FixedPointDecimals._check_overflows(T, V(V(typemax(T)) + 1), true)
+                @test FixedPointDecimals._check_overflows(T, V(V(typemax(T)) + 2), true)
+            end
+
+            if V === BigInt || typemax(T) == typemax(V)
+                @test !FixedPointDecimals._check_overflows(T, V(typemax(T) - 1), false)
+                @test !FixedPointDecimals._check_overflows(T, V(typemax(T)), false)
+            end
+
+            if V === BigInt || typemax(T) < typemax(V)
+                @test FixedPointDecimals._check_overflows(T, V(V(typemax(T)) + 1), false)
+                @test FixedPointDecimals._check_overflows(T, V(V(typemax(T)) + 2), false)
+            end
+
+            if V !== BigInt && typemax(T) > typemax(V)
+                @test !FixedPointDecimals._check_overflows(T, typemax(V), false)
+            end
+        end
+    end
 end
 
 T = Int64
@@ -427,7 +457,6 @@ end
 end
 end # @testset "xparse"
 
-
 @testset "parse" begin
     # Note: the underscore used in the reinterpreted integer is used to indicate the decimal
     # place.
@@ -553,8 +582,7 @@ end # @testset "xparse"
         @test_throws ArgumentError parse(FD4, "1.2.3")
         @test_throws ArgumentError parse(FD4, "1.2", RoundUp)
     end
-end
-
+end # @testset "parse"
 
 @testset "tryparse" begin
     # Note: the underscore used in the reinterpreted integer is used to indicate the decimal
@@ -679,6 +707,6 @@ end
         @test isnothing(tryparse(FD4, "1.2e100"))
         @test isnothing(tryparse(FD4, "foo"))
         @test isnothing(tryparse(FD4, "1.2.3"))
-        @test isnothing(tryparse(FD4, "1.2", RoundUp))
+        @test_throws ArgumentError tryparse(FD4, "1.2", RoundUp)
     end
-end
+end # @testset "tryparse"
