@@ -943,147 +943,20 @@ end
     end
 end
 
-@testset "xparse" begin
+@testset "parsing" begin
     @time include(joinpath(pkg_path, "test", "parse_tests.jl"))
 end
 
-@testset "parse" begin
-    # Note: the underscore used in the reinterpreted integer is used to indicate the decimal
-    # place.
-    @testset "decimal position" begin
-        @test parse(FD2, "123")   == reinterpret(FD2, 123_00)
-        @test parse(FD2, "0.123") == reinterpret(FD2, 0_12)
-        @test parse(FD2, ".123")  == reinterpret(FD2, 0_12)
-        @test parse(FD2, "1.23")  == reinterpret(FD2, 1_23)
-        @test parse(FD2, "12.3")  == reinterpret(FD2, 12_30)
-        @test parse(FD2, "123.")  == reinterpret(FD2, 123_00)
-        @test parse(FD2, "123.0") == reinterpret(FD2, 123_00)
+@testset "hashing" begin
+    fd1 = FixedDecimal{Int, 4}(2.5)
+    fd2 = FixedDecimal{Int, 5}(2.5)
+    fd3 = FixedDecimal{Int, 4}(3.5)
 
-        @test parse(FD2, "-123")   == reinterpret(FD2, -123_00)
-        @test parse(FD2, "-0.123") == reinterpret(FD2, -0_12)
-        @test parse(FD2, "-.123")  == reinterpret(FD2, -0_12)
-        @test parse(FD2, "-1.23")  == reinterpret(FD2, -1_23)
-        @test parse(FD2, "-12.3")  == reinterpret(FD2, -12_30)
-        @test parse(FD2, "-123.")  == reinterpret(FD2, -123_00)
-        @test parse(FD2, "-123.0") == reinterpret(FD2, -123_00)
-    end
-
-    @testset "scientific notation" begin
-        @test parse(FD4, "12e0")   == reinterpret(FD4, 00012_0000)
-        @test parse(FD4, "12e3")   == reinterpret(FD4, 12000_0000)
-        @test parse(FD4, "12e-3")  == reinterpret(FD4, 00000_0120)
-        @test parse(FD4, "1.2e0")  == reinterpret(FD4, 00001_2000)
-        @test parse(FD4, "1.2e3")  == reinterpret(FD4, 01200_0000)
-        @test parse(FD4, "1.2e-3") == reinterpret(FD4, 00000_0012)
-        @test parse(FD4, "1.2e-4") == reinterpret(FD4, 00000_0001)
-
-        @test parse(FD4, "-12e0")   == reinterpret(FD4, -00012_0000)
-        @test parse(FD4, "-12e3")   == reinterpret(FD4, -12000_0000)
-        @test parse(FD4, "-12e-3")  == reinterpret(FD4, -00000_0120)
-        @test parse(FD4, "-1.2e0")  == reinterpret(FD4, -00001_2000)
-        @test parse(FD4, "-1.2e3")  == reinterpret(FD4, -01200_0000)
-        @test parse(FD4, "-1.2e-3") == reinterpret(FD4, -00000_0012)
-
-        @test parse(FD2, "999e-1") == reinterpret(FD2, 99_90)
-        @test parse(FD2, "999e-2") == reinterpret(FD2, 09_99)
-        @test parse(FD2, "999e-3") == reinterpret(FD2, 01_00)
-        @test parse(FD2, "999e-4") == reinterpret(FD2, 00_10)
-        @test parse(FD2, "999e-5") == reinterpret(FD2, 00_01)
-        @test parse(FD2, "999e-6") == reinterpret(FD2, 00_00)
-
-        @test parse(FD2, "-999e-1") == reinterpret(FD2, -99_90)
-        @test parse(FD2, "-999e-2") == reinterpret(FD2, -09_99)
-        @test parse(FD2, "-999e-3") == reinterpret(FD2, -01_00)
-        @test parse(FD2, "-999e-4") == reinterpret(FD2, -00_10)
-        @test parse(FD2, "-999e-5") == reinterpret(FD2, -00_01)
-        @test parse(FD2, "-999e-6") == reinterpret(FD2, -00_00)
-
-        @test parse(FD4, "9"^96 * "e-100") == reinterpret(FD4, 0_001)
-    end
-
-    @testset "round to nearest" begin
-        @test parse(FD2, "0.444") == reinterpret(FD2, 0_44)
-        @test parse(FD2, "0.445") == reinterpret(FD2, 0_44)
-        @test parse(FD2, "0.446") == reinterpret(FD2, 0_45)
-        @test parse(FD2, "0.454") == reinterpret(FD2, 0_45)
-        @test parse(FD2, "0.455") == reinterpret(FD2, 0_46)
-        @test parse(FD2, "0.456") == reinterpret(FD2, 0_46)
-
-        @test parse(FD2, "-0.444") == reinterpret(FD2, -0_44)
-        @test parse(FD2, "-0.445") == reinterpret(FD2, -0_44)
-        @test parse(FD2, "-0.446") == reinterpret(FD2, -0_45)
-        @test parse(FD2, "-0.454") == reinterpret(FD2, -0_45)
-        @test parse(FD2, "-0.455") == reinterpret(FD2, -0_46)
-        @test parse(FD2, "-0.456") == reinterpret(FD2, -0_46)
-
-        @test parse(FD2, "0.009")  == reinterpret(FD2,  0_01)
-        @test parse(FD2, "-0.009") == reinterpret(FD2, -0_01)
-
-        @test parse(FD4, "1.5e-4") == reinterpret(FD4, 0_0002)
-    end
-
-    @testset "round to zero" begin
-        @test parse(FD2, "0.444", RoundToZero) == reinterpret(FD2, 0_44)
-        @test parse(FD2, "0.445", RoundToZero) == reinterpret(FD2, 0_44)
-        @test parse(FD2, "0.446", RoundToZero) == reinterpret(FD2, 0_44)
-        @test parse(FD2, "0.454", RoundToZero) == reinterpret(FD2, 0_45)
-        @test parse(FD2, "0.455", RoundToZero) == reinterpret(FD2, 0_45)
-        @test parse(FD2, "0.456", RoundToZero) == reinterpret(FD2, 0_45)
-
-        @test parse(FD2, "-0.444", RoundToZero) == reinterpret(FD2, -0_44)
-        @test parse(FD2, "-0.445", RoundToZero) == reinterpret(FD2, -0_44)
-        @test parse(FD2, "-0.446", RoundToZero) == reinterpret(FD2, -0_44)
-        @test parse(FD2, "-0.454", RoundToZero) == reinterpret(FD2, -0_45)
-        @test parse(FD2, "-0.455", RoundToZero) == reinterpret(FD2, -0_45)
-        @test parse(FD2, "-0.456", RoundToZero) == reinterpret(FD2, -0_45)
-
-        @test parse(FD2, "0.009", RoundToZero)  == reinterpret(FD2, 0_00)
-        @test parse(FD2, "-0.009", RoundToZero) == reinterpret(FD2, 0_00)
-
-        @test parse(FD4, "1.5e-4", RoundToZero) == reinterpret(FD4, 0_0001)
-    end
-
-    @testset "round throws" begin
-        @test parse(FD2, "0.44", RoundThrows)  == reinterpret(FD2, 0_44)
-        @test parse(FD2, "0.440", RoundThrows) == reinterpret(FD2, 0_44)
-
-        @test_throws InexactError parse(FD2, "0.444", RoundThrows)
-        @test_throws InexactError parse(FD2, "0.445", RoundThrows)
-        @test_throws InexactError parse(FD2, "0.446", RoundThrows)
-        @test_throws InexactError parse(FD2, "0.454", RoundThrows)
-        @test_throws InexactError parse(FD2, "0.455", RoundThrows)
-        @test_throws InexactError parse(FD2, "0.456", RoundThrows)
-
-        @test_throws InexactError parse(FD2, "-0.444", RoundThrows)
-        @test_throws InexactError parse(FD2, "-0.445", RoundThrows)
-        @test_throws InexactError parse(FD2, "-0.446", RoundThrows)
-        @test_throws InexactError parse(FD2, "-0.454", RoundThrows)
-        @test_throws InexactError parse(FD2, "-0.455", RoundThrows)
-        @test_throws InexactError parse(FD2, "-0.456", RoundThrows)
-
-        @test_throws InexactError parse(FD2, "0.009", RoundThrows)
-        @test_throws InexactError parse(FD2, "-0.009", RoundThrows)
-        @test_throws InexactError parse(FD4, "1.5e-4", RoundThrows)
-    end
-
-    @testset "invalid" begin
-        @test_throws OverflowError parse(FD4, "1.2e100")
-        @test_throws ArgumentError parse(FD4, "foo")
-        @test_throws ArgumentError parse(FD4, "1.2.3")
-        @test_throws ArgumentError parse(FD4, "1.2", RoundUp)
-    end
-
-    @testset "hashing" begin
-        fd1 = FixedDecimal{Int, 4}(2.5)
-        fd2 = FixedDecimal{Int, 5}(2.5)
-        fd3 = FixedDecimal{Int, 4}(3.5)
-
-        @test hash(fd1) == hash(fd2)
-        @test hash(fd1) != hash(fd3)
-        @test hash(fd1) != hash(fd1.i)
-        @test hash(FD2(1//10)) == hash(1//10)
-        @test hash(FD2(1//10)) ≠ hash(0.1)
-    end
+    @test hash(fd1) == hash(fd2)
+    @test hash(fd1) != hash(fd3)
+    @test hash(fd1) != hash(fd1.i)
+    @test hash(FD2(1//10)) == hash(1//10)
+    @test hash(FD2(1//10)) ≠ hash(0.1)
 end
 
 end  # global testset

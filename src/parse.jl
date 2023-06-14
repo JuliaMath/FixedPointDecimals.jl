@@ -12,15 +12,17 @@ const RoundThrows = RoundingMode{:Throw}()
 struct FixedDecimalConf{T<:Integer} <: AbstractConf{T}
     f::Int
 end
-# this overload says that when parsing a FixedDecimal type, use our new custom FixedDecimalConf type
+# This overload says that when parsing a FixedDecimal type, use our new custom FixedDecimalConf type
 Parsers.conf(::Type{FixedDecimal{T,f}}, opts::Parsers.Options, kw...) where {T<:Integer,f} = FixedDecimalConf{T}(f)
 # Because the value returned from our `typeparser` isn't a FixedDecimal, we overload here to show we're returning an integer type
 Parsers.returntype(::Type{FixedDecimal{T,f}}) where {T,f} = T
-# this overload allows us to take the Result{IntegerType} returned from typeparser and turn it into a FixedDecimal Result
+# This overload allows us to take the Result{IntegerType} returned from typeparser and turn it into a FixedDecimal Result
 function Parsers.result(FD::Type{FixedDecimal{T,f}}, res::Parsers.Result{T}) where {T,f}
     return Parsers.invalid(res.code) ? Result{FD}(res.code, res.tlen) :
         Result{FD}(res.code, res.tlen, reinterpret(FD, res.val))
 end
+# Tell Parsers that we can use our custom typeparser and not rely on Base.tryparse
+Parsers.supportedtype(::Type{<:FixedDecimal}) = true
 
 const OPTIONS_ROUND_NEAREST = Parsers.Options(rounding=RoundNearest)
 const OPTIONS_ROUND_TO_ZERO = Parsers.Options(rounding=RoundToZero)
@@ -117,9 +119,9 @@ end
         # all digits are zero
         i = zero(T)
     # The backing_integer_digits == 0 case is handled in the `else` (it means
-    # that all the digits are passed the precision but we might get `1` from rounding) 
+    # that all the digits are passed the precision but we might get `1` from rounding)
     elseif backing_integer_digits < 0
-        # All digits are past our precision, no overflow possible
+        # All digits are past our precision, no overflow possible, but we might get an inexact
         i = zero(T)
         (rounding === RoundThrows) && (code |= Parsers.INEXACT)
     elseif neg && (T <: Unsigned)
@@ -165,6 +167,10 @@ end
     return Parsers.scale(conf, FT, digits, exp, neg, code, ndigits, f, options)
 end
 
+# This hooks into the floating point parsing machinery from Parsers.jl, where we also accumulate
+# all the digits and note the effective exponent before we do "scaling" -- for FixedDecimals,
+# the scaling means padding the backing integer with zeros or rounding them as necessary.
+# We overloaded the "scale" and "noscale" methods to produce backing integers for FixedDecimals.
 # We return a value of T -- i.e. the _integer_ backing the FixedDecimal, the reintrpret needs to happen later
 @inline function Parsers.typeparser(conf::FixedDecimalConf{T}, source, pos, len, b, code, pl, options) where {T<:Integer}
     if !(options.rounding in (nothing, RoundNearest, RoundToZero, RoundThrows))
@@ -201,8 +207,6 @@ end
     @label done
     return pos, code, Parsers.PosLen(pl.pos, pos - pl.pos), x
 end
-
-Parsers.supportedtype(::Type{<:FixedDecimal}) = true
 
 function _base_parse(::Type{FD{T, f}}, source::AbstractString, mode::RoundingMode=RoundNearest) where {T, f}
     if !(mode in (RoundThrows, RoundNearest, RoundToZero))
