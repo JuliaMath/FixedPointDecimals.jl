@@ -1,5 +1,5 @@
 using Parsers
-using Parsers: AbstractConf, SourceType, XOPTIONS, Result
+using Parsers: AbstractConf, Result
 
 """
     RoundThrows
@@ -8,11 +8,15 @@ Raises an `InexactError` if any rounding is necessary.
 """
 const RoundThrows = RoundingMode{:Throw}()
 
+# make our own conf struct to avoid specializing Parsers.typeparser on each unique precision value
 struct FixedDecimalConf{T<:Integer} <: AbstractConf{T}
     f::Int
 end
+# this overload says that when parsing a FixedDecimal type, use our new custom FixedDecimalConf type
 Parsers.conf(::Type{FixedDecimal{T,f}}, opts::Parsers.Options, kw...) where {T<:Integer,f} = FixedDecimalConf{T}(f)
+# Because the value returned from our `typeparser` isn't a FixedDecimal, we overload here to show we're returning an integer type
 Parsers.returntype(::Type{FixedDecimal{T,f}}) where {T,f} = T
+# this overload allows us to take the Result{IntegerType} returned from typeparser and turn it into a FixedDecimal Result
 function Parsers.result(FD::Type{FixedDecimal{T,f}}, res::Parsers.Result{T}) where {T,f}
     return Parsers.invalid(res.code) ? Result{FD}(res.code, res.tlen) :
         Result{FD}(res.code, res.tlen, reinterpret(FD, res.val))
@@ -98,11 +102,12 @@ function _divpow10!(x::BigInt, code, pow, ::RoundingMode{:Throw})
 end
 
 # Rescale the digits we accumulated so far into the the a an integer representing the decimal
+# Note the 2nd argument `FloatType` is used by Parsers.jl for _float_ parsing, but we can ignore in the fixed decimal case
 @inline function Parsers.scale(
     conf::FixedDecimalConf{T}, ::Parsers.FloatType, digits::V, exp, neg, code, ndigits, f::F, options::Parsers.Options
 ) where {T,V,F}
     rounding = something(options.rounding, RoundThrows)
-    # Positive: how many trailing zeroes we need to add to out integer
+    # Positive: how many trailing zeroes we need to add to our integer
     # Negative: how many digits are past our precision (we need to handle them in rounding)
     decimal_shift = conf.f + exp
     # Number of digits we need to accumulate including any trailigng zeros or digits past our precision
@@ -111,6 +116,8 @@ end
     if iszero(ndigits)
         # all digits are zero
         i = zero(T)
+    # The backing_integer_digits == 0 case is handled in the `else` (it means
+    # that all the digits are passed the precision but we might get `1` from rounding) 
     elseif backing_integer_digits < 0
         # All digits are past our precision, no overflow possible
         i = zero(T)
