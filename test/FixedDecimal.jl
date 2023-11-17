@@ -298,6 +298,21 @@ end
         @test_throws InexactError(:convert, FD2, typemax(UInt128)) convert(FD2, typemax(UInt128))
         @test_throws InexactError(:convert, UFD2, typemax(UInt128)) convert(UFD2, typemax(UInt128))
     end
+
+    @testset "Convert from BigInt to 128-bit" begin
+        @test convert(WFD2, BigInt(1)).i === Int128(100)
+        @test convert(UWFD2, BigInt(1)).i === UInt128(100)
+        @test convert(WFD2, BigInt(-1)).i === Int128(-100)
+        @test_throws InexactError(:convert, UWFD2, BigInt(-1)) convert(UWFD2, BigInt(-1))
+        @test_throws InexactError(:convert, FD2, BigInt(typemax(Int128))) convert(FD2, BigInt(typemax(Int128)))
+    end
+
+    @testset "Convert from 128-bit to BigInt" begin
+        @test convert(FixedDecimal{BigInt,2}, Int128(1)).i == BigInt(100)
+        @test convert(FixedDecimal{BigInt,2}, UInt128(1)).i == BigInt(100)
+        @test convert(FixedDecimal{BigInt,2}, Int128(-1)).i == BigInt(-100)
+        @test convert(FixedDecimal{BigInt,2}, typemax(UInt128)).i == BigInt(typemax(UInt128))*100
+    end
 end
 
 module PerfTests
