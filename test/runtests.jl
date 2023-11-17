@@ -5,6 +5,8 @@ using Printf
 using Base.Checked: checked_mul
 using Parsers
 
+Base.Experimental.@optlevel 2  # For perf tests
+
 pkg_path = pkgdir(FixedPointDecimals)
 include(joinpath(pkg_path, "test", "utils.jl"))
 
@@ -16,6 +18,8 @@ const FD3 = FixedDecimal{Int, 3}
 const FD4 = FixedDecimal{Int, 4}
 const WFD2 = FixedDecimal{Int128, 2}
 const WFD4 = FixedDecimal{Int128, 4}
+const UFD2 = FixedDecimal{UInt, 2}
+const UWFD2 = FixedDecimal{UInt128, 2}
 
 const CONTAINER_TYPES = Base.BitInteger_types  # Integer concrete subtypes which are bits
 
@@ -261,6 +265,59 @@ end
         end
     end
 end
+
+@testset "128-bit conversion correctness" begin
+    # TODO: Negatives
+    @testset "Convert from 64-bit to 128-bit" begin
+        @test Base.convert(WFD2, 1).i === Int128(100)
+        @test Base.convert(UWFD2, 1).i === UInt128(100)
+        @test Base.convert(WFD2, -1).i === Int128(-100)
+        @test_throws InexactError(:convert, UWFD2, -1) Base.convert(UWFD2, -1)
+        @test Base.convert(WFD2, UInt(1)).i === Int128(100)
+        @test Base.convert(UWFD2, UInt(1)).i === UInt128(100)
+        @test Base.convert(WFD2, typemax(Int)).i === Int128(922337203685477580700)
+        @test Base.convert(UWFD2, typemax(Int)).i === UInt128(922337203685477580700)
+        @test Base.convert(WFD2, typemin(Int)).i === Int128(-922337203685477580800)
+        @test_throws InexactError(:convert, UWFD2, typemin(Int)) Base.convert(UWFD2, typemin(Int))
+        @test Base.convert(WFD2, typemax(UInt)).i === Int128(1844674407370955161500)
+        @test Base.convert(UWFD2, typemax(UInt)).i === UInt128(1844674407370955161500)
+    end
+
+    @testset "Convert from 128-bit to 128-bit" begin
+        @test Base.convert(WFD2, Int128(1)).i === Int128(100)
+        @test Base.convert(UWFD2, Int128(1)).i === UInt128(100)
+        @test Base.convert(WFD2, UInt128(1)).i === Int128(100)
+        @test Base.convert(UWFD2, UInt128(1)).i === UInt128(100)
+        @test Base.convert(WFD2, Int128(-1)).i === Int128(-100)
+        @test_throws InexactError(:convert, UWFD2, Int128(-1)) Base.convert(UWFD2, Int128(-1))
+        @test_throws InexactError(:convert, WFD2, typemax(Int128)) Base.convert(WFD2, typemax(Int128))
+        @test_throws InexactError(:convert, UWFD2, typemax(Int128)) Base.convert(UWFD2, typemax(Int128))
+        @test_throws InexactError(:convert, WFD2, typemin(Int128)) Base.convert(WFD2, typemin(Int128))
+        @test_throws InexactError(:convert, UWFD2, typemin(Int128)) Base.convert(UWFD2, typemin(Int128))
+        @test_throws InexactError(:convert, WFD2, typemax(UInt128)) Base.convert(WFD2, typemax(UInt128))
+        @test_throws InexactError(:convert, UWFD2, typemax(UInt128)) Base.convert(UWFD2, typemax(UInt128))
+    end
+
+    @testset "Convert from 128-bit to 64-bit" begin
+        @test Base.convert(FD2, Int128(1)).i === Int(100)
+        @test Base.convert(UFD2, Int128(1)).i === UInt(100)
+        @test Base.convert(FD2, UInt128(1)).i === Int(100)
+        @test Base.convert(UFD2, UInt128(1)).i === UInt(100)
+        @test Base.convert(FD2, Int128(-1)).i === Int(-100)
+        @test_throws InexactError(:convert, UFD2, Int128(-1)) Base.convert(UFD2, Int128(-1))
+        @test_throws InexactError(:convert, FD2, typemax(Int128)) Base.convert(FD2, typemax(Int128))
+        @test_throws InexactError(:convert, UFD2, typemax(Int128)) Base.convert(UFD2, typemax(Int128))
+        @test_throws InexactError(:convert, FD2, typemin(Int128)) Base.convert(FD2, typemin(Int128))
+        @test_throws InexactError(:convert, UFD2, typemin(Int128)) Base.convert(UFD2, typemin(Int128))
+        @test_throws InexactError(:convert, FD2, typemax(UInt128)) Base.convert(FD2, typemax(UInt128))
+        @test_throws InexactError(:convert, UFD2, typemax(UInt128)) Base.convert(UFD2, typemax(UInt128))
+    end
+end
+@testset "128-bit conversion performance" begin
+    #@test Base.convert(WFD2, 1) == WFD2(1)
+    #@test @allocated(Base.convert(WFD2, 1)) == 0
+end
+
 
 @testset "promotion" begin
     @test 1//10 + FD2(0.1) === 1//5
