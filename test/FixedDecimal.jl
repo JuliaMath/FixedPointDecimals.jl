@@ -338,36 +338,36 @@ const UWFD2 = FixedDecimal{UInt128, 2}
 
 @testset "128-bit conversion performance" begin
     # Baseline cases
-    @test @allocated(Base.convert(FD2, Int8(-1))) == 0
-    @test @allocated(Base.convert(FD2, UInt8(1))) == 0
-    @test @allocated(Base.convert(SFD2, Int8(-1))) == 0
+    @test @allocated(convert(FD2, Int8(-1))) == 0
+    @test @allocated(convert(FD2, UInt8(1))) == 0
+    @test @allocated(convert(SFD2, Int8(-1))) == 0
 
     # Int 128 cases
-    @test @allocated(Base.convert(WFD2, 1)) == 0
-    @test @allocated(Base.convert(WFD2, 1)) == 0
-    @test @allocated(Base.convert(UWFD2, 1)) == 0
-    @test @allocated(Base.convert(WFD2, -1)) == 0
-    # @test @allocated(Base.convert(UWFD2, -1)) == 32   # not sure how best to test this
-    @test @allocated(Base.convert(WFD2, UInt(1))) == 0
-    @test @allocated(Base.convert(UWFD2, UInt(1))) == 0
+    @test @allocated(convert(WFD2, 1)) == 0
+    @test @allocated(convert(WFD2, 1)) == 0
+    @test @allocated(convert(UWFD2, 1)) == 0
+    @test @allocated(convert(WFD2, -1)) == 0
+    # @test @allocated(convert(UWFD2, -1)) == 32   # not sure how best to test this
+    @test @allocated(convert(WFD2, UInt(1))) == 0
+    @test @allocated(convert(UWFD2, UInt(1))) == 0
 
-    @test @allocated(Base.convert(WFD2, Int128(1))) == 0
-    @test @allocated(Base.convert(UWFD2, Int128(1))) == 0
-    @test @allocated(Base.convert(WFD2, UInt128(1))) == 0
-    @test @allocated(Base.convert(UWFD2, UInt128(1))) == 0
-    @test @allocated(Base.convert(WFD2, Int128(-1))) == 0
+    @test @allocated(convert(WFD2, Int128(1))) == 0
+    @test @allocated(convert(UWFD2, Int128(1))) == 0
+    @test @allocated(convert(WFD2, UInt128(1))) == 0
+    @test @allocated(convert(UWFD2, UInt128(1))) == 0
+    @test @allocated(convert(WFD2, Int128(-1))) == 0
 
-    @test @allocated(Base.convert(FD2, Int128(1))) == 0
-    @test @allocated(Base.convert(UFD2, Int128(1))) == 0
-    @test @allocated(Base.convert(FD2, UInt128(1))) == 0
-    @test @allocated(Base.convert(UFD2, UInt128(1))) == 0
-    @test @allocated(Base.convert(FD2, Int128(-1))) == 0
+    @test @allocated(convert(FD2, Int128(1))) == 0
+    @test @allocated(convert(UFD2, Int128(1))) == 0
+    @test @allocated(convert(FD2, UInt128(1))) == 0
+    @test @allocated(convert(UFD2, UInt128(1))) == 0
+    @test @allocated(convert(FD2, Int128(-1))) == 0
 end
 
 @testset "BigInt conversion performance" begin
     b = BigInt(2)
     # Special-cased f=1 to not allocate for BigInt => FD conversion
-    @test @allocated(Base.convert(FixedDecimal{BigInt, 1}, b)) == 0
+    @test @allocated(convert(FixedDecimal{BigInt, 1}, b)) == 0
 end
 
 end  # module PerfTests
