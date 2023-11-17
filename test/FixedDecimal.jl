@@ -360,6 +360,12 @@ const UWFD2 = FixedDecimal{UInt128, 2}
     @test @allocated(Base.convert(FD2, Int128(-1))) == 0
 end
 
+@testset "BigInt conversion performance" begin
+    b = BigInt(2)
+    # Special-cased f=1 to not allocate for BigInt => FD conversion
+    @test @allocated(Base.convert(FixedDecimal{BigInt, 1}, b)) == 0
+end
+
 end  # module PerfTests
 
 @testset "promotion" begin
