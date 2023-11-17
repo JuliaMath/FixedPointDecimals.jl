@@ -254,6 +254,10 @@ end
 end
 
 @testset "128-bit conversion correctness" begin
+    # Force the bits for these tests
+    FD2 = FixedDecimal{Int64, 2}
+    UFD2 = FixedDecimal{UInt64, 2}
+
     @testset "Convert from 64-bit to 128-bit" begin
         @test convert(WFD2, 1).i === Int128(100)
         @test convert(UWFD2, 1).i === UInt128(100)
