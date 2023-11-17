@@ -294,7 +294,7 @@ end
         @test convert(F64D2, UInt128(1)).i === Int64(100)
         @test convert(UF64D2, UInt128(1)).i === UInt64(100)
         @test convert(F64D2, Int128(-1)).i === Int64(-100)
-        @test_throws InexactError(:convert, UF64D2, Int128(-1)) convert(UFD2, Int128(-1))
+        @test_throws InexactError(:convert, UF64D2, Int128(-1)) convert(UF64D2, Int128(-1))
         @test_throws InexactError(:convert, F64D2, typemax(Int128)) convert(F64D2, typemax(Int128))
         @test_throws InexactError(:convert, UF64D2, typemax(Int128)) convert(UF64D2, typemax(Int128))
         @test_throws InexactError(:convert, F64D2, typemin(Int128)) convert(F64D2, typemin(Int128))
