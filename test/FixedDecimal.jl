@@ -339,6 +339,9 @@ const WFD2 = FixedDecimal{Int128, 2}
 const UFD2 = FixedDecimal{UInt, 2}
 const UWFD2 = FixedDecimal{UInt128, 2}
 
+# These perf tests only make sense on 64-bit architectures, since 32-bit architectures
+# use BigInts to implement Int128, so there will be allocations for many of these tests.
+@static if Int === Int64
 @testset "128-bit conversion performance" begin
     # Baseline cases
     @test @allocated(convert(F64D2, Int8(-1))) == 0
@@ -366,6 +369,7 @@ const UWFD2 = FixedDecimal{UInt128, 2}
     @test @allocated(convert(UF64D2, UInt128(1))) == 0
     @test @allocated(convert(F64D2, Int128(-1))) == 0
 end
+end  # if @static Int === Int64
 
 @testset "BigInt conversion performance" begin
     b = BigInt(2)
