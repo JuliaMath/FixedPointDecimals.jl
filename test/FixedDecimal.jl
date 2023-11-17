@@ -255,22 +255,22 @@ end
 
 @testset "128-bit conversion correctness" begin
     # Force the bits for these tests
-    FD2 = FixedDecimal{Int64, 2}
-    UFD2 = FixedDecimal{UInt64, 2}
+    F64D2 = FixedDecimal{Int64, 2}
+    UF64D2 = FixedDecimal{UInt64, 2}
 
     @testset "Convert from 64-bit to 128-bit" begin
         @test convert(WFD2, 1).i === Int128(100)
         @test convert(UWFD2, 1).i === UInt128(100)
         @test convert(WFD2, -1).i === Int128(-100)
         @test_throws InexactError(:convert, UWFD2, -1) convert(UWFD2, -1)
-        @test convert(WFD2, UInt(1)).i === Int128(100)
-        @test convert(UWFD2, UInt(1)).i === UInt128(100)
-        @test convert(WFD2, typemax(Int)).i === Int128(922337203685477580700)
-        @test convert(UWFD2, typemax(Int)).i === UInt128(922337203685477580700)
-        @test convert(WFD2, typemin(Int)).i === Int128(-922337203685477580800)
-        @test_throws InexactError(:convert, UWFD2, typemin(Int)) convert(UWFD2, typemin(Int))
-        @test convert(WFD2, typemax(UInt)).i === Int128(1844674407370955161500)
-        @test convert(UWFD2, typemax(UInt)).i === UInt128(1844674407370955161500)
+        @test convert(WFD2, UInt64(1)).i === Int128(100)
+        @test convert(UWFD2, UInt64(1)).i === UInt128(100)
+        @test convert(WFD2, typemax(Int64)).i === Int128(922337203685477580700)
+        @test convert(UWFD2, typemax(Int64)).i === UInt128(922337203685477580700)
+        @test convert(WFD2, typemin(Int64)).i === Int128(-922337203685477580800)
+        @test_throws InexactError(:convert, UWFD2, typemin(Int64)) convert(UWFD2, typemin(Int64))
+        @test convert(WFD2, typemax(UInt64)).i === Int128(1844674407370955161500)
+        @test convert(UWFD2, typemax(UInt64)).i === UInt128(1844674407370955161500)
     end
 
     @testset "Convert from 128-bit to 128-bit" begin
@@ -289,18 +289,18 @@ end
     end
 
     @testset "Convert from 128-bit to 64-bit" begin
-        @test convert(FD2, Int128(1)).i === Int(100)
-        @test convert(UFD2, Int128(1)).i === UInt(100)
-        @test convert(FD2, UInt128(1)).i === Int(100)
-        @test convert(UFD2, UInt128(1)).i === UInt(100)
-        @test convert(FD2, Int128(-1)).i === Int(-100)
-        @test_throws InexactError(:convert, UFD2, Int128(-1)) convert(UFD2, Int128(-1))
-        @test_throws InexactError(:convert, FD2, typemax(Int128)) convert(FD2, typemax(Int128))
-        @test_throws InexactError(:convert, UFD2, typemax(Int128)) convert(UFD2, typemax(Int128))
-        @test_throws InexactError(:convert, FD2, typemin(Int128)) convert(FD2, typemin(Int128))
-        @test_throws InexactError(:convert, UFD2, typemin(Int128)) convert(UFD2, typemin(Int128))
-        @test_throws InexactError(:convert, FD2, typemax(UInt128)) convert(FD2, typemax(UInt128))
-        @test_throws InexactError(:convert, UFD2, typemax(UInt128)) convert(UFD2, typemax(UInt128))
+        @test convert(F64D2, Int128(1)).i === Int64(100)
+        @test convert(UF64D2, Int128(1)).i === UInt64(100)
+        @test convert(F64D2, UInt128(1)).i === Int64(100)
+        @test convert(UF64D2, UInt128(1)).i === UInt64(100)
+        @test convert(F64D2, Int128(-1)).i === Int64(-100)
+        @test_throws InexactError(:convert, UF64D2, Int128(-1)) convert(UFD2, Int128(-1))
+        @test_throws InexactError(:convert, F64D2, typemax(Int128)) convert(F64D2, typemax(Int128))
+        @test_throws InexactError(:convert, UF64D2, typemax(Int128)) convert(UF64D2, typemax(Int128))
+        @test_throws InexactError(:convert, F64D2, typemin(Int128)) convert(F64D2, typemin(Int128))
+        @test_throws InexactError(:convert, UF64D2, typemin(Int128)) convert(UF64D2, typemin(Int128))
+        @test_throws InexactError(:convert, F64D2, typemax(UInt128)) convert(F64D2, typemax(UInt128))
+        @test_throws InexactError(:convert, UF64D2, typemax(UInt128)) convert(UF64D2, typemax(UInt128))
     end
 
     @testset "Convert from BigInt to 128-bit" begin
@@ -333,19 +333,16 @@ using FixedPointDecimals
 
 const SFD2 = FixedDecimal{Int16, 2}
 const SFD4 = FixedDecimal{Int16, 4}
-const FD1 = FixedDecimal{Int, 1}
-const FD2 = FixedDecimal{Int, 2}
-const FD3 = FixedDecimal{Int, 3}
-const FD4 = FixedDecimal{Int, 4}
+const F64D2 = FixedDecimal{Int64, 2}
+const UF64D2 = FixedDecimal{UInt64, 2}
 const WFD2 = FixedDecimal{Int128, 2}
-const WFD4 = FixedDecimal{Int128, 4}
 const UFD2 = FixedDecimal{UInt, 2}
 const UWFD2 = FixedDecimal{UInt128, 2}
 
 @testset "128-bit conversion performance" begin
     # Baseline cases
-    @test @allocated(convert(FD2, Int8(-1))) == 0
-    @test @allocated(convert(FD2, UInt8(1))) == 0
+    @test @allocated(convert(F64D2, Int8(-1))) == 0
+    @test @allocated(convert(F64D2, UInt8(1))) == 0
     @test @allocated(convert(SFD2, Int8(-1))) == 0
 
     # Int 128 cases
@@ -363,11 +360,11 @@ const UWFD2 = FixedDecimal{UInt128, 2}
     @test @allocated(convert(UWFD2, UInt128(1))) == 0
     @test @allocated(convert(WFD2, Int128(-1))) == 0
 
-    @test @allocated(convert(FD2, Int128(1))) == 0
-    @test @allocated(convert(UFD2, Int128(1))) == 0
-    @test @allocated(convert(FD2, UInt128(1))) == 0
-    @test @allocated(convert(UFD2, UInt128(1))) == 0
-    @test @allocated(convert(FD2, Int128(-1))) == 0
+    @test @allocated(convert(F64D2, Int128(1))) == 0
+    @test @allocated(convert(UF64D2, Int128(1))) == 0
+    @test @allocated(convert(F64D2, UInt128(1))) == 0
+    @test @allocated(convert(UF64D2, UInt128(1))) == 0
+    @test @allocated(convert(F64D2, Int128(-1))) == 0
 end
 
 @testset "BigInt conversion performance" begin
