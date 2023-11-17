@@ -308,17 +308,17 @@ function Base.convert(::Type{FD{T, f}}, x::Integer) where {T, f}
     end
     reinterpret(FD{T, f}, v)
 end
-function Base.convert(::Type{FD{BigT, f}}, x::Integer) where {BigT<:Union{BigFloat,BigInt}, f}
+function Base.convert(::Type{FD{BigInt, f}}, x::Integer) where {f}
     # We specialize on f==1, since julia can't eliminate BigInt multiplication.
     if f == 1
         # If x is already a BigInt, this is a no-op, otherwise we alloc a new BigInt.
-        return reinterpret(FD{BigT, f}, BigT(x))
+        return reinterpret(FD{BigInt, f}, BigInt(x))
     end
     # For the normal case, we multiply by C, which produces a BigInt value.
-    C = coefficient(FD{BigT, f})
+    C = coefficient(FD{BigInt, f})
     # This can't throw since BigInt and BigFloat can hold any number.
     v = x * C
-    reinterpret(FD{BigT, f}, v)
+    reinterpret(FD{BigInt, f}, v)
 end
 
 Base.convert(::Type{T}, x::AbstractFloat) where {T <: FD} = round(T, x)

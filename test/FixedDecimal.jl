@@ -317,6 +317,12 @@ end
         @test convert(FixedDecimal{BigInt,2}, Int128(-1)).i == BigInt(-100)
         @test convert(FixedDecimal{BigInt,2}, typemax(UInt128)).i == BigInt(typemax(UInt128))*100
     end
+
+    @testset "Convert from Big* to BigInt" begin
+        @test convert(FixedDecimal{BigInt,2}, BigInt(1)).i == BigInt(100)
+        @test convert(FixedDecimal{BigInt,2}, BigFloat(1)).i == BigInt(100)
+        @test convert(FixedDecimal{BigInt,2}, BigFloat(1.5)).i == BigInt(150)
+    end
 end
 
 module PerfTests
