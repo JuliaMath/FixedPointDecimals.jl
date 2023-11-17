@@ -296,7 +296,17 @@ end
 Base.convert(::Type{FD{T, f}}, x::FD{T, f}) where {T, f} = x  # Converting an FD to itself is a no-op
 
 function Base.convert(::Type{FD{T, f}}, x::Integer) where {T, f}
-    reinterpret(FD{T, f}, T(widemul(x, coefficient(FD{T, f}))))
+    C = coefficient(FD{T, f})
+    throw_inexact() = throw(InexactError(:convert, FD{T, f}, x))
+    typemin(T) <= x <= typemax(T) || throw_inexact()
+    xT = convert(T, x)  # This won't throw, since we already checked, above.
+    # Perform x * C, and check for overflow. This is cheaper than a widemul, especially for
+    # 128-bit T, since those widen into a BigInt.
+    v, overflow = Base.mul_with_overflow(xT, C)
+    if overflow
+        throw_inexact()
+    end
+    reinterpret(FD{T, f}, v)
 end
 
 Base.convert(::Type{T}, x::AbstractFloat) where {T <: FD} = round(T, x)

@@ -314,10 +314,32 @@ end
     end
 end
 @testset "128-bit conversion performance" begin
-    #@test Base.convert(WFD2, 1) == WFD2(1)
-    #@test @allocated(Base.convert(WFD2, 1)) == 0
-end
+    # Baseline cases
+    @test @allocated(Base.convert(FD2, Int8(-1))) == 0
+    @test @allocated(Base.convert(FD2, UInt8(1))) == 0
+    @test @allocated(Base.convert(SFD2, Int8(-1))) == 0
 
+    # Int 128 cases
+    @test @allocated(Base.convert(WFD2, 1)) == 0
+    @test @allocated(Base.convert(WFD2, 1)) == 0
+    @test @allocated(Base.convert(UWFD2, 1)) == 0
+    @test @allocated(Base.convert(WFD2, -1)) == 0
+    # @test @allocated(Base.convert(UWFD2, -1)) == 32   # not sure how best to test this
+    @test @allocated(Base.convert(WFD2, UInt(1))) == 0
+    @test @allocated(Base.convert(UWFD2, UInt(1))) == 0
+
+    @test @allocated(Base.convert(WFD2, Int128(1))) == 0
+    @test @allocated(Base.convert(UWFD2, Int128(1))) == 0
+    @test @allocated(Base.convert(WFD2, UInt128(1))) == 0
+    @test @allocated(Base.convert(UWFD2, UInt128(1))) == 0
+    @test @allocated(Base.convert(WFD2, Int128(-1))) == 0
+
+    @test @allocated(Base.convert(FD2, Int128(1))) == 0
+    @test @allocated(Base.convert(UFD2, Int128(1))) == 0
+    @test @allocated(Base.convert(FD2, UInt128(1))) == 0
+    @test @allocated(Base.convert(UFD2, UInt128(1))) == 0
+    @test @allocated(Base.convert(FD2, Int128(-1))) == 0
+end
 
 @testset "promotion" begin
     @test 1//10 + FD2(0.1) === 1//5
