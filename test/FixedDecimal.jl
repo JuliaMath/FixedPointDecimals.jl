@@ -336,6 +336,7 @@ const SFD4 = FixedDecimal{Int16, 4}
 const F64D2 = FixedDecimal{Int64, 2}
 const UF64D2 = FixedDecimal{UInt64, 2}
 const WFD2 = FixedDecimal{Int128, 2}
+const WFD3 = FixedDecimal{Int128, 3}
 const UFD2 = FixedDecimal{UInt, 2}
 const UWFD2 = FixedDecimal{UInt128, 2}
 
@@ -369,6 +370,19 @@ const UWFD2 = FixedDecimal{UInt128, 2}
     @test @allocated(convert(UF64D2, UInt128(1))) == 0
     @test @allocated(convert(F64D2, Int128(-1))) == 0
 end
+
+@testset "128-bit FD to FD conversion performance" begin
+    @test @allocated(convert(WFD3, WFD2(1))) == 0
+    @test @allocated(convert(SFD4, SFD2(1))) == 0
+    @test @allocated(convert(SFD4, WFD2(1))) == 0
+end
+
+@testset "128-bit FD to FD conversion performance" begin
+    @test @allocated(convert(WFD3, WFD2(1))) == 0
+    @test @allocated(convert(SFD4, SFD2(1))) == 0
+    @test @allocated(convert(SFD4, WFD2(1))) == 0
+end
+
 end  # if @static Int === Int64
 
 @testset "BigInt conversion performance" begin

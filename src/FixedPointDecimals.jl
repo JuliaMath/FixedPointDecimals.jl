@@ -302,10 +302,7 @@ function Base.convert(::Type{FD{T, f}}, x::Integer) where {T, f}
     xT = convert(T, x)  # This won't throw, since we already checked, above.
     # Perform x * C, and check for overflow. This is cheaper than a widemul, especially for
     # 128-bit T, since those widen into a BigInt.
-    v, overflow = Base.mul_with_overflow(xT, C)
-    if overflow
-        throw_inexact()
-    end
+    v = _mul_checked_overflow(throw_inexact, xT, C)
     reinterpret(FD{T, f}, v)
 end
 function Base.convert(::Type{FD{BigInt, f}}, x::Integer) where {f}
@@ -321,6 +318,15 @@ function Base.convert(::Type{FD{BigInt, f}}, x::Integer) where {f}
     reinterpret(FD{BigInt, f}, v)
 end
 
+# x * y - if overflow, report an InexactError(FDT, )
+function _mul_checked_overflow(overflow_callback, x, y)
+    v, overflow = Base.mul_with_overflow(x, y)
+    if overflow
+        overflow_callback()
+    end
+    return v
+end
+
 Base.convert(::Type{T}, x::AbstractFloat) where {T <: FD} = round(T, x)
 
 function Base.convert(::Type{FD{T, f}}, x::Rational) where {T, f}
@@ -332,7 +338,10 @@ function Base.convert(::Type{FD{T, f}}, x::FD{U, g}) where {T, f, U, g}
     if f ≥ g
         # Compute `10^(f - g)` without overflow
         powt = div(coefficient(FD{T, f}), coefficient(FD{U, g}))
-        reinterpret(FD{T, f}, T(widemul(x.i, powt)))
+        v = _mul_checked_overflow(promote(x.i, powt)...) do
+            throw(InexactError(:convert, FD{T, f}, x))
+        end
+        reinterpret(FD{T, f}, T(v))
     else
         # Compute `10^(g - f)` without overflow
         powt = div(coefficient(FD{U, g}), coefficient(FD{T, f}))
