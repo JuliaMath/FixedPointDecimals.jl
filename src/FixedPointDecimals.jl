@@ -303,11 +303,11 @@ function Base.convert(::Type{FD{T, f}}, x::Integer) where {T, f}
     # Perform x * C, and check for overflow. This is cheaper than a widemul, especially for
     # 128-bit T, since those widen into a BigInt.
     v = _mul_checked_overflow(throw_inexact, xT, C)
-    reinterpret(FD{T, f}, v)
+    return reinterpret(FD{T, f}, v)
 end
 function Base.convert(::Type{FD{BigInt, f}}, x::Integer) where {f}
     # We specialize on f==1, since julia can't eliminate BigInt multiplication.
-    if f == 1
+    if f == 0
         # If x is already a BigInt, this is a no-op, otherwise we alloc a new BigInt.
         return reinterpret(FD{BigInt, f}, BigInt(x))
     end
@@ -315,7 +315,7 @@ function Base.convert(::Type{FD{BigInt, f}}, x::Integer) where {f}
     C = coefficient(FD{BigInt, f})
     # This can't throw since BigInt and BigFloat can hold any number.
     v = x * C
-    reinterpret(FD{BigInt, f}, v)
+    return reinterpret(FD{BigInt, f}, v)
 end
 
 # x * y - if overflow, report an InexactError(FDT, )

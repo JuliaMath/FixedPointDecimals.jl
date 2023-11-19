@@ -316,12 +316,18 @@ end
         @test convert(FixedDecimal{BigInt,2}, UInt128(1)).i == BigInt(100)
         @test convert(FixedDecimal{BigInt,2}, Int128(-1)).i == BigInt(-100)
         @test convert(FixedDecimal{BigInt,2}, typemax(UInt128)).i == BigInt(typemax(UInt128))*100
+
+        @test convert(FixedDecimal{BigInt, 1}, Int128(1)).i == BigInt(10)
+        @test convert(FixedDecimal{BigInt, 0}, Int128(1)).i == BigInt(1)
     end
 
     @testset "Convert from Big* to BigInt" begin
         @test convert(FixedDecimal{BigInt,2}, BigInt(1)).i == BigInt(100)
         @test convert(FixedDecimal{BigInt,2}, BigFloat(1)).i == BigInt(100)
         @test convert(FixedDecimal{BigInt,2}, BigFloat(1.5)).i == BigInt(150)
+
+        @test convert(FixedDecimal{BigInt, 1}, BigInt(1)).i == BigInt(10)
+        @test convert(FixedDecimal{BigInt, 0}, BigInt(1)).i == BigInt(1)
     end
 end
 
@@ -388,7 +394,7 @@ end  # if @static Int === Int64
 @testset "BigInt conversion performance" begin
     b = BigInt(2)
     # Special-cased f=1 to not allocate for BigInt => FD conversion
-    @test @allocated(convert(FixedDecimal{BigInt, 1}, b)) == 0
+    @test @allocated(convert(FixedDecimal{BigInt, 0}, b)) == 0
 end
 
 end  # module PerfTests
