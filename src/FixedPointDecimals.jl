@@ -306,7 +306,7 @@ function Base.convert(::Type{FD{T, f}}, x::Integer) where {T, f}
     return reinterpret(FD{T, f}, v)
 end
 function Base.convert(::Type{FD{BigInt, f}}, x::Integer) where {f}
-    # We specialize on f==1, since julia can't eliminate BigInt multiplication.
+    # We specialize on f==0, since julia can't eliminate BigInt multiplication.
     if f == 0
         # If x is already a BigInt, this is a no-op, otherwise we alloc a new BigInt.
         return reinterpret(FD{BigInt, f}, BigInt(x))
