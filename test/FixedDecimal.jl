@@ -360,7 +360,6 @@ const UWFD2 = FixedDecimal{UInt128, 2}
     @test @allocated(convert(WFD2, 1)) == 0
     @test @allocated(convert(UWFD2, 1)) == 0
     @test @allocated(convert(WFD2, -1)) == 0
-    # @test @allocated(convert(UWFD2, -1)) == 32   # not sure how best to test this
     @test @allocated(convert(WFD2, UInt(1))) == 0
     @test @allocated(convert(UWFD2, UInt(1))) == 0
 
