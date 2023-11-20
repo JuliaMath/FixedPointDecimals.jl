@@ -296,7 +296,35 @@ end
 Base.convert(::Type{FD{T, f}}, x::FD{T, f}) where {T, f} = x  # Converting an FD to itself is a no-op
 
 function Base.convert(::Type{FD{T, f}}, x::Integer) where {T, f}
-    reinterpret(FD{T, f}, T(widemul(x, coefficient(FD{T, f}))))
+    C = coefficient(FD{T, f})
+    throw_inexact() = throw(InexactError(:convert, FD{T, f}, x))
+    typemin(T) <= x <= typemax(T) || throw_inexact()
+    xT = convert(T, x)  # This won't throw, since we already checked, above.
+    # Perform x * C, and check for overflow. This is cheaper than a widemul, especially for
+    # 128-bit T, since those widen into a BigInt.
+    v = _mul_checked_overflow(throw_inexact, xT, C)
+    return reinterpret(FD{T, f}, v)
+end
+function Base.convert(::Type{FD{BigInt, f}}, x::Integer) where {f}
+    # We specialize on f==0, since julia can't eliminate BigInt multiplication.
+    if f == 0
+        # If x is already a BigInt, this is a no-op, otherwise we alloc a new BigInt.
+        return reinterpret(FD{BigInt, f}, BigInt(x))
+    end
+    # For the normal case, we multiply by C, which produces a BigInt value.
+    C = coefficient(FD{BigInt, f})
+    # This can't throw since BigInt and BigFloat can hold any number.
+    v = x * C
+    return reinterpret(FD{BigInt, f}, v)
+end
+
+# x * y - if overflow, report an InexactError(FDT, )
+function _mul_checked_overflow(overflow_callback, x, y)
+    v, overflow = Base.mul_with_overflow(x, y)
+    if overflow
+        overflow_callback()
+    end
+    return v
 end
 
 Base.convert(::Type{T}, x::AbstractFloat) where {T <: FD} = round(T, x)
@@ -310,7 +338,10 @@ function Base.convert(::Type{FD{T, f}}, x::FD{U, g}) where {T, f, U, g}
     if f ≥ g
         # Compute `10^(f - g)` without overflow
         powt = div(coefficient(FD{T, f}), coefficient(FD{U, g}))
-        reinterpret(FD{T, f}, T(widemul(x.i, powt)))
+        v = _mul_checked_overflow(promote(x.i, powt)...) do
+            throw(InexactError(:convert, FD{T, f}, x))
+        end
+        reinterpret(FD{T, f}, T(v))
     else
         # Compute `10^(g - f)` without overflow
         powt = div(coefficient(FD{U, g}), coefficient(FD{T, f}))
