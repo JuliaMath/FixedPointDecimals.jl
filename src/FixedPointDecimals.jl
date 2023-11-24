@@ -187,13 +187,13 @@ end
 
 # these functions are needed to avoid InexactError when converting from the
 # integer type
-Base.:*(x::Integer, y::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, T(x * y.i))
-Base.:*(x::FD{T, f}, y::Integer) where {T, f} = reinterpret(FD{T, f}, T(x.i * y))
+Base.:*(x::Integer, y::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, *(promote(x, y.i)...))
+Base.:*(x::FD{T, f}, y::Integer) where {T, f} = reinterpret(FD{T, f}, *(promote(x.i, y)...))
 
 function Base.:/(x::FD{T, f}, y::FD{T, f}) where {T, f}
     powt = coefficient(FD{T, f})
     quotient, remainder = fldmod(widemul(x.i, powt), y.i)
-    reinterpret(FD{T, f}, T(_round_to_nearest(quotient, remainder, y.i)))
+    reinterpret(FD{T, f}, _round_to_nearest(quotient, remainder, y.i))
 end
 
 # These functions allow us to perform division with integers outside of the range of the
@@ -202,12 +202,12 @@ function Base.:/(x::Integer, y::FD{T, f}) where {T, f}
     powt = coefficient(FD{T, f})
     powtsq = widemul(powt, powt)
     quotient, remainder = fldmod(widemul(x, powtsq), y.i)
-    reinterpret(FD{T, f}, T(_round_to_nearest(quotient, remainder, y.i)))
+    reinterpret(FD{T, f}, _round_to_nearest(quotient, remainder, y.i))
 end
 
 function Base.:/(x::FD{T, f}, y::Integer) where {T, f}
     quotient, remainder = fldmod(x.i, y)
-    reinterpret(FD{T, f}, T(_round_to_nearest(quotient, remainder, y)))
+    reinterpret(FD{T, f}, _round_to_nearest(quotient, remainder, y))
 end
 
 # integerification
@@ -362,12 +362,22 @@ end
 for divfn in [:div, :fld, :fld1, :cld]
     # div(x.i, y.i) eliminates the scaling coefficient, so we call the FD constructor.
     # We don't need any widening logic, since we won't be multiplying by the coefficient.
-    @eval Base.$divfn(x::T, y::T) where {T <: FD} = T($divfn(x.i, y.i))
+    #@eval Base.$divfn(x::T, y::T) where {T <: FD} = T($divfn(x.i, y.i))
+    # @eval Base.$divfn(x::T, y::T) where {T <: FD} = $divfn(promote(x.i, y.i)...)
+    # TODO(PR): I'm not sure about this one...
+    # What should it *mean* for `typemax(FD) ÷ FD(0.5)` to overflow?
+    @eval function Base.$divfn(x::T, y::T) where {T <: FD}
+        C = coefficient(T)
+        return reinterpret(T, C * $divfn(promote(x.i, y.i)...))
+    end
 end
 if VERSION >= v"1.4.0-"
     # div(x.i, y.i) eliminates the scaling coefficient, so we call the FD constructor.
     # We don't need any widening logic, since we won't be multiplying by the coefficient.
-    Base.div(x::T, y::T, r::RoundingMode) where {T <: FD} = T(div(x.i, y.i, r))
+    @eval function Base.div(x::T, y::T, r::RoundingMode) where {T <: FD}
+        C = coefficient(T)
+        return reinterpret(T, C * div(x.i, y.i, r))
+    end
 end
 
 Base.convert(::Type{AbstractFloat}, x::FD) = convert(floattype(typeof(x)), x)

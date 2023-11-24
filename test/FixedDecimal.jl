@@ -712,6 +712,36 @@ end
     end
 end
 
+@testset "overflow" begin
+    @testset "addition" begin
+        @test typemax(FD2) + eps(FD2) == typemin(FD2)
+        @test typemin(FD2) + (-eps(FD2)) == typemax(FD2)
+    end
+
+    @testset "subtraction" begin
+        @test typemin(FD2) - eps(FD2) == typemax(FD2)
+        @test typemax(FD2) - (-eps(FD2)) == typemin(FD2)
+    end
+
+    @testset "multiplication" begin
+        @test typemax(FD2) * 2 == FD2(-0.02)
+        @test typemin(FD2) * 2 == FD2(0)
+    end
+
+    @testset "division" begin
+        @test typemax(FD2) / FD2(0.5) == FD2(-0.02)
+        @test typemin(FD2) / FD2(0.5) == FD2(0)
+    end
+
+    @testset "truncating division" begin
+        # TODO(PR): Is this the expected value?
+        @test typemax(FD2) ÷ FD2(0.5) == FD2(-0.16)
+        @test typemin(FD2) ÷ FD2(0.5) == FD2(0.16)
+        @test typemax(FD2) ÷ eps(FD2) == FD2(-1)
+        @test typemin(FD2) ÷ eps(FD2) == FD2(0)
+    end
+end
+
 @testset "isinteger" begin
     # Note: Test cannot be used unless we can construct `FD{Int8,6}`
     # @testset "overflow" begin
