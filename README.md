@@ -44,3 +44,60 @@ julia> 0.1 + 0.2
 julia> FixedDecimal{Int,1}(0.1) + FixedDecimal{Int,1}(0.2)
 FixedDecimal{Int64,1}(0.3)
 ```
+
+### Arithmetic details: Overflow and checked math
+
+By default, all arithmetic operations on FixedDecimals **will silently overflow**, following the standard behavior for bit integer types in Julia. For example:
+```julia
+julia> FixedDecimal{Int8,2}(1.0) + FixedDecimal{Int8,2}(1.0)
+FixedDecimal{Int8,2}(-0.56)
+
+julia> -FixedDecimal{Int8,2}(-1.28)  # negative typemin wraps to typemin again
+FixedDecimal{Int8,2}(-1.28)
+
+julia> abs(FixedDecimal{Int8,2}(-1.28))  # negative typemin wraps to typemin again
+FixedDecimal{Int8,2}(-1.28)
+```
+
+In most applications dealing with `FixedDecimals`, you will likely want to use the **checked arithmetic** operations instead. These operations will _throw an OverflowError_ on overflow or underflow, rather than silently wrapping. For example:
+```julia
+julia> Base.checked_mul(FixedDecimal{Int8,2}(1.2), FixedDecimal{Int8,2}(1.2))
+ERROR: OverflowError: 1.20 * 1.20 overflowed for type FixedDecimal{Int8, 2}
+
+julia> Base.checked_add(FixedDecimal{Int8,2}(1.2), 1)
+ERROR: OverflowError: 1.20 + 1.00 overflowed for type FixedDecimal{Int8, 2}
+
+julia> Base.checked_div(Int8(1), FixedDecimal{Int8,2}(0.5))
+ERROR: OverflowError: 1.00 ÷ 0.50 overflowed for type FixedDecimal{Int8, 2}
+```
+
+**Checked division:** Note that `checked_div` performs truncating, integer division. Julia Base does not provide a function to perform checked decimal division, so we provide one in this package, `FixedPointDecimals.checked_decimal_division`.
+
+Here are all the checked arithmetic operations supported by `FixedDecimal`s:
+- `Base.checked_add`
+- `Base.checked_sub`
+- `Base.checked_mul`
+- `Base.checked_div`
+- `FixedPointDecimals.checked_decimal_division`
+- `Base.checked_cld`
+- `Base.checked_fld`
+- `Base.checked_rem`
+- `Base.checked_mod`
+- `Base.checked_neg`
+- `Base.checked_abs`
+
+### Conversions, Promotions, and Inexact Errors.
+
+Note that arithmetic operations will _promote_ all arguments to the same FixedDecimal type
+before performing the operation. If you are promoting a non-FixedDecimal _number_ to a FixedDecimal, there is always a chance that the Number will not fit in the FD type. In that case, the conversion will throw an exception. Here are some examples:
+```julia
+julia> FixedDecimal{Int8,2}(2)  # 200 doesn't fit in Int8
+ERROR: InexactError: convert(FixedDecimal{Int8, 2}, 2)
+
+julia> FixedDecimal{Int8,2}(1) + 2  # Same here: 2 is promoted to FD{Int8,2}(2)
+ERROR: InexactError: convert(FixedDecimal{Int8, 2}, 2)
+
+julia> FixedDecimal{Int8,2}(1) + FixedDecimal{Int8,1}(2)  # Promote to the higher-precision type again throws.
+ERROR: InexactError: convert(FixedDecimal{Int8, 2}, 2.0)
+```
+
