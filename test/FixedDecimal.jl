@@ -630,6 +630,13 @@ end
 
         @test_throws OverflowError Base.checked_div(Int8(1), FD{Int8,2}(0.5))
         @test_throws OverflowError Base.checked_div(FD{Int8,2}(1), FD{Int8,2}(0.4))
+
+        @testset "checked_decimal_division" begin
+            using FixedPointDecimals: checked_decimal_division
+
+            @test checked_decimal_division(Int8(1), FD{Int8,2}(0.8)) == FD{Int8,2}(1.25)
+            @test_throws OverflowError checked_decimal_division(Int8(1), FD{Int8,2}(0.7))
+        end
     end
 
     @testset "limits of $T" for T in CONTAINER_TYPES

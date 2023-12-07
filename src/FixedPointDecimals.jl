@@ -421,6 +421,30 @@ function Base.checked_div(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
     return reinterpret(FD{T, f}, v)
 end
 
+# We introduce a new function for this since Base.Checked only supports integers, and ints
+# don't have a decimal division operation.
+"""
+    FixedPointDecimals.checked_decimal_division(x::FD, y::FD) -> FD
+
+Calculates `x / y`, checking for overflow errors where applicable.
+
+The overflow protection may impose a perceptible performance penalty.
+
+See also:
+- `Base.checked_div` for truncating division.
+"""
+checked_decimal_division(x::FD, y::FD) = checked_decimal_division(promote(x, y)...)
+checked_decimal_division(x, y::FD) = checked_decimal_division(promote(x, y)...)
+checked_decimal_division(x::FD, y) = checked_decimal_division(promote(x, y)...)
+
+function checked_decimal_division(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
+    powt = coefficient(FD{T, f})
+    quotient, remainder = fldmod(widemul(x.i, powt), y.i)
+    v = _round_to_nearest(quotient, remainder, y.i)
+    typemin(T) <= v <= typemax(T) || Base.Checked.throw_overflowerr_binaryop(:/, x, y)
+    return reinterpret(FD{T, f}, v)
+end
+
 # --------------------------
 
 Base.convert(::Type{AbstractFloat}, x::FD) = convert(floattype(typeof(x)), x)
