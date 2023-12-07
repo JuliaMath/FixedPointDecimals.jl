@@ -406,20 +406,19 @@ function Base.checked_sub(x::T, y::T) where {T<:FD}
     b && Base.Checked.throw_overflowerr_binaryop(:-, x, y)
     return reinterpret(T, z)
 end
-function Base.checked_mul(x::FD{T,f}, y::FD{T,f}) where {T, f}
+function Base.checked_mul(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
     powt = coefficient(FD{T, f})
     quotient, remainder = fldmodinline(widemul(x.i, y.i), powt)
     v = _round_to_nearest(quotient, remainder, powt)
     typemin(T) <= v <= typemax(T) || Base.Checked.throw_overflowerr_binaryop(:*, x, y)
     return reinterpret(FD{T, f}, T(v))
 end
-function Base.checked_div(x::FD{T,f}, y::FD{T,f}) where {T,f}
+function Base.checked_div(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
     C = coefficient(FD{T, f})
-    v1 = div(promote(x.i, y.i)...)
-    v2, b = Base.Checked.mul_with_overflow(C, v1)
+    # Note: The div() will already throw for divide-by-zero and typemin(T) ÷ -1.
+    v, b = Base.Checked.mul_with_overflow(C, div(x.i, y.i))
     b && Base.Checked.throw_overflowerr_binaryop(:÷, x, y)
-    typemin(T) <= v2 <= typemax(T) || Base.Checked.throw_overflowerr_binaryop(:÷, x, y)
-    return reinterpret(FD{T, f}, T(v2))
+    return reinterpret(FD{T, f}, v)
 end
 
 # --------------------------

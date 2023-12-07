@@ -628,7 +628,7 @@ end
         @test_throws OverflowError Base.checked_add(FD{Int8,2}(1), FD{Int8,2}(1))
         @test_throws OverflowError Base.checked_add(FD{Int8,2}(1), FD{Int8,2}(0.4))
 
-        @test_throws OverflowError Base.checked_div(Int8(1), FD{Int8,2}(0.4))
+        @test_throws OverflowError Base.checked_div(Int8(1), FD{Int8,2}(0.5))
         @test_throws OverflowError Base.checked_div(FD{Int8,2}(1), FD{Int8,2}(0.4))
     end
 
