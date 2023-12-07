@@ -380,6 +380,50 @@ if VERSION >= v"1.4.0-"
     end
 end
 
+# --- Checked arithmetic ---
+
+Base.checked_add(x::FD, y::FD) = Base.checked_add(promote(x, y)...)
+Base.checked_sub(x::FD, y::FD) = Base.checked_sub(promote(x, y)...)
+Base.checked_mul(x::FD, y::FD) = Base.checked_mul(promote(x, y)...)
+Base.checked_div(x::FD, y::FD) = Base.checked_div(promote(x, y)...)
+
+Base.checked_add(x, y::FD) = Base.checked_add(promote(x, y)...)
+Base.checked_add(x::FD, y) = Base.checked_add(promote(x, y)...)
+Base.checked_sub(x, y::FD) = Base.checked_sub(promote(x, y)...)
+Base.checked_sub(x::FD, y) = Base.checked_sub(promote(x, y)...)
+Base.checked_mul(x, y::FD) = Base.checked_mul(promote(x, y)...)
+Base.checked_mul(x::FD, y) = Base.checked_mul(promote(x, y)...)
+Base.checked_div(x, y::FD) = Base.checked_div(promote(x, y)...)
+Base.checked_div(x::FD, y) = Base.checked_div(promote(x, y)...)
+
+function Base.checked_add(x::T, y::T) where {T<:FD}
+    z, b = Base.add_with_overflow(x.i, y.i)
+    b && Base.Checked.throw_overflowerr_binaryop(:+, x, y)
+    return reinterpret(T, z)
+end
+function Base.checked_sub(x::T, y::T) where {T<:FD}
+    z, b = Base.sub_with_overflow(x.i, y.i)
+    b && Base.Checked.throw_overflowerr_binaryop(:-, x, y)
+    return reinterpret(T, z)
+end
+function Base.checked_mul(x::FD{T,f}, y::FD{T,f}) where {T, f}
+    powt = coefficient(FD{T, f})
+    quotient, remainder = fldmodinline(widemul(x.i, y.i), powt)
+    v = _round_to_nearest(quotient, remainder, powt)
+    typemin(T) <= v <= typemax(T) || Base.Checked.throw_overflowerr_binaryop(:*, x, y)
+    return reinterpret(FD{T, f}, T(v))
+end
+function Base.checked_div(x::FD{T,f}, y::FD{T,f}) where {T,f}
+    C = coefficient(FD{T, f})
+    v1 = div(promote(x.i, y.i)...)
+    v2, b = Base.Checked.mul_with_overflow(C, v1)
+    b && Base.Checked.throw_overflowerr_binaryop(:÷, x, y)
+    typemin(T) <= v2 <= typemax(T) || Base.Checked.throw_overflowerr_binaryop(:÷, x, y)
+    return reinterpret(FD{T, f}, T(v2))
+end
+
+# --------------------------
+
 Base.convert(::Type{AbstractFloat}, x::FD) = convert(floattype(typeof(x)), x)
 function Base.convert(::Type{TF}, x::FD{T, f}) where {TF <: AbstractFloat, T, f}
     convert(TF, x.i / coefficient(FD{T, f}))::TF
