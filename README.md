@@ -74,17 +74,17 @@ ERROR: OverflowError: 1.00 ÷ 0.50 overflowed for type FixedDecimal{Int8, 2}
 **Checked division:** Note that `checked_div` performs truncating, integer division. Julia Base does not provide a function to perform checked decimal division, so we provide one in this package, `FixedPointDecimals.checked_decimal_division`.
 
 Here are all the checked arithmetic operations supported by `FixedDecimal`s:
-- `Base.checked_add`
-- `Base.checked_sub`
-- `Base.checked_mul`
-- `Base.checked_div`
-- `FixedPointDecimals.checked_decimal_division`
-- `Base.checked_cld`
-- `Base.checked_fld`
-- `Base.checked_rem`
-- `Base.checked_mod`
-- `Base.checked_neg`
-- `Base.checked_abs`
+- `Base.checked_add(x,y)`
+- `Base.checked_sub(x,y)`
+- `Base.checked_mul(x,y)`
+- `Base.checked_div(x,y)`
+- `FixedPointDecimals.checked_decimal_division(x,y)`
+- `Base.checked_cld(x,y)`
+- `Base.checked_fld(x,y)`
+- `Base.checked_rem(x,y)`
+- `Base.checked_mod(x,y)`
+- `Base.checked_neg(x)`
+- `Base.checked_abs(x)`
 
 ### Conversions, Promotions, and Inexact Errors.
 

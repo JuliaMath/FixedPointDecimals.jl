@@ -386,6 +386,10 @@ Base.checked_add(x::FD, y::FD) = Base.checked_add(promote(x, y)...)
 Base.checked_sub(x::FD, y::FD) = Base.checked_sub(promote(x, y)...)
 Base.checked_mul(x::FD, y::FD) = Base.checked_mul(promote(x, y)...)
 Base.checked_div(x::FD, y::FD) = Base.checked_div(promote(x, y)...)
+Base.checked_cld(x::FD, y::FD) = Base.checked_cld(promote(x, y)...)
+Base.checked_fld(x::FD, y::FD) = Base.checked_fld(promote(x, y)...)
+Base.checked_rem(x::FD, y::FD) = Base.checked_rem(promote(x, y)...)
+Base.checked_mod(x::FD, y::FD) = Base.checked_mod(promote(x, y)...)
 
 Base.checked_add(x, y::FD) = Base.checked_add(promote(x, y)...)
 Base.checked_add(x::FD, y) = Base.checked_add(promote(x, y)...)
@@ -395,6 +399,14 @@ Base.checked_mul(x, y::FD) = Base.checked_mul(promote(x, y)...)
 Base.checked_mul(x::FD, y) = Base.checked_mul(promote(x, y)...)
 Base.checked_div(x, y::FD) = Base.checked_div(promote(x, y)...)
 Base.checked_div(x::FD, y) = Base.checked_div(promote(x, y)...)
+Base.checked_cld(x, y::FD) = Base.checked_cld(promote(x, y)...)
+Base.checked_cld(x, y::FD) = Base.checked_cld(promote(x, y)...)
+Base.checked_fld(x::FD, y) = Base.checked_fld(promote(x, y)...)
+Base.checked_fld(x, y::FD) = Base.checked_fld(promote(x, y)...)
+Base.checked_rem(x::FD, y) = Base.checked_rem(promote(x, y)...)
+Base.checked_rem(x, y::FD) = Base.checked_rem(promote(x, y)...)
+Base.checked_mod(x::FD, y) = Base.checked_mod(promote(x, y)...)
+Base.checked_mod(x, y::FD) = Base.checked_mod(promote(x, y)...)
 
 function Base.checked_add(x::T, y::T) where {T<:FD}
     z, b = Base.add_with_overflow(x.i, y.i)
@@ -413,12 +425,33 @@ function Base.checked_mul(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
     typemin(T) <= v <= typemax(T) || Base.Checked.throw_overflowerr_binaryop(:*, x, y)
     return reinterpret(FD{T, f}, T(v))
 end
-function Base.checked_div(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
-    C = coefficient(FD{T, f})
-    # Note: The div() will already throw for divide-by-zero and typemin(T) ÷ -1.
-    v, b = Base.Checked.mul_with_overflow(C, div(x.i, y.i))
-    b && Base.Checked.throw_overflowerr_binaryop(:÷, x, y)
-    return reinterpret(FD{T, f}, v)
+# Checked division functions
+for divfn in [:div, :fld, :cld]
+    @eval function Base.$(Symbol("checked_$divfn"))(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
+        C = coefficient(FD{T, f})
+        # Note: The div() will already throw for divide-by-zero and typemin(T) ÷ -1.
+        v, b = Base.Checked.mul_with_overflow(C, $divfn(x.i, y.i))
+        b && _throw_overflowerr_op($(QuoteNode(divfn)), x, y)
+        return reinterpret(FD{T, f}, v)
+    end
+end
+for remfn in [:rem, :mod]
+    # rem and mod already check for divide-by-zero and typemin(T) ÷ -1, so nothing to do.
+    @eval Base.$(Symbol("checked_$remfn"))(x::T, y::T) where {T <: FD} = $remfn(x, y)
+end
+
+_throw_overflowerr_op(op, x::T, y::T) where T = throw(OverflowError("$op($x, $y) overflowed for type $T"))
+
+function Base.checked_neg(x::T) where {T<:FD}
+    r = -x
+    (x<0) & (r<0) && Base.Checked.throw_overflowerr_negation(x)
+    return r
+end
+function Base.checked_abs(x::FD)
+    r = ifelse(x<0, -x, x)
+    r<0 || return r
+    msg = LazyString("checked arithmetic: cannot compute |x| for x = ", x, "::", typeof(x))
+    throw(OverflowError(msg))
 end
 
 # We introduce a new function for this since Base.Checked only supports integers, and ints

@@ -624,11 +624,17 @@ end
         @test FD{Int8,1}(2) / Int8(20) == FD{Int8,1}(0.1)
     end
 
-    @testset "limits" begin
+    @testset "limits: overflow" begin
         @test_throws OverflowError Base.checked_add(FD{Int8,2}(1), FD{Int8,2}(1))
+        @test_throws OverflowError Base.checked_add(FD{Int8,2}(1), 1)
         @test_throws OverflowError Base.checked_add(FD{Int8,2}(1), FD{Int8,2}(0.4))
 
-        @test_throws OverflowError Base.checked_div(Int8(1), FD{Int8,2}(0.5))
+        @test_throws OverflowError Base.checked_sub(FD{Int8,2}(1), FD{Int8,2}(-1))
+        @test_throws OverflowError Base.checked_sub(1, FD{Int8,2}(-1))
+        @test_throws OverflowError Base.checked_sub(FD{Int8,2}(1), FD{Int8,2}(0.4))
+
+        @test_throws OverflowError Base.checked_div(FD{Int8,2}(1), FD{Int8,2}(0.5))
+        @test_throws OverflowError Base.checked_div(1, FD{Int8,2}(0.5))
         @test_throws OverflowError Base.checked_div(FD{Int8,2}(1), FD{Int8,2}(0.4))
 
         @testset "checked_decimal_division" begin
@@ -637,6 +643,19 @@ end
             @test checked_decimal_division(Int8(1), FD{Int8,2}(0.8)) == FD{Int8,2}(1.25)
             @test_throws OverflowError checked_decimal_division(Int8(1), FD{Int8,2}(0.7))
         end
+
+        @test_throws OverflowError Base.checked_fld(FD{Int8,2}(-1), FD{Int8,2}(0.9))
+        @test_throws OverflowError Base.checked_cld(FD{Int8,2}(-1), FD{Int8,2}(1.1))
+
+        # Rem and Mod only throw DivideError and nothing more. They can't overflow, since
+        # they can only return smaller values than the arguments.
+        @test_throws DivideError Base.checked_rem(FD{Int8,2}(-1), FD{Int8,2}(0))
+        @test_throws DivideError Base.checked_mod(FD{Int8,2}(-1), FD{Int8,2}(0))
+
+        @test_throws OverflowError Base.checked_abs(typemin(FD{Int8,2}))
+        @test_throws OverflowError Base.checked_neg(typemin(FD{Int8,2}))
+        @test Base.checked_abs(typemax(FD{Int8,2})) == FD{Int8,2}(1.27)
+        @test Base.checked_neg(typemax(FD{Int8,2})) == FD{Int8,2}(-1.27)
     end
 
     @testset "limits of $T" for T in CONTAINER_TYPES
