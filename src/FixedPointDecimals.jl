@@ -391,15 +391,15 @@ Base.checked_fld(x::FD, y::FD) = Base.checked_fld(promote(x, y)...)
 Base.checked_rem(x::FD, y::FD) = Base.checked_rem(promote(x, y)...)
 Base.checked_mod(x::FD, y::FD) = Base.checked_mod(promote(x, y)...)
 
-Base.checked_add(x, y::FD) = Base.checked_add(promote(x, y)...)
 Base.checked_add(x::FD, y) = Base.checked_add(promote(x, y)...)
-Base.checked_sub(x, y::FD) = Base.checked_sub(promote(x, y)...)
+Base.checked_add(x, y::FD) = Base.checked_add(promote(x, y)...)
 Base.checked_sub(x::FD, y) = Base.checked_sub(promote(x, y)...)
-Base.checked_mul(x, y::FD) = Base.checked_mul(promote(x, y)...)
+Base.checked_sub(x, y::FD) = Base.checked_sub(promote(x, y)...)
 Base.checked_mul(x::FD, y) = Base.checked_mul(promote(x, y)...)
-Base.checked_div(x, y::FD) = Base.checked_div(promote(x, y)...)
+Base.checked_mul(x, y::FD) = Base.checked_mul(promote(x, y)...)
 Base.checked_div(x::FD, y) = Base.checked_div(promote(x, y)...)
-Base.checked_cld(x, y::FD) = Base.checked_cld(promote(x, y)...)
+Base.checked_div(x, y::FD) = Base.checked_div(promote(x, y)...)
+Base.checked_cld(x::FD, y) = Base.checked_cld(promote(x, y)...)
 Base.checked_cld(x, y::FD) = Base.checked_cld(promote(x, y)...)
 Base.checked_fld(x::FD, y) = Base.checked_fld(promote(x, y)...)
 Base.checked_fld(x, y::FD) = Base.checked_fld(promote(x, y)...)
@@ -450,8 +450,14 @@ end
 function Base.checked_abs(x::FD)
     r = ifelse(x<0, -x, x)
     r<0 || return r
-    msg = LazyString("checked arithmetic: cannot compute |x| for x = ", x, "::", typeof(x))
-    throw(OverflowError(msg))
+    _throw_overflow_abs(x)
+end
+if VERSION >= v"1.8.0-"
+    @noinline _throw_overflow_abs(x) =
+        throw(OverflowError(LazyString("checked arithmetic: cannot compute |x| for x = ", x, "::", typeof(x))))
+else
+    @noinline _throw_overflow_abs(x) =
+        throw(OverflowError("checked arithmetic: cannot compute |x| for x = $x"))
 end
 
 # We introduce a new function for this since Base.Checked only supports integers, and ints
