@@ -817,6 +817,7 @@ end
     end
 
     @testset "division" begin
+        # TODO(PR): Is this the expected value?
         @test typemax(FD2) / FD2(0.5) == FD2(-0.02)
         @test typemin(FD2) / FD2(0.5) == FD2(0)
     end
@@ -827,6 +828,25 @@ end
         @test typemin(FD2) ÷ FD2(0.5) == FD2(0.16)
         @test typemax(FD2) ÷ eps(FD2) == FD2(-1)
         @test typemin(FD2) ÷ eps(FD2) == FD2(0)
+    end
+
+    @testset "fld / cld" begin
+        # TODO(PR): Is this the expected value?
+        @test fld(typemax(FD2), FD2(0.5)) == FD2(-0.16)
+        @test fld(typemin(FD2), FD2(0.5)) == FD2(-0.84)
+        @test fld(typemax(FD2), eps(FD2)) == FD2(-1)
+        @test fld(typemin(FD2), eps(FD2)) == FD2(0)
+
+        # TODO(PR): Is this the expected value?
+        @test cld(typemax(FD2), FD2(0.5)) == FD2(0.84)
+        @test cld(typemin(FD2), FD2(0.5)) == FD2(0.16)
+        @test cld(typemax(FD2), eps(FD2)) == FD2(-1)
+        @test cld(typemin(FD2), eps(FD2)) == FD2(0)
+    end
+
+    @testset "abs / neg" begin
+        @test abs(typemin(FD2)) == typemin(FD2)
+        @test -(typemin(FD2)) == typemin(FD2)
     end
 end
 
