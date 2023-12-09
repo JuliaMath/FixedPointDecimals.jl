@@ -539,7 +539,7 @@ end
 
             # signed integers using two's complement have one additional negative value
             if x < 0 && x == typemin(x)
-                @test_throws InexactError x / -one(x)
+                @test x / -one(x) == x  # -typemin(x) == typemin(x)
             else
                 @test x / -one(x) == -x
             end
@@ -631,7 +631,7 @@ end
 
         @test_throws OverflowError Base.checked_sub(FD{Int8,2}(1), FD{Int8,2}(-1))
         @test_throws OverflowError Base.checked_sub(1, FD{Int8,2}(-1))
-        @test_throws OverflowError Base.checked_sub(FD{Int8,2}(1), FD{Int8,2}(0.4))
+        @test_throws OverflowError Base.checked_sub(FD{Int8,2}(-1), FD{Int8,2}(0.4))
 
         @test_throws OverflowError Base.checked_div(FD{Int8,2}(1), FD{Int8,2}(0.5))
         @test_throws OverflowError Base.checked_div(1, FD{Int8,2}(0.5))
@@ -644,8 +644,10 @@ end
             @test_throws OverflowError checked_decimal_division(Int8(1), FD{Int8,2}(0.7))
         end
 
+        # Rounds down to 2
         @test_throws OverflowError Base.checked_fld(FD{Int8,2}(-1), FD{Int8,2}(0.9))
-        @test_throws OverflowError Base.checked_cld(FD{Int8,2}(-1), FD{Int8,2}(1.1))
+        # Rounds up to 2
+        @test_throws OverflowError Base.checked_cld(FD{Int8,2}(1),  FD{Int8,2}(0.9))
 
         # Rem and Mod only throw DivideError and nothing more. They can't overflow, since
         # they can only return smaller values than the arguments.
