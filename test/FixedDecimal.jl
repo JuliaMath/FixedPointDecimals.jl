@@ -801,52 +801,53 @@ end
 end
 
 @testset "overflow" begin
+    T = FD{Int8, 1}
     @testset "addition" begin
-        @test typemax(FD2) + eps(FD2) == typemin(FD2)
-        @test typemin(FD2) + (-eps(FD2)) == typemax(FD2)
+        @test typemax(T) + eps(T) == typemin(T)
+        @test typemin(T) + (-eps(T)) == typemax(T)
     end
 
     @testset "subtraction" begin
-        @test typemin(FD2) - eps(FD2) == typemax(FD2)
-        @test typemax(FD2) - (-eps(FD2)) == typemin(FD2)
+        @test typemin(T) - eps(T) == typemax(T)
+        @test typemax(T) - (-eps(T)) == typemin(T)
     end
 
     @testset "multiplication" begin
-        @test typemax(FD2) * 2 == FD2(-0.02)
-        @test typemin(FD2) * 2 == FD2(0)
+        @test typemax(T) * 2 == T(-0.2)
+        @test typemin(T) * 2 == T(0)
     end
 
     @testset "division" begin
         # TODO(PR): Is this the expected value?
-        @test typemax(FD2) / FD2(0.5) == FD2(-0.02)
-        @test typemin(FD2) / FD2(0.5) == FD2(0)
+        @test typemax(T) / T(0.5) == FD2(-0.2)
+        @test typemin(T) / T(0.5) == FD2(0)
     end
 
     @testset "truncating division" begin
         # TODO(PR): Is this the expected value?
-        @test typemax(FD2) ÷ FD2(0.5) == FD2(-0.16)
-        @test typemin(FD2) ÷ FD2(0.5) == FD2(0.16)
-        @test typemax(FD2) ÷ eps(FD2) == FD2(-1)
-        @test typemin(FD2) ÷ eps(FD2) == FD2(0)
+        @test typemax(T) ÷ T(0.5) == T(-0.6)
+        @test typemin(T) ÷ T(0.5) == T(0.6)
+        @test typemax(T) ÷ eps(T) == T(-1)
+        @test typemin(T) ÷ eps(T) == T(0)
     end
 
     @testset "fld / cld" begin
         # TODO(PR): Is this the expected value?
-        @test fld(typemax(FD2), FD2(0.5)) == FD2(-0.16)
-        @test fld(typemin(FD2), FD2(0.5)) == FD2(-0.84)
-        @test fld(typemax(FD2), eps(FD2)) == FD2(-1)
-        @test fld(typemin(FD2), eps(FD2)) == FD2(0)
+        @test fld(typemax(T), T(0.5)) == T(-0.6)
+        @test fld(typemin(T), T(0.5)) == T(-0.4)
+        @test fld(typemax(T), eps(T)) == T(-1)
+        @test fld(typemin(T), eps(T)) == T(0)
 
         # TODO(PR): Is this the expected value?
-        @test cld(typemax(FD2), FD2(0.5)) == FD2(0.84)
-        @test cld(typemin(FD2), FD2(0.5)) == FD2(0.16)
-        @test cld(typemax(FD2), eps(FD2)) == FD2(-1)
-        @test cld(typemin(FD2), eps(FD2)) == FD2(0)
+        @test cld(typemax(T), T(0.5)) == T(0.4)
+        @test cld(typemin(T), T(0.5)) == T(0.6)
+        @test cld(typemax(T), eps(T)) == T(-1)
+        @test cld(typemin(T), eps(T)) == T(0)
     end
 
     @testset "abs / neg" begin
-        @test abs(typemin(FD2)) == typemin(FD2)
-        @test -(typemin(FD2)) == typemin(FD2)
+        @test abs(typemin(T)) == typemin(T)
+        @test -(typemin(T)) == typemin(T)
     end
 end
 
