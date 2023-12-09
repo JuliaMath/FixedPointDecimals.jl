@@ -625,6 +625,7 @@ end
     end
 
     @testset "limits: overflow" begin
+        # Easy to reason about cases of overflow:
         @test_throws OverflowError Base.checked_add(FD{Int8,2}(1), FD{Int8,2}(1))
         @test_throws OverflowError Base.checked_add(FD{Int8,2}(1), 1)
         @test_throws OverflowError Base.checked_add(FD{Int8,2}(1), FD{Int8,2}(0.4))
@@ -632,6 +633,11 @@ end
         @test_throws OverflowError Base.checked_sub(FD{Int8,2}(1), FD{Int8,2}(-1))
         @test_throws OverflowError Base.checked_sub(1, FD{Int8,2}(-1))
         @test_throws OverflowError Base.checked_sub(FD{Int8,2}(-1), FD{Int8,2}(0.4))
+
+        @test_throws OverflowError Base.checked_mul(FD{Int8,2}(1.2), FD{Int8,2}(1.2))
+        @test_throws OverflowError Base.checked_mul(FD{Int8,1}(12), 2)
+        @test_throws OverflowError Base.checked_mul(FD{Int8,0}(120), 2)
+        @test_throws OverflowError Base.checked_mul(120, FD{Int8,0}(2))
 
         @test_throws OverflowError Base.checked_div(FD{Int8,2}(1), FD{Int8,2}(0.5))
         @test_throws OverflowError Base.checked_div(1, FD{Int8,2}(0.5))
@@ -644,7 +650,7 @@ end
             @test_throws OverflowError checked_decimal_division(Int8(1), FD{Int8,2}(0.7))
         end
 
-        # Rounds down to 2
+        # Rounds down to -2
         @test_throws OverflowError Base.checked_fld(FD{Int8,2}(-1), FD{Int8,2}(0.9))
         # Rounds up to 2
         @test_throws OverflowError Base.checked_cld(FD{Int8,2}(1),  FD{Int8,2}(0.9))
@@ -658,6 +664,57 @@ end
         @test_throws OverflowError Base.checked_neg(typemin(FD{Int8,2}))
         @test Base.checked_abs(typemax(FD{Int8,2})) == FD{Int8,2}(1.27)
         @test Base.checked_neg(typemax(FD{Int8,2})) == FD{Int8,2}(-1.27)
+
+        @testset "Overflow corner cases" begin
+            @testset for I in (Int128, UInt128, Int8, UInt8), f in (0,2)
+            T = FD{I, f}
+                issigned(I) = signed(I) === I
+
+                @test_throws OverflowError Base.checked_add(typemax(T), eps(T))
+                issigned(I) && @test_throws OverflowError Base.checked_add(typemin(T), -eps(T))
+                @test_throws OverflowError Base.checked_add(typemax(T), 1)
+                @test_throws OverflowError Base.checked_add(1, typemax(T))
+
+                @test_throws OverflowError Base.checked_sub(typemin(T), eps(T))
+                issigned(I) && @test_throws OverflowError Base.checked_sub(typemax(T), -eps(T))
+                @test_throws OverflowError Base.checked_sub(typemin(T), 1)
+                if issigned(I) && 2.0 <= typemax(T)
+                    @test_throws OverflowError Base.checked_sub(-2, typemax(T))
+                end
+
+                @test_throws OverflowError Base.checked_mul(typemax(T), typemax(T))
+                issigned(I) && @test_throws OverflowError Base.checked_mul(typemin(T), typemax(T))
+                if 2.0 <= typemax(T)
+                    @test_throws OverflowError Base.checked_mul(typemax(T), 2)
+                    @test_throws OverflowError Base.checked_mul(2, typemax(T))
+                    issigned(I) && @test_throws OverflowError Base.checked_mul(typemin(T), 2)
+                    issigned(I) && @test_throws OverflowError Base.checked_mul(2, typemin(T))
+                end
+
+                if f > 0
+                    @test_throws OverflowError Base.checked_div(typemax(T), eps(T))
+                    issigned(I) && @test_throws OverflowError Base.checked_div(typemin(T), eps(T))
+                    issigned(I) && @test_throws OverflowError Base.checked_div(typemax(T), -eps(T))
+
+                    issigned(I) && @test_throws DivideError Base.checked_div(typemax(T), T(0))
+                    issigned(I) && @test_throws DivideError Base.checked_div(typemin(T), T(0))
+                    issigned(I) && @test_throws DivideError Base.checked_div(typemin(T), -eps(T))
+                end
+
+                if f > 0
+                    @test_throws OverflowError Base.checked_fld(typemax(T), eps(T))
+                    issigned(I) && @test_throws OverflowError Base.checked_fld(typemin(T), eps(T))
+                    issigned(I) && @test_throws OverflowError Base.checked_fld(typemax(T), -eps(T))
+
+                    @test_throws OverflowError Base.checked_cld(typemax(T), eps(T))
+                    issigned(I) && @test_throws OverflowError Base.checked_cld(typemin(T), eps(T))
+                    issigned(I) && @test_throws OverflowError Base.checked_cld(typemax(T), -eps(T))
+                end
+
+                issigned(I) && @test_throws OverflowError Base.checked_abs(typemin(T))
+                issigned(I) && @test_throws OverflowError Base.checked_neg(typemin(T))
+            end
+        end
     end
 
     @testset "limits of $T" for T in CONTAINER_TYPES
