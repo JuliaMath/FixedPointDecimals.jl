@@ -624,7 +624,7 @@ end
         @test FD{Int8,1}(2) / Int8(20) == FD{Int8,1}(0.1)
     end
 
-    @testset "limits: overflow" begin
+    @testset "limits: overflow checked math" begin
         # Easy to reason about cases of overflow:
         @test_throws OverflowError Base.checked_add(FD{Int8,2}(1), FD{Int8,2}(1))
         @test_throws OverflowError Base.checked_add(FD{Int8,2}(1), 1)
@@ -665,7 +665,7 @@ end
         @test Base.checked_abs(typemax(FD{Int8,2})) == FD{Int8,2}(1.27)
         @test Base.checked_neg(typemax(FD{Int8,2})) == FD{Int8,2}(-1.27)
 
-        @testset "Overflow corner cases" begin
+        @testset "checked math corner cases" begin
             @testset for I in (Int128, UInt128, Int8, UInt8), f in (0,2)
             T = FD{I, f}
                 issigned(I) = signed(I) === I
@@ -713,6 +713,22 @@ end
 
                 issigned(I) && @test_throws OverflowError Base.checked_abs(typemin(T))
                 issigned(I) && @test_throws OverflowError Base.checked_neg(typemin(T))
+            end
+        end
+
+        @testset "checked math promotions" begin
+            x = FD{Int8,1}(1)
+            y = FD{Int64,1}(2)
+            @testset for op in (
+                Base.checked_add, Base.checked_sub, Base.checked_mul, Base.checked_div,
+                Base.checked_cld, Base.checked_fld, Base.checked_rem, Base.checked_mod,
+                FixedPointDecimals.checked_decimal_division,
+            )
+                @test op(x, y) === op(FD{Int64,1}(1), y)
+                @test op(y, x) === op(y, FD{Int64,1}(1))
+
+                @test op(x, 2) === op(x, FD{Int8,1}(2))
+                @test op(2, x) === op(FD{Int8,1}(2), x)
             end
         end
     end
