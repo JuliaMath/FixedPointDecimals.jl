@@ -447,7 +447,7 @@ for remfn in [:rem, :mod]
     @eval Base.$(Symbol("checked_$remfn"))(x::T, y::T) where {T <: FD} = $remfn(x, y)
 end
 
-_throw_overflowerr_op(op, x::T, y::T) where T = throw(OverflowError("$op($x, $y) overflowed for type $T"))
+@noinline _throw_overflowerr_op(op, x::T, y::T) where T = throw(OverflowError("$op($x, $y) overflowed for type $T"))
 
 function Base.checked_neg(x::T) where {T<:FD}
     r = -x
