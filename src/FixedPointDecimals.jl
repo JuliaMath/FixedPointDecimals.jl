@@ -194,8 +194,8 @@ end
 
 # these functions are needed to avoid InexactError when converting from the
 # integer type
-Base.:*(x::Integer, y::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, *(promote(x, y.i)...))
-Base.:*(x::FD{T, f}, y::Integer) where {T, f} = reinterpret(FD{T, f}, *(promote(x.i, y)...))
+Base.:*(x::Integer, y::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, *(x, y.i))
+Base.:*(x::FD{T, f}, y::Integer) where {T, f} = reinterpret(FD{T, f}, *(x.i, y))
 
 function Base.:/(x::FD{T, f}, y::FD{T, f}) where {T, f}
     powt = coefficient(FD{T, f})
