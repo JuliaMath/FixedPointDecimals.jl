@@ -643,11 +643,11 @@ end
         @test_throws OverflowError Base.checked_div(1, FD{Int8,2}(0.5))
         @test_throws OverflowError Base.checked_div(FD{Int8,2}(1), FD{Int8,2}(0.4))
 
-        @testset "checked_decimal_division" begin
-            using FixedPointDecimals: checked_decimal_division
+        @testset "checked_rdiv" begin
+            using FixedPointDecimals: checked_rdiv
 
-            @test checked_decimal_division(Int8(1), FD{Int8,2}(0.8)) == FD{Int8,2}(1.25)
-            @test_throws OverflowError checked_decimal_division(Int8(1), FD{Int8,2}(0.7))
+            @test checked_rdiv(Int8(1), FD{Int8,2}(0.8)) == FD{Int8,2}(1.25)
+            @test_throws OverflowError checked_rdiv(Int8(1), FD{Int8,2}(0.7))
         end
 
         # Rounds down to -2
@@ -722,7 +722,7 @@ end
             @testset for op in (
                 Base.checked_add, Base.checked_sub, Base.checked_mul, Base.checked_div,
                 Base.checked_cld, Base.checked_fld, Base.checked_rem, Base.checked_mod,
-                FixedPointDecimals.checked_decimal_division,
+                FixedPointDecimals.checked_rdiv,
             )
                 @test op(x, y) === op(FD{Int64,1}(1), y)
                 @test op(y, x) === op(y, FD{Int64,1}(1))
