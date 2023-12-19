@@ -356,7 +356,7 @@ end
 Base.div(x::FD, y::FD) = Base.checked_div(x, y)
 Base.fld(x::FD, y::FD) = Base.checked_fld(x, y)
 Base.cld(x::FD, y::FD) = Base.checked_cld(x, y)
-# There is not checked_fld1, so this is implemented here:
+# There is no checked_fld1, so this is implemented here:
 function Base.fld1(x::FD{T,f}, y::FD{T,f}) where {T, f}
     C = coefficient(FD{T, f})
     # Note: fld1() will already throw for divide-by-zero and typemin(T) ÷ -1.
