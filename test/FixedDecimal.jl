@@ -266,9 +266,31 @@ end
 
     # Integer == FD
     @test 1 == FD{Int8, 2}(1)
-    @test_broken 2 != FD{Int8, 2}(1)
+    @test 2 != FD{Int8, 2}(1)
     @test FD{Int8, 2}(1) == 1
-    @test_broken FD{Int8, 2}(1) != 2
+    @test FD{Int8, 2}(1) != 2
+end
+@testset "inequality between types" begin
+    @test FD{Int8, 0}(1) <= FD{Int8, 2}(1)
+    @test FD{Int8, 0}(0) < FD{Int8, 2}(1)
+    # Note: this doesn't throw inexact error
+    @test FD{Int8, 0}(2) >= FD{Int8, 2}(1)  # FD{Int8,2}(2) doesn't fit
+    @test FD{Int8, 2}(1) < FD{Int8, 0}(2)  # FD{Int8,2}(2) doesn't fit
+
+    @test FD{Int8, 0}(1) <= FD{Int16, 1}(1)
+    @test FD{Int8, 0}(2) > FD{Int16, 1}(1)
+    # Note: this doesn't throw inexact error
+    @test FD{Int8, 0}(4) > FD{Int16, 4}(1)  # FD{Int16,4}(4) doesn't fit
+    @test FD{Int8, 0}(4) >= FD{Int16, 4}(1)  # FD{Int16,4}(4) doesn't fit
+    @test FD{Int16, 4}(1) < FD{Int8, 0}(4)  # FD{Int16,4}(4) doesn't fit
+
+    # Integer == FD
+    @test 1 <= FD{Int8, 2}(1) <= 1
+    @test 1 >= FD{Int8, 2}(1) >= 1
+    @test 2 > FD{Int8, 2}(1)
+    @test FD{Int8, 2}(1) < 2
+    @test 2 >= FD{Int8, 2}(1)
+    @test FD{Int8, 2}(1) <= 2
 end
 
 @testset "128-bit conversion correctness" begin
