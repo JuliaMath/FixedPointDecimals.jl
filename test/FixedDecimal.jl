@@ -539,7 +539,7 @@ end
 
             # signed integers using two's complement have one additional negative value
             if x < 0 && x == typemin(x)
-                @test_throws InexactError x / -one(x)
+                @test_throws OverflowError x / -one(x)
             else
                 @test x / -one(x) == -x
             end
@@ -624,9 +624,113 @@ end
         @test FD{Int8,1}(2) / Int8(20) == FD{Int8,1}(0.1)
     end
 
-    @testset "limits" begin
-        @test_throws InexactError Int8(1) / FD{Int8,2}(0.4)
-        @test_throws InexactError FD{Int8,2}(1) / FD{Int8,2}(0.4)
+    @testset "limits: overflow checked math" begin
+        # Easy to reason about cases of overflow:
+        @test_throws OverflowError Base.checked_add(FD{Int8,2}(1), FD{Int8,2}(1))
+        @test_throws OverflowError Base.checked_add(FD{Int8,2}(1), 1)
+        @test_throws OverflowError Base.checked_add(FD{Int8,2}(1), FD{Int8,2}(0.4))
+
+        @test_throws OverflowError Base.checked_sub(FD{Int8,2}(1), FD{Int8,2}(-1))
+        @test_throws OverflowError Base.checked_sub(1, FD{Int8,2}(-1))
+        @test_throws OverflowError Base.checked_sub(FD{Int8,2}(-1), FD{Int8,2}(0.4))
+
+        @test_throws OverflowError Base.checked_mul(FD{Int8,2}(1.2), FD{Int8,2}(1.2))
+        @test_throws OverflowError Base.checked_mul(FD{Int8,1}(12), 2)
+        @test_throws OverflowError Base.checked_mul(FD{Int8,0}(120), 2)
+        @test_throws OverflowError Base.checked_mul(120, FD{Int8,0}(2))
+
+        @test_throws OverflowError Base.checked_div(FD{Int8,2}(1), FD{Int8,2}(0.5))
+        @test_throws OverflowError Base.checked_div(1, FD{Int8,2}(0.5))
+        @test_throws OverflowError Base.checked_div(FD{Int8,2}(1), FD{Int8,2}(0.4))
+
+        @testset "checked_rdiv" begin
+            using FixedPointDecimals: checked_rdiv
+
+            @test checked_rdiv(Int8(1), FD{Int8,2}(0.8)) == FD{Int8,2}(1.25)
+            @test_throws OverflowError checked_rdiv(Int8(1), FD{Int8,2}(0.7))
+        end
+
+        # Rounds down to -2
+        @test_throws OverflowError Base.checked_fld(FD{Int8,2}(-1), FD{Int8,2}(0.9))
+        # Rounds up to 2
+        @test_throws OverflowError Base.checked_cld(FD{Int8,2}(1),  FD{Int8,2}(0.9))
+
+        # Rem and Mod only throw DivideError and nothing more. They can't overflow, since
+        # they can only return smaller values than the arguments.
+        @test_throws DivideError Base.checked_rem(FD{Int8,2}(-1), FD{Int8,2}(0))
+        @test_throws DivideError Base.checked_mod(FD{Int8,2}(-1), FD{Int8,2}(0))
+
+        @test_throws OverflowError Base.checked_abs(typemin(FD{Int8,2}))
+        @test_throws OverflowError Base.checked_neg(typemin(FD{Int8,2}))
+        @test Base.checked_abs(typemax(FD{Int8,2})) == FD{Int8,2}(1.27)
+        @test Base.checked_neg(typemax(FD{Int8,2})) == FD{Int8,2}(-1.27)
+
+        @testset "checked math corner cases" begin
+            @testset for I in (Int128, UInt128, Int8, UInt8), f in (0,2)
+            T = FD{I, f}
+                issigned(I) = signed(I) === I
+
+                @test_throws OverflowError Base.checked_add(typemax(T), eps(T))
+                issigned(I) && @test_throws OverflowError Base.checked_add(typemin(T), -eps(T))
+                @test_throws OverflowError Base.checked_add(typemax(T), 1)
+                @test_throws OverflowError Base.checked_add(1, typemax(T))
+
+                @test_throws OverflowError Base.checked_sub(typemin(T), eps(T))
+                issigned(I) && @test_throws OverflowError Base.checked_sub(typemax(T), -eps(T))
+                @test_throws OverflowError Base.checked_sub(typemin(T), 1)
+                if issigned(I) && 2.0 <= typemax(T)
+                    @test_throws OverflowError Base.checked_sub(-2, typemax(T))
+                end
+
+                @test_throws OverflowError Base.checked_mul(typemax(T), typemax(T))
+                issigned(I) && @test_throws OverflowError Base.checked_mul(typemin(T), typemax(T))
+                if 2.0 <= typemax(T)
+                    @test_throws OverflowError Base.checked_mul(typemax(T), 2)
+                    @test_throws OverflowError Base.checked_mul(2, typemax(T))
+                    issigned(I) && @test_throws OverflowError Base.checked_mul(typemin(T), 2)
+                    issigned(I) && @test_throws OverflowError Base.checked_mul(2, typemin(T))
+                end
+
+                if f > 0
+                    @test_throws OverflowError Base.checked_div(typemax(T), eps(T))
+                    issigned(I) && @test_throws OverflowError Base.checked_div(typemin(T), eps(T))
+                    issigned(I) && @test_throws OverflowError Base.checked_div(typemax(T), -eps(T))
+
+                    issigned(I) && @test_throws DivideError Base.checked_div(typemax(T), T(0))
+                    issigned(I) && @test_throws DivideError Base.checked_div(typemin(T), T(0))
+                    issigned(I) && @test_throws DivideError Base.checked_div(typemin(T), -eps(T))
+                end
+
+                if f > 0
+                    @test_throws OverflowError Base.checked_fld(typemax(T), eps(T))
+                    issigned(I) && @test_throws OverflowError Base.checked_fld(typemin(T), eps(T))
+                    issigned(I) && @test_throws OverflowError Base.checked_fld(typemax(T), -eps(T))
+
+                    @test_throws OverflowError Base.checked_cld(typemax(T), eps(T))
+                    issigned(I) && @test_throws OverflowError Base.checked_cld(typemin(T), eps(T))
+                    issigned(I) && @test_throws OverflowError Base.checked_cld(typemax(T), -eps(T))
+                end
+
+                issigned(I) && @test_throws OverflowError Base.checked_abs(typemin(T))
+                issigned(I) && @test_throws OverflowError Base.checked_neg(typemin(T))
+            end
+        end
+
+        @testset "checked math promotions" begin
+            x = FD{Int8,1}(1)
+            y = FD{Int64,1}(2)
+            @testset for op in (
+                Base.checked_add, Base.checked_sub, Base.checked_mul, Base.checked_div,
+                Base.checked_cld, Base.checked_fld, Base.checked_rem, Base.checked_mod,
+                FixedPointDecimals.checked_rdiv,
+            )
+                @test op(x, y) === op(FD{Int64,1}(1), y)
+                @test op(y, x) === op(y, FD{Int64,1}(1))
+
+                @test op(x, 2) === op(x, FD{Int8,1}(2))
+                @test op(2, x) === op(FD{Int8,1}(2), x)
+            end
+        end
     end
 
     @testset "limits of $T" for T in CONTAINER_TYPES
@@ -709,6 +813,63 @@ end
             end
             @test (abs(x) == 0) === (x == 0)
         end
+    end
+end
+
+@testset "overflow" begin
+    T = FD{Int8, 1}
+    @testset "addition" begin
+        @test typemax(T) + eps(T) == typemin(T)
+        @test typemin(T) + (-eps(T)) == typemax(T)
+    end
+
+    @testset "subtraction" begin
+        @test typemin(T) - eps(T) == typemax(T)
+        @test typemax(T) - (-eps(T)) == typemin(T)
+    end
+
+    @testset "multiplication" begin
+        @test typemax(T) * 2 == T(-0.2)
+        @test typemin(T) * 2 == T(0)
+    end
+
+    @testset "division" begin
+        @test_throws OverflowError typemax(T) / T(0.5)
+        @test_throws OverflowError typemin(T) / T(0.5)
+    end
+
+    @testset "truncating division" begin
+        @test_throws OverflowError typemax(T) ÷ T(0.5)
+        @test_throws OverflowError typemin(T) ÷ T(0.5)
+        @test_throws OverflowError typemax(T) ÷ eps(T)
+        @test_throws OverflowError typemin(T) ÷ eps(T)
+
+        @test_throws OverflowError div(typemax(T), T(0.5), RoundUp)
+        @test_throws OverflowError div(typemin(T), T(0.5), RoundUp)
+        @test_throws OverflowError div(typemax(T), eps(T), RoundUp)
+        @test_throws OverflowError div(typemin(T), eps(T), RoundUp)
+    end
+
+    @testset "fld / cld" begin
+        @test_throws OverflowError fld(typemax(T), T(0.5))
+        @test_throws OverflowError fld(typemin(T), T(0.5))
+        @test_throws OverflowError fld(typemax(T), eps(T))
+        @test_throws OverflowError fld(typemin(T), eps(T))
+
+        @test_throws OverflowError fld1(typemax(T), T(0.5))
+        @test_throws OverflowError fld1(typemin(T), T(0.5))
+        @test_throws OverflowError fld1(typemax(T), eps(T))
+        @test_throws OverflowError fld1(typemin(T), eps(T))
+
+        @test_throws OverflowError cld(typemax(T), T(0.5))
+        @test_throws OverflowError cld(typemin(T), T(0.5))
+        @test_throws OverflowError cld(typemax(T), eps(T))
+        @test_throws OverflowError cld(typemin(T), eps(T))
+    end
+
+    @testset "abs / neg" begin
+        @test abs(typemin(T)) == typemin(T)
+        @test -(typemin(T)) == typemin(T)
     end
 end
 

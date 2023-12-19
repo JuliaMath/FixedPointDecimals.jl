@@ -27,6 +27,13 @@ module FixedPointDecimals
 
 export FixedDecimal, RoundThrows
 
+# (Re)export checked_* arithmetic functions
+# - Defined in this package:
+export checked_rdiv
+# - Reexported from Base:
+export checked_abs, checked_add, checked_cld, checked_div, checked_fld,
+    checked_mod, checked_mul, checked_neg, checked_rem, checked_sub
+
 using Base: decompose, BitInteger
 import Parsers
 
@@ -187,28 +194,12 @@ end
 
 # these functions are needed to avoid InexactError when converting from the
 # integer type
-Base.:*(x::Integer, y::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, T(x * y.i))
-Base.:*(x::FD{T, f}, y::Integer) where {T, f} = reinterpret(FD{T, f}, T(x.i * y))
+Base.:*(x::Integer, y::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, x * y.i)
+Base.:*(x::FD{T, f}, y::Integer) where {T, f} = reinterpret(FD{T, f}, x.i * y)
 
-function Base.:/(x::FD{T, f}, y::FD{T, f}) where {T, f}
-    powt = coefficient(FD{T, f})
-    quotient, remainder = fldmod(widemul(x.i, powt), y.i)
-    reinterpret(FD{T, f}, T(_round_to_nearest(quotient, remainder, y.i)))
-end
-
-# These functions allow us to perform division with integers outside of the range of the
-# FixedDecimal.
-function Base.:/(x::Integer, y::FD{T, f}) where {T, f}
-    powt = coefficient(FD{T, f})
-    powtsq = widemul(powt, powt)
-    quotient, remainder = fldmod(widemul(x, powtsq), y.i)
-    reinterpret(FD{T, f}, T(_round_to_nearest(quotient, remainder, y.i)))
-end
-
-function Base.:/(x::FD{T, f}, y::Integer) where {T, f}
-    quotient, remainder = fldmod(x.i, y)
-    reinterpret(FD{T, f}, T(_round_to_nearest(quotient, remainder, y)))
-end
+Base.:/(x::FD, y::FD) = checked_rdiv(x, y)
+Base.:/(x::Integer, y::FD) = checked_rdiv(x, y)
+Base.:/(x::FD, y::Integer) = checked_rdiv(x, y)
 
 # integerification
 Base.trunc(x::FD{T, f}) where {T, f} = FD{T, f}(div(x.i, coefficient(FD{T, f})))
@@ -359,16 +350,153 @@ for remfn in [:rem, :mod, :mod1, :min, :max]
 end
 # TODO: When we upgrade to a min julia version >=1.4 (i.e Julia 2.0), this block can be
 # dropped in favor of three-argument `div`, below.
-for divfn in [:div, :fld, :fld1, :cld]
-    # div(x.i, y.i) eliminates the scaling coefficient, so we call the FD constructor.
-    # We don't need any widening logic, since we won't be multiplying by the coefficient.
-    @eval Base.$divfn(x::T, y::T) where {T <: FD} = T($divfn(x.i, y.i))
+# The division functions all default to *throwing OverflowError* rather than
+# wrapping on integer overflow.
+# This decision may be changed in a future release of FixedPointDecimals.
+Base.div(x::FD, y::FD) = Base.checked_div(x, y)
+Base.fld(x::FD, y::FD) = Base.checked_fld(x, y)
+Base.cld(x::FD, y::FD) = Base.checked_cld(x, y)
+# There is no checked_fld1, so this is implemented here:
+function Base.fld1(x::FD{T,f}, y::FD{T,f}) where {T, f}
+    C = coefficient(FD{T, f})
+    # Note: fld1() will already throw for divide-by-zero and typemin(T) ÷ -1.
+    v, b = Base.Checked.mul_with_overflow(C, fld1(x.i, y.i))
+    b && _throw_overflowerr_op(:fld1, x, y)
+    return reinterpret(FD{T, f}, v)
 end
 if VERSION >= v"1.4.0-"
     # div(x.i, y.i) eliminates the scaling coefficient, so we call the FD constructor.
     # We don't need any widening logic, since we won't be multiplying by the coefficient.
-    Base.div(x::T, y::T, r::RoundingMode) where {T <: FD} = T(div(x.i, y.i, r))
+    @eval function Base.div(x::FD{T, f}, y::FD{T, f}, r::RoundingMode) where {T<:Integer, f}
+        C = coefficient(FD{T, f})
+        # Note: The div() will already throw for divide-by-zero and typemin(T) ÷ -1.
+        v, b = Base.Checked.mul_with_overflow(C, div(x.i, y.i, r))
+        b && _throw_overflowerr_op(:div, x, y)
+        return reinterpret(FD{T, f}, v)
+    end
 end
+
+# --- Checked arithmetic ---
+
+Base.checked_add(x::FD, y::FD) = Base.checked_add(promote(x, y)...)
+Base.checked_sub(x::FD, y::FD) = Base.checked_sub(promote(x, y)...)
+Base.checked_mul(x::FD, y::FD) = Base.checked_mul(promote(x, y)...)
+Base.checked_div(x::FD, y::FD) = Base.checked_div(promote(x, y)...)
+Base.checked_cld(x::FD, y::FD) = Base.checked_cld(promote(x, y)...)
+Base.checked_fld(x::FD, y::FD) = Base.checked_fld(promote(x, y)...)
+Base.checked_rem(x::FD, y::FD) = Base.checked_rem(promote(x, y)...)
+Base.checked_mod(x::FD, y::FD) = Base.checked_mod(promote(x, y)...)
+
+Base.checked_add(x::FD, y) = Base.checked_add(promote(x, y)...)
+Base.checked_add(x, y::FD) = Base.checked_add(promote(x, y)...)
+Base.checked_sub(x::FD, y) = Base.checked_sub(promote(x, y)...)
+Base.checked_sub(x, y::FD) = Base.checked_sub(promote(x, y)...)
+Base.checked_mul(x::FD, y) = Base.checked_mul(promote(x, y)...)
+Base.checked_mul(x, y::FD) = Base.checked_mul(promote(x, y)...)
+Base.checked_div(x::FD, y) = Base.checked_div(promote(x, y)...)
+Base.checked_div(x, y::FD) = Base.checked_div(promote(x, y)...)
+Base.checked_cld(x::FD, y) = Base.checked_cld(promote(x, y)...)
+Base.checked_cld(x, y::FD) = Base.checked_cld(promote(x, y)...)
+Base.checked_fld(x::FD, y) = Base.checked_fld(promote(x, y)...)
+Base.checked_fld(x, y::FD) = Base.checked_fld(promote(x, y)...)
+Base.checked_rem(x::FD, y) = Base.checked_rem(promote(x, y)...)
+Base.checked_rem(x, y::FD) = Base.checked_rem(promote(x, y)...)
+Base.checked_mod(x::FD, y) = Base.checked_mod(promote(x, y)...)
+Base.checked_mod(x, y::FD) = Base.checked_mod(promote(x, y)...)
+
+function Base.checked_add(x::T, y::T) where {T<:FD}
+    z, b = Base.add_with_overflow(x.i, y.i)
+    b && Base.Checked.throw_overflowerr_binaryop(:+, x, y)
+    return reinterpret(T, z)
+end
+function Base.checked_sub(x::T, y::T) where {T<:FD}
+    z, b = Base.sub_with_overflow(x.i, y.i)
+    b && Base.Checked.throw_overflowerr_binaryop(:-, x, y)
+    return reinterpret(T, z)
+end
+function Base.checked_mul(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
+    powt = coefficient(FD{T, f})
+    quotient, remainder = fldmodinline(widemul(x.i, y.i), powt)
+    v = _round_to_nearest(quotient, remainder, powt)
+    typemin(T) <= v <= typemax(T) || Base.Checked.throw_overflowerr_binaryop(:*, x, y)
+    return reinterpret(FD{T, f}, T(v))
+end
+# Checked division functions
+for divfn in [:div, :fld, :cld]
+    @eval function Base.$(Symbol("checked_$divfn"))(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
+        C = coefficient(FD{T, f})
+        # Note: The div() will already throw for divide-by-zero and typemin(T) ÷ -1.
+        v, b = Base.Checked.mul_with_overflow(C, $divfn(x.i, y.i))
+        b && _throw_overflowerr_op($(QuoteNode(divfn)), x, y)
+        return reinterpret(FD{T, f}, v)
+    end
+end
+for remfn in [:rem, :mod]
+    # rem and mod already check for divide-by-zero and typemin(T) ÷ -1, so nothing to do.
+    @eval Base.$(Symbol("checked_$remfn"))(x::T, y::T) where {T <: FD} = $remfn(x, y)
+end
+
+@noinline _throw_overflowerr_op(op, x::T, y::T) where T = throw(OverflowError("$op($x, $y) overflowed for type $T"))
+
+function Base.checked_neg(x::T) where {T<:FD}
+    r = -x
+    (x<0) & (r<0) && Base.Checked.throw_overflowerr_negation(x)
+    return r
+end
+function Base.checked_abs(x::FD)
+    r = ifelse(x<0, -x, x)
+    r<0 || return r
+    _throw_overflow_abs(x)
+end
+if VERSION >= v"1.8.0-"
+    @noinline _throw_overflow_abs(x) =
+        throw(OverflowError(LazyString("checked arithmetic: cannot compute |x| for x = ", x, "::", typeof(x))))
+else
+    @noinline _throw_overflow_abs(x) =
+        throw(OverflowError("checked arithmetic: cannot compute |x| for x = $x"))
+end
+
+# We introduce a new function for this since Base.Checked only supports integers, and ints
+# don't have a decimal division operation.
+"""
+    FixedPointDecimals.checked_rdiv(x::FD, y::FD) -> FD
+
+Calculates `x / y`, checking for overflow errors where applicable.
+
+The overflow protection may impose a perceptible performance penalty.
+
+See also:
+- `Base.checked_div` for truncating division.
+"""
+checked_rdiv(x::FD, y::FD) = checked_rdiv(promote(x, y)...)
+
+function checked_rdiv(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
+    powt = coefficient(FD{T, f})
+    quotient, remainder = fldmod(widemul(x.i, powt), y.i)
+    v = _round_to_nearest(quotient, remainder, y.i)
+    typemin(T) <= v <= typemax(T) || Base.Checked.throw_overflowerr_binaryop(:/, x, y)
+    return reinterpret(FD{T, f}, v)
+end
+
+# These functions allow us to perform division with integers outside of the range of the
+# FixedDecimal.
+function checked_rdiv(x::Integer, y::FD{T, f}) where {T<:Integer, f}
+    powt = coefficient(FD{T, f})
+    powtsq = widemul(powt, powt)
+    quotient, remainder = fldmod(widemul(x, powtsq), y.i)
+    v = _round_to_nearest(quotient, remainder, y.i)
+    typemin(T) <= v <= typemax(T) || Base.Checked.throw_overflowerr_binaryop(:/, x, y)
+    reinterpret(FD{T, f}, v)
+end
+function checked_rdiv(x::FD{T, f}, y::Integer) where {T<:Integer, f}
+    quotient, remainder = fldmod(x.i, y)
+    v = _round_to_nearest(quotient, remainder, y)
+    typemin(T) <= v <= typemax(T) || Base.Checked.throw_overflowerr_binaryop(:/, x, y)
+    reinterpret(FD{T, f}, v)
+end
+
+
+# --------------------------
 
 Base.convert(::Type{AbstractFloat}, x::FD) = convert(floattype(typeof(x)), x)
 function Base.convert(::Type{TF}, x::FD{T, f}) where {TF <: AbstractFloat, T, f}
