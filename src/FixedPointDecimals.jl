@@ -581,10 +581,15 @@ for comp_op in (:(==), :(<), :(<=))
             # compare the integer values directly. e.g. Int8(2) == Int16(2) is true.
             return $comp_op(x, y.i)
         else
-            # If x is too big to fit in T, then we know already that it's bigger than y,
-            # so not equal and not less than.
-            if !(x isa T) && x > typemax(T)
-                return false
+            if !(x isa T)
+                if x > typemax(T)
+                    # If x is too big to fit in T, then we know already that it's bigger
+                    # than y, so not equal and not less than.
+                    return false
+                elseif x < typemin(T)
+                    # Similarly, if too small, it's definitely less than y (and not equal).
+                    return $(comp_op == :(==)) ? false : true
+                end
             end
             # Now it's safe to truncate x down to y's type.
             xi = x % T
@@ -601,13 +606,14 @@ for comp_op in (:(==), :(<), :(<=))
             # compare the integer values directly. e.g. Int8(2) == Int16(2) is true.
             return $comp_op(x.i, y)
         else
-            # If y is too big to fit in T, then we know already that it's bigger than x,
-            # so not equal, but definitely greater than.
-            if !(y isa T) && y > typemax(T)
-                if $(comp_op == :(==))
+            if !(y isa T)
+                if y > typemax(T)
+                    # If y is too big to fit in T, then we know already that x is smaller
+                    # than y. So not equal, but definitely x < y.
+                    return $(comp_op == :(==)) ? false : true
+                elseif y < typemin(T)
+                    # Similarly, if y is too small, definitely x > y (and not equal).
                     return false
-                else
-                    return true
                 end
             end
             # Now it's safe to truncate x down to y's type.

@@ -275,6 +275,16 @@ end
     @test typemax(Int16) !== FD{Int8, 2}(1)
     @test typemin(Int16) !== FD{Int8, 0}(1)
     @test typemin(Int16) !== FD{Int8, 2}(1)
+
+    @test typemax(Int16) !== FD{Int8, 0}(-1)
+    @test typemax(Int16) !== FD{Int8, 2}(-1)
+    @test typemin(Int16) !== FD{Int8, 0}(-1)
+    @test typemin(Int16) !== FD{Int8, 2}(-1)
+
+    @test typemax(Int16) !== FD{Int8, 0}(0)
+    @test typemax(Int16) !== FD{Int8, 2}(0)
+    @test typemin(Int16) !== FD{Int8, 0}(0)
+    @test typemin(Int16) !== FD{Int8, 2}(0)
 end
 @testset "inequality between types" begin
     @test FD{Int8, 0}(1) <= FD{Int8, 2}(1)
@@ -303,6 +313,16 @@ end
     @test typemax(Int16) > FD{Int8, 2}(1) > typemin(Int16)
     @test typemin(Int16) < FD{Int8, 0}(1) < typemax(Int16)
     @test typemin(Int16) < FD{Int8, 2}(1) < typemax(Int16)
+
+    @test typemax(Int16) > FD{Int8, 0}(-1) > typemin(Int16)
+    @test typemax(Int16) > FD{Int8, 2}(-1) > typemin(Int16)
+    @test typemin(Int16) < FD{Int8, 0}(-1) < typemax(Int16)
+    @test typemin(Int16) < FD{Int8, 2}(-1) < typemax(Int16)
+
+    @test typemax(Int16) > FD{Int8, 0}(0) > typemin(Int16)
+    @test typemax(Int16) > FD{Int8, 2}(0) > typemin(Int16)
+    @test typemin(Int16) < FD{Int8, 0}(0) < typemax(Int16)
+    @test typemin(Int16) < FD{Int8, 2}(0) < typemax(Int16)
 end
 
 @testset "128-bit conversion correctness" begin
