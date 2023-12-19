@@ -440,12 +440,14 @@ end
 
 function Base.checked_neg(x::T) where {T<:FD}
     r = -x
-    (x<0) & (r<0) && Base.Checked.throw_overflowerr_negation(x)
+    # Simplify the compiler's job, no need to call the FD,Int comparison
+    (x.i<0) & (r.i<0) && Base.Checked.throw_overflowerr_negation(x)
     return r
 end
 function Base.checked_abs(x::FD)
-    r = ifelse(x<0, -x, x)
-    r<0 || return r
+    # Simplify the compiler's job, no need to call the FD,Int comparison
+    r = ifelse(x.i<0, -x, x)
+    r.i<0 || return r
     _throw_overflow_abs(x)
 end
 if VERSION >= v"1.8.0-"
@@ -536,6 +538,97 @@ Base.one(::Type{FD{T, f}}) where {T, f} = reinterpret(FD{T, f}, coefficient(FD{T
 Base.:(==)(x::T, y::T) where {T <: FD} = x.i == y.i
 Base.:(<)(x::T, y::T) where {T <: FD} = x.i < y.i
 Base.:(<=)(x::T, y::T) where {T <: FD} = x.i <= y.i
+
+# In the case where the FD types are different, or where one is an Integer, add
+# custom overloads, rather than relying on the default promotions, to avoid throwing
+# InexactError from the promotions. This lets us do e.g. `FD{Int8,2}(0) < 2`, without the
+# promotion to FD{Int8,2}(2) throwing an InexactError.
+for comp_op in (:(==), :(<), :(<=))
+    @eval function Base.$comp_op(x::FD{T1,f1}, y::FD{T2,f2}) where {T1<:Integer, f1, T2<:Integer, f2}
+        if f1 == f2
+            # If the precisions are the same, even if the types are different, we can compare
+            # the integer values directly. e.g. Int8(2) == Int16(2) is true.
+            return $comp_op(x.i, y.i)
+        else
+            # Promote the integers to the larger type, and then scale them to the same
+            # precision. If the scaling operation ends up overflowing, we know that they aren't
+            # equal, because we know that the less precise value wasn't even representable in
+            # the more precise type, so they cannot be equal.
+            newFD = promote_type(FD{T1,f1}, FD{T2,f2})
+            xi, yi = promote(x.i, y.i)
+            if f1 > f2
+                C = coefficient(newFD) ÷ coefficient(FD{T2,f2})
+                yi, overflowed = Base.mul_with_overflow(yi, C)
+                if $(comp_op == :(==))
+                    overflowed && return false
+                else
+                    # y overflowed, so it's bigger than x, since it doesn't fit in x's type
+                    overflowed && return true
+                end
+            else
+                C = coefficient(newFD) ÷ coefficient(FD{T1,f1})
+                xi, overflowed = Base.mul_with_overflow(xi, C)
+                # Whether we're computing `==`, `<` or `<=`, if x overflowed, it means it's
+                # bigger than y, so this is false.
+                overflowed && return false
+            end
+            return $comp_op(xi, yi)
+        end
+    end
+    @eval function Base.$comp_op(x::Integer, y::FD{T,f}) where {T<:Integer, f}
+        if f == 0
+            # If the precisions are the same, even if the types are different, we can
+            # compare the integer values directly. e.g. Int8(2) == Int16(2) is true.
+            return $comp_op(x, y.i)
+        else
+            if !(x isa T)
+                if x > typemax(T)
+                    # If x is too big to fit in T, then we know already that it's bigger
+                    # than y, so not equal and not less than.
+                    return false
+                elseif x < typemin(T)
+                    # Similarly, if too small, it's definitely less than y (and not equal).
+                    return $(comp_op == :(==)) ? false : true
+                end
+            end
+            # Now it's safe to truncate x down to y's type.
+            xi = x % T
+            xi, overflowed = Base.mul_with_overflow(xi, coefficient(FD{T,f}))
+            # Whether we're computing `==`, `<` or `<=`, if x overflowed, it means it's
+            # bigger than y, so this is false.
+            overflowed && return false
+            return $comp_op(xi, y.i)
+        end
+    end
+    @eval function Base.$comp_op(x::FD{T,f}, y::Integer) where {T<:Integer, f}
+        if f == 0
+            # If the precisions are the same, even if the types are different, we can
+            # compare the integer values directly. e.g. Int8(2) == Int16(2) is true.
+            return $comp_op(x.i, y)
+        else
+            if !(y isa T)
+                if y > typemax(T)
+                    # If y is too big to fit in T, then we know already that x is smaller
+                    # than y. So not equal, but definitely x < y.
+                    return $(comp_op == :(==)) ? false : true
+                elseif y < typemin(T)
+                    # Similarly, if y is too small, definitely x > y (and not equal).
+                    return false
+                end
+            end
+            # Now it's safe to truncate x down to y's type.
+            yi = y % T
+            yi, overflowed = Base.mul_with_overflow(yi, coefficient(FD{T,f}))
+            if $(comp_op == :(==))
+                overflowed && return false
+            else
+                # y overflowed, so it's bigger than x, since it doesn't fit in x's type
+                overflowed && return true
+            end
+            return $comp_op(x.i, yi)
+        end
+    end
+end
 
 # predicates and traits
 Base.isinteger(x::FD{T, f}) where {T, f} = rem(x.i, coefficient(FD{T, f})) == 0
