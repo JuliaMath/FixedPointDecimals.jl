@@ -560,6 +560,23 @@ function Base.:(==)(x::FD{T1,f1}, y::FD{T2,f2}) where {T1<:Integer, f1, T2<:Inte
         return xi == yi
     end
 end
+Base.:(==)(x::FD, y::Integer) = ==(y, x)
+function Base.:(==)(x::Integer, y::FD{T,f}) where {T<:Integer, f}
+    if f == 0
+        # If the precisions are the same, even if the types are different, we can compare
+        # the integer values directly. e.g. Int8(2) == Int16(2) is true.
+        return x == y.i
+    else
+        # Promote the integers to the larger type, and then scale them to the same
+        # precision. If the scaling operation ends up overflowing, we know that they aren't
+        # equal, because we know that the less precise value wasn't even representable in
+        # the more precise type, so they cannot be equal.
+        xi, yi = promote(x, y.i)
+        xi, overflowed = Base.mul_with_overflow(promote(xi, coefficient(FD{T,f}))...)
+        overflowed && return false
+        return xi == yi
+    end
+end
 
 
 # predicates and traits
