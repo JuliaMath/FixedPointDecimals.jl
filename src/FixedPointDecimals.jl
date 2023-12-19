@@ -539,7 +539,10 @@ Base.:(==)(x::T, y::T) where {T <: FD} = x.i == y.i
 Base.:(<)(x::T, y::T) where {T <: FD} = x.i < y.i
 Base.:(<=)(x::T, y::T) where {T <: FD} = x.i <= y.i
 
-# Avoid promotions when possible to avoid throwing InexactError
+# In the case where the FD types are different, or where one is an Integer, add
+# custom overloads, rather than relying on the default promotions, to avoid throwing
+# InexactError from the promotions. This lets us do e.g. `FD{Int8,2}(0) < 2`, without the
+# promotion to FD{Int8,2}(2) throwing an InexactError.
 for comp_op in (:(==), :(<), :(<=))
     @eval function Base.$comp_op(x::FD{T1,f1}, y::FD{T2,f2}) where {T1<:Integer, f1, T2<:Integer, f2}
         if f1 == f2
