@@ -444,8 +444,8 @@ function Base.checked_neg(x::T) where {T<:FD}
     return r
 end
 function Base.checked_abs(x::FD)
-    r = ifelse(x<0, -x, x)
-    r<0 || return r
+    r = ifelse(x.i<0, -x, x)
+    r.i<0 || return r
     _throw_overflow_abs(x)
 end
 if VERSION >= v"1.8.0-"
