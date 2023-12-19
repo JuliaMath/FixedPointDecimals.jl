@@ -194,8 +194,8 @@ end
 
 # these functions are needed to avoid InexactError when converting from the
 # integer type
-Base.:*(x::Integer, y::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, *(x, y.i))
-Base.:*(x::FD{T, f}, y::Integer) where {T, f} = reinterpret(FD{T, f}, *(x.i, y))
+Base.:*(x::Integer, y::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, x * y.i)
+Base.:*(x::FD{T, f}, y::Integer) where {T, f} = reinterpret(FD{T, f}, x.i * y)
 
 Base.:/(x::FD, y::FD) = checked_rdiv(x, y)
 Base.:/(x::Integer, y::FD) = checked_rdiv(x, y)
