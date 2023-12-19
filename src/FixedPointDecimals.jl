@@ -440,10 +440,12 @@ end
 
 function Base.checked_neg(x::T) where {T<:FD}
     r = -x
-    (x.i<0) & (r<0) && Base.Checked.throw_overflowerr_negation(x)
+    # Simplify the compiler's job, no need to call the FD,Int comparison
+    (x.i<0) & (r.i<0) && Base.Checked.throw_overflowerr_negation(x)
     return r
 end
 function Base.checked_abs(x::FD)
+    # Simplify the compiler's job, no need to call the FD,Int comparison
     r = ifelse(x.i<0, -x, x)
     r.i<0 || return r
     _throw_overflow_abs(x)
