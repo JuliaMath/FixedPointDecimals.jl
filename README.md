@@ -47,6 +47,8 @@ FixedDecimal{Int64,1}(0.3)
 
 ### Arithmetic details: Overflow and checked math
 
+_NOTE: This section applies to FixedPointDecimals v0.5+._
+
 By default, all arithmetic operations on FixedDecimals, except division, **will silently overflow** following the standard behavior for bit integer types in Julia. For example:
 ```julia
 julia> FixedDecimal{Int8,2}(1.0) + FixedDecimal{Int8,2}(1.0)
