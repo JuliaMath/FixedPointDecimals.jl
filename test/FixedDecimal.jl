@@ -834,27 +834,33 @@ end
     end
 
     @testset "division" begin
-        # TODO(PR): Is this the expected value?
         @test_throws OverflowError typemax(T) / T(0.5)
         @test_throws OverflowError typemin(T) / T(0.5)
     end
 
     @testset "truncating division" begin
-        # TODO(PR): Is this the expected value?
         @test_throws OverflowError typemax(T) ÷ T(0.5)
         @test_throws OverflowError typemin(T) ÷ T(0.5)
         @test_throws OverflowError typemax(T) ÷ eps(T)
         @test_throws OverflowError typemin(T) ÷ eps(T)
+
+        @test_throws OverflowError div(typemax(T), T(0.5), RoundUp)
+        @test_throws OverflowError div(typemin(T), T(0.5), RoundUp)
+        @test_throws OverflowError div(typemax(T), eps(T), RoundUp)
+        @test_throws OverflowError div(typemin(T), eps(T), RoundUp)
     end
 
     @testset "fld / cld" begin
-        # TODO(PR): Is this the expected value?
         @test_throws OverflowError fld(typemax(T), T(0.5))
         @test_throws OverflowError fld(typemin(T), T(0.5))
         @test_throws OverflowError fld(typemax(T), eps(T))
         @test_throws OverflowError fld(typemin(T), eps(T))
 
-        # TODO(PR): Is this the expected value?
+        @test_throws OverflowError fld1(typemax(T), T(0.5))
+        @test_throws OverflowError fld1(typemin(T), T(0.5))
+        @test_throws OverflowError fld1(typemax(T), eps(T))
+        @test_throws OverflowError fld1(typemin(T), eps(T))
+
         @test_throws OverflowError cld(typemax(T), T(0.5))
         @test_throws OverflowError cld(typemin(T), T(0.5))
         @test_throws OverflowError cld(typemax(T), eps(T))

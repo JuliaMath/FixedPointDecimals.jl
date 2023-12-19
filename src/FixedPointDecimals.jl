@@ -367,9 +367,12 @@ end
 if VERSION >= v"1.4.0-"
     # div(x.i, y.i) eliminates the scaling coefficient, so we call the FD constructor.
     # We don't need any widening logic, since we won't be multiplying by the coefficient.
-    @eval function Base.div(x::T, y::T, r::RoundingMode) where {T <: FD}
-        C = coefficient(T)
-        return reinterpret(T, C * div(x.i, y.i, r))
+    @eval function Base.div(x::FD{T, f}, y::FD{T, f}, r::RoundingMode) where {T<:Integer, f}
+        C = coefficient(FD{T, f})
+        # Note: The div() will already throw for divide-by-zero and typemin(T) ÷ -1.
+        v, b = Base.Checked.mul_with_overflow(C, div(x.i, y.i, r))
+        b && _throw_overflowerr_op(:div, x, y)
+        return reinterpret(FD{T, f}, v)
     end
 end
 
