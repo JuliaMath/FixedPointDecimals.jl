@@ -440,7 +440,7 @@ end
 
 function Base.checked_neg(x::T) where {T<:FD}
     r = -x
-    (x<0) & (r<0) && Base.Checked.throw_overflowerr_negation(x)
+    (x.i<0) & (r<0) && Base.Checked.throw_overflowerr_negation(x)
     return r
 end
 function Base.checked_abs(x::FD)
@@ -552,7 +552,8 @@ for comp_op in (:(==), :(<), :(<=))
             newFD = promote_type(FD{T1,f1}, FD{T2,f2})
             xi, yi = promote(x.i, y.i)
             if f1 > f2
-                yi, overflowed = Base.mul_with_overflow(yi, coefficient(newFD))
+                C = coefficient(newFD) ÷ coefficient(FD{T2,f2})
+                yi, overflowed = Base.mul_with_overflow(yi, C)
                 if $(comp_op == :(==))
                     overflowed && return false
                 else
@@ -560,7 +561,8 @@ for comp_op in (:(==), :(<), :(<=))
                     overflowed && return true
                 end
             else
-                xi, overflowed = Base.mul_with_overflow(xi, coefficient(newFD))
+                C = coefficient(newFD) ÷ coefficient(FD{T1,f1})
+                xi, overflowed = Base.mul_with_overflow(xi, C)
                 # Whether we're computing `==`, `<` or `<=`, if x overflowed, it means it's
                 # bigger than y, so this is false.
                 overflowed && return false
@@ -592,7 +594,7 @@ for comp_op in (:(==), :(<), :(<=))
         if f == 0
             # If the precisions are the same, even if the types are different, we can
             # compare the integer values directly. e.g. Int8(2) == Int16(2) is true.
-            return $comp_op(x, y.i)
+            return $comp_op(x.i, y)
         else
             # If y is too big to fit in T, then we know already that it's bigger than x,
             # so not equal, but definitely greater than.
