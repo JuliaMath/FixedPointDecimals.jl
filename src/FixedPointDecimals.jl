@@ -537,6 +537,31 @@ Base.:(==)(x::T, y::T) where {T <: FD} = x.i == y.i
 Base.:(<)(x::T, y::T) where {T <: FD} = x.i < y.i
 Base.:(<=)(x::T, y::T) where {T <: FD} = x.i <= y.i
 
+# Avoid promotions when possible to avoid throwing InexactError
+function Base.:(==)(x::FD{T1,f1}, y::FD{T2,f2}) where {T1<:Integer, f1, T2<:Integer, f2}
+    if f1 == f2
+        # If the precisions are the same, even if the types are different, we can compare
+        # the integer values directly. e.g. Int8(2) == Int16(2) is true.
+        return x.i == y.i
+    else
+        # Promote the integers to the larger type, and then scale them to the same
+        # precision. If the scaling operation ends up overflowing, we know that they aren't
+        # equal, because we know that the less precise value wasn't even representable in
+        # the more precise type, so they cannot be equal.
+        newFD = promote_type(FD{T1,f1}, FD{T2,f2})
+        xi, yi = promote(x.i, y.i)
+        if f1 > f2
+            yi, overflowed = Base.mul_with_overflow(yi, coefficient(newFD))
+            overflowed && return false
+        else
+            xi, overflowed = Base.mul_with_overflow(xi, coefficient(newFD))
+            overflowed && return false
+        end
+        return xi == yi
+    end
+end
+
+
 # predicates and traits
 Base.isinteger(x::FD{T, f}) where {T, f} = rem(x.i, coefficient(FD{T, f})) == 0
 Base.typemin(::Type{FD{T, f}}) where {T, f} = reinterpret(FD{T, f}, typemin(T))
