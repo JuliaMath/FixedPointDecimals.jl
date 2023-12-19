@@ -539,7 +539,7 @@ end
 
             # signed integers using two's complement have one additional negative value
             if x < 0 && x == typemin(x)
-                @test x / -one(x) == x  # -typemin(x) == typemin(x)
+                @test_throws OverflowError x / -one(x)
             else
                 @test x / -one(x) == -x
             end
@@ -835,30 +835,30 @@ end
 
     @testset "division" begin
         # TODO(PR): Is this the expected value?
-        @test typemax(T) / T(0.5) == FD2(-0.2)
-        @test typemin(T) / T(0.5) == FD2(0)
+        @test_throws OverflowError typemax(T) / T(0.5)
+        @test_throws OverflowError typemin(T) / T(0.5)
     end
 
     @testset "truncating division" begin
         # TODO(PR): Is this the expected value?
-        @test typemax(T) ÷ T(0.5) == T(-0.6)
-        @test typemin(T) ÷ T(0.5) == T(0.6)
-        @test typemax(T) ÷ eps(T) == T(-1)
-        @test typemin(T) ÷ eps(T) == T(0)
+        @test_throws OverflowError typemax(T) ÷ T(0.5)
+        @test_throws OverflowError typemin(T) ÷ T(0.5)
+        @test_throws OverflowError typemax(T) ÷ eps(T)
+        @test_throws OverflowError typemin(T) ÷ eps(T)
     end
 
     @testset "fld / cld" begin
         # TODO(PR): Is this the expected value?
-        @test fld(typemax(T), T(0.5)) == T(-0.6)
-        @test fld(typemin(T), T(0.5)) == T(-0.4)
-        @test fld(typemax(T), eps(T)) == T(-1)
-        @test fld(typemin(T), eps(T)) == T(0)
+        @test_throws OverflowError fld(typemax(T), T(0.5))
+        @test_throws OverflowError fld(typemin(T), T(0.5))
+        @test_throws OverflowError fld(typemax(T), eps(T))
+        @test_throws OverflowError fld(typemin(T), eps(T))
 
         # TODO(PR): Is this the expected value?
-        @test cld(typemax(T), T(0.5)) == T(0.4)
-        @test cld(typemin(T), T(0.5)) == T(0.6)
-        @test cld(typemax(T), eps(T)) == T(-1)
-        @test cld(typemin(T), eps(T)) == T(0)
+        @test_throws OverflowError cld(typemax(T), T(0.5))
+        @test_throws OverflowError cld(typemin(T), T(0.5))
+        @test_throws OverflowError cld(typemax(T), eps(T))
+        @test_throws OverflowError cld(typemin(T), eps(T))
     end
 
     @testset "abs / neg" begin

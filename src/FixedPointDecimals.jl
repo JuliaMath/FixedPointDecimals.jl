@@ -197,25 +197,9 @@ end
 Base.:*(x::Integer, y::FD{T, f}) where {T, f} = reinterpret(FD{T, f}, *(x, y.i))
 Base.:*(x::FD{T, f}, y::Integer) where {T, f} = reinterpret(FD{T, f}, *(x.i, y))
 
-function Base.:/(x::FD{T, f}, y::FD{T, f}) where {T, f}
-    powt = coefficient(FD{T, f})
-    quotient, remainder = fldmod(widemul(x.i, powt), y.i)
-    reinterpret(FD{T, f}, _round_to_nearest(quotient, remainder, y.i))
-end
-
-# These functions allow us to perform division with integers outside of the range of the
-# FixedDecimal.
-function Base.:/(x::Integer, y::FD{T, f}) where {T, f}
-    powt = coefficient(FD{T, f})
-    powtsq = widemul(powt, powt)
-    quotient, remainder = fldmod(widemul(x, powtsq), y.i)
-    reinterpret(FD{T, f}, _round_to_nearest(quotient, remainder, y.i))
-end
-
-function Base.:/(x::FD{T, f}, y::Integer) where {T, f}
-    quotient, remainder = fldmod(x.i, y)
-    reinterpret(FD{T, f}, _round_to_nearest(quotient, remainder, y))
-end
+Base.:/(x::FD, y::FD) = checked_rdiv(x, y)
+Base.:/(x::Integer, y::FD) = checked_rdiv(x, y)
+Base.:/(x::FD, y::Integer) = checked_rdiv(x, y)
 
 # integerification
 Base.trunc(x::FD{T, f}) where {T, f} = FD{T, f}(div(x.i, coefficient(FD{T, f})))
@@ -366,17 +350,19 @@ for remfn in [:rem, :mod, :mod1, :min, :max]
 end
 # TODO: When we upgrade to a min julia version >=1.4 (i.e Julia 2.0), this block can be
 # dropped in favor of three-argument `div`, below.
-for divfn in [:div, :fld, :fld1, :cld]
-    # div(x.i, y.i) eliminates the scaling coefficient, so we call the FD constructor.
-    # We don't need any widening logic, since we won't be multiplying by the coefficient.
-    #@eval Base.$divfn(x::T, y::T) where {T <: FD} = T($divfn(x.i, y.i))
-    # @eval Base.$divfn(x::T, y::T) where {T <: FD} = $divfn(promote(x.i, y.i)...)
-    # TODO(PR): I'm not sure about this one...
-    # What should it *mean* for `typemax(FD) ÷ FD(0.5)` to overflow?
-    @eval function Base.$divfn(x::T, y::T) where {T <: FD}
-        C = coefficient(T)
-        return reinterpret(T, C * $divfn(promote(x.i, y.i)...))
-    end
+# The division functions all default to *throwing OverflowError* rather than
+# wrapping on integer overflow.
+# This decision may be changed in a future release of FixedPointDecimals.
+Base.div(x::FD, y::FD) = Base.checked_div(x, y)
+Base.fld(x::FD, y::FD) = Base.checked_fld(x, y)
+Base.cld(x::FD, y::FD) = Base.checked_cld(x, y)
+# There is not checked_fld1, so this is implemented here:
+function Base.fld1(x::FD{T,f}, y::FD{T,f}) where {T, f}
+    C = coefficient(FD{T, f})
+    # Note: fld1() will already throw for divide-by-zero and typemin(T) ÷ -1.
+    v, b = Base.Checked.mul_with_overflow(C, fld1(x.i, y.i))
+    b && _throw_overflowerr_op(:fld1, x, y)
+    return reinterpret(FD{T, f}, v)
 end
 if VERSION >= v"1.4.0-"
     # div(x.i, y.i) eliminates the scaling coefficient, so we call the FD constructor.
@@ -480,8 +466,6 @@ See also:
 - `Base.checked_div` for truncating division.
 """
 checked_rdiv(x::FD, y::FD) = checked_rdiv(promote(x, y)...)
-checked_rdiv(x, y::FD) = checked_rdiv(promote(x, y)...)
-checked_rdiv(x::FD, y) = checked_rdiv(promote(x, y)...)
 
 function checked_rdiv(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
     powt = coefficient(FD{T, f})
@@ -490,6 +474,24 @@ function checked_rdiv(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
     typemin(T) <= v <= typemax(T) || Base.Checked.throw_overflowerr_binaryop(:/, x, y)
     return reinterpret(FD{T, f}, v)
 end
+
+# These functions allow us to perform division with integers outside of the range of the
+# FixedDecimal.
+function checked_rdiv(x::Integer, y::FD{T, f}) where {T<:Integer, f}
+    powt = coefficient(FD{T, f})
+    powtsq = widemul(powt, powt)
+    quotient, remainder = fldmod(widemul(x, powtsq), y.i)
+    v = _round_to_nearest(quotient, remainder, y.i)
+    typemin(T) <= v <= typemax(T) || Base.Checked.throw_overflowerr_binaryop(:/, x, y)
+    reinterpret(FD{T, f}, v)
+end
+function checked_rdiv(x::FD{T, f}, y::Integer) where {T<:Integer, f}
+    quotient, remainder = fldmod(x.i, y)
+    v = _round_to_nearest(quotient, remainder, y)
+    typemin(T) <= v <= typemax(T) || Base.Checked.throw_overflowerr_binaryop(:/, x, y)
+    reinterpret(FD{T, f}, v)
+end
+
 
 # --------------------------
 
