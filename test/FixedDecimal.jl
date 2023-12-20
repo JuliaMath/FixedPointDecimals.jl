@@ -327,6 +327,17 @@ end
     @test typemax(FD{Int8, 2}) <  typemax(FD{Int8,1})
     @test typemax(FD{Int8, 2}) <= typemax(FD{Int8,1})
 
+    @test !(typemin(FD{Int8, 2}) <= typemin(FD{Int8,1}))
+    @test !(typemin(FD{Int8, 1}) >= typemin(FD{Int8,2}))
+    @test !(typemin(FD{Int8, 1}) >  typemin(FD{Int8,2}))
+    @test !(typemin(FD{Int8, 1}) >= typemin(FD{Int8,2}))
+    @test !(typemin(FD{Int8, 2}) <  typemin(FD{Int8,1}))
+    @test !(typemin(FD{Int8, 2}) <= typemin(FD{Int8,1}))
+    @test !(typemax(FD{Int8, 1}) <  typemax(FD{Int8,2}))
+    @test !(typemax(FD{Int8, 1}) <= typemax(FD{Int8,2}))
+    @test !(typemax(FD{Int8, 2}) >  typemax(FD{Int8,1}))
+    @test !(typemax(FD{Int8, 2}) >= typemax(FD{Int8,1}))
+
     @testset "Integer and FD" begin
         @test 1 <= FD{Int8, 2}(1) <= 1
         @test 1 >= FD{Int8, 2}(1) >= 1
