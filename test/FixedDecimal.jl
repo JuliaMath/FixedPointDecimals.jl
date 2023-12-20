@@ -317,11 +317,15 @@ end
     @test FD{Int16, 4}(1) < FD{Int8, 0}(4)  # FD{Int16,4}(4) doesn't fit
 
     # less precision allows smaller numbers
-    @test typemin(FD{Int8, 1}) < typemin(FD{Int8,2})
+    @test typemin(FD{Int8, 1}) <  typemin(FD{Int8,2})
     @test typemin(FD{Int8, 1}) <= typemin(FD{Int8,2})
+    @test typemin(FD{Int8, 2}) >  typemin(FD{Int8,1})
+    @test typemin(FD{Int8, 2}) >= typemin(FD{Int8,1})
     # less precision allows bigger numbers
-    @test typemax(FD{Int8, 1}) > typemax(FD{Int8,2})
+    @test typemax(FD{Int8, 1}) >  typemax(FD{Int8,2})
     @test typemax(FD{Int8, 1}) >= typemax(FD{Int8,2})
+    @test typemax(FD{Int8, 2}) <  typemax(FD{Int8,1})
+    @test typemax(FD{Int8, 2}) <= typemax(FD{Int8,1})
 
     @testset "Integer and FD" begin
         @test 1 <= FD{Int8, 2}(1) <= 1
