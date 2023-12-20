@@ -558,19 +558,34 @@ for comp_op in (:(==), :(<), :(<=))
             xi, yi = promote(x.i, y.i)
             if f1 > f2
                 C = coefficient(newFD) ÷ coefficient(FD{T2,f2})
-                yi, overflowed = Base.mul_with_overflow(yi, C)
-                if $(comp_op == :(==))
-                    overflowed && return false
-                else
-                    # y overflowed, so it's bigger than x, since it doesn't fit in x's type
-                    overflowed && return true
+                yi, wrapped = Base.mul_with_overflow(yi, C)
+                if wrapped
+                    is_underflow = (y.i < 0)
+                    if !is_underflow
+                        # Whether we're computing `==`, `<` or `<=`, if y overflowed, it
+                        # means it's bigger than x.
+                        return $(comp_op == :(==)) ? false : true
+                    else  # underflow
+                        # If y is negative, then y is definitely less than x, since y is so
+                        # small, it doesn't even fit in y's type.
+                        return false
+                    end
                 end
             else
                 C = coefficient(newFD) ÷ coefficient(FD{T1,f1})
-                xi, overflowed = Base.mul_with_overflow(xi, C)
-                # Whether we're computing `==`, `<` or `<=`, if x overflowed, it means it's
-                # bigger than y, so this is false.
-                overflowed && return false
+                xi, wrapped = Base.mul_with_overflow(xi, C)
+                if wrapped
+                    is_underflow = (x.i < 0)
+                    if !is_underflow
+                        # Whether we're computing `==`, `<` or `<=`, if x overflowed, it
+                        # means it's bigger than y, so this is false.
+                        return false
+                    else  # underflow
+                        # If x is negative, then x is definitely less than y, since x is so
+                        # small, it doesn't even fit in y's type.
+                        return $(comp_op == :(==)) ? false : true
+                    end
+                end
             end
             return $comp_op(xi, yi)
         end
@@ -593,10 +608,19 @@ for comp_op in (:(==), :(<), :(<=))
             end
             # Now it's safe to truncate x down to y's type.
             xi = x % T
-            xi, overflowed = Base.mul_with_overflow(xi, coefficient(FD{T,f}))
-            # Whether we're computing `==`, `<` or `<=`, if x overflowed, it means it's
-            # bigger than y, so this is false.
-            overflowed && return false
+            xi, wrapped = Base.mul_with_overflow(xi, coefficient(FD{T,f}))
+            if wrapped
+                is_underflow = (x < 0)
+                if !is_underflow
+                    # Whether we're computing `==`, `<` or `<=`, if x overflowed, it means it's
+                    # bigger than y, so this is false.
+                    return false
+                else  # underflow
+                    # If x is negative, then x is definitely less than y, since x is so
+                    # small, it doesn't even fit in y's type.
+                    return $(comp_op == :(==)) ? false : true
+                end
+            end
             return $comp_op(xi, y.i)
         end
     end
@@ -618,12 +642,18 @@ for comp_op in (:(==), :(<), :(<=))
             end
             # Now it's safe to truncate x down to y's type.
             yi = y % T
-            yi, overflowed = Base.mul_with_overflow(yi, coefficient(FD{T,f}))
-            if $(comp_op == :(==))
-                overflowed && return false
-            else
-                # y overflowed, so it's bigger than x, since it doesn't fit in x's type
-                overflowed && return true
+            yi, wrapped = Base.mul_with_overflow(yi, coefficient(FD{T,f}))
+            if wrapped
+                is_underflow = (y < 0)
+                if !is_underflow
+                    # Whether we're computing `==`, `<` or `<=`, if y overflowed, it means it's
+                    # bigger than x.
+                    return $(comp_op == :(==)) ? false : true
+                else  # underflow
+                    # If y is negative, then y is definitely less than x, since y is so
+                    # small, it doesn't even fit in y's type.
+                    return false
+                end
             end
             return $comp_op(x.i, yi)
         end
