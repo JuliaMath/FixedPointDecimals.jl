@@ -1,7 +1,7 @@
 name = "FixedPointDecimals"
 uuid = "fb4d412d-6eee-574d-9565-ede6634db7b0"
 authors = ["Fengyang Wang <fengyang.wang.0@gmail.com>", "Curtis Vogt <curtis.vogt@gmail.com>"]
-version = "0.5.2"
+version = "0.5.3"
 
 [deps]
 BitIntegers = "c3b6d118-76ef-56ca-8cc7-ebb389d030a1"
