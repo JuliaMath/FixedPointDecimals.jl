@@ -123,17 +123,16 @@ end
 # Custom widemul implementation to avoid the cost of widening to BigInt.
 # FD{Int128} operations should widen to 256 bits internally, rather than to a BigInt.
 const BitInteger128 = Union{Int128, UInt128}
-_widemul(x, y) = widemul(x, y)
-_widemul(x::BitInteger128, y) = _widemul(promote(x, y)...)
-_widemul(x, y::BitInteger128) = _widemul(promote(x, y)...)
-_widemul(x::Int128, y::Int128) = BitIntegers.Int256(x) * BitIntegers.Int256(y)
-_widemul(x::UInt128, y::UInt128) = BitIntegers.UInt256(x) * BitIntegers.UInt256(y)
+_widemul(x, y) = _widen(x) * _widen(y)
+_widemul(x::Signed,y::Unsigned) = _widen(x) * signed(_widen(y))
+_widemul(x::Unsigned,y::Signed) = signed(_widen(x)) * _widen(y)
 
 # Custom widen implementation to avoid the cost of widening to BigInt.
 # FD{Int128} operations should widen to 256 bits internally, rather than to a BigInt.
 _widen(::Type{Int128}) = BitIntegers.Int256
 _widen(::Type{UInt128}) = BitIntegers.UInt256
-_widen(t) = widen(t)
+_widen(t::Type) = widen(t)
+_widen(x::T) where {T} = (_widen(T))(x)
 
 
 (::Type{T})(x::Real) where {T <: FD} = convert(T, x)
