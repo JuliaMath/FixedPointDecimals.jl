@@ -175,7 +175,9 @@ function _round_to_nearest(quotient::T,
                            divisor::T,
                            ::RoundingMode{M}=RoundNearest) where {T <: Integer, M}
     halfdivisor = divisor >> 1
-    if iseven(divisor) && remainder == halfdivisor
+    # PERF Note: Only need the last bit to check iseven, and default iseven(Int256)
+    # allocates, so we truncate first.
+    if iseven((divisor % Int8)) && remainder == halfdivisor
         # `:NearestTiesAway` will tie away from zero, e.g. -8.5 ->
         # -9. `:NearestTiesUp` will always ties towards positive
         # infinity. `:Nearest` will tie towards the nearest even
