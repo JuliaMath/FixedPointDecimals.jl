@@ -10,4 +10,9 @@ include(joinpath(pkg_path, "test", "utils.jl"))
 
 @testset "FixedPointDecimals" begin
     include("FixedDecimal.jl")
-end  # global testset
+end
+
+@testset "FixedPointDecimals" begin
+    include("fldmod-by-const_tests.jl")
+end
+
