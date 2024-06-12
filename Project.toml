@@ -4,6 +4,7 @@ authors = ["Fengyang Wang <fengyang.wang.0@gmail.com>", "Curtis Vogt <curtis.vog
 version = "0.5.2"
 
 [deps]
+BitIntegers = "c3b6d118-76ef-56ca-8cc7-ebb389d030a1"
 Parsers = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
 
 [compat]

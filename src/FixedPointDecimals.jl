@@ -35,6 +35,8 @@ export checked_abs, checked_add, checked_cld, checked_div, checked_fld,
     checked_mod, checked_mul, checked_neg, checked_rem, checked_sub
 
 using Base: decompose, BitInteger
+
+import BitIntegers  # For 128-bit _widemul / _widen
 import Parsers
 
 # floats that support fma and are roughly IEEE-like
@@ -118,6 +120,22 @@ function __init__()
     return
 end
 
+# Custom widemul implementation to avoid the cost of widening to BigInt.
+# FD{Int128} operations should widen to 256 bits internally, rather than to a BigInt.
+const BitInteger128 = Union{Int128, UInt128}
+_widemul(x, y) = widemul(x, y)
+_widemul(x::BitInteger128, y) = _widemul(promote(x, y)...)
+_widemul(x, y::BitInteger128) = _widemul(promote(x, y)...)
+_widemul(x::Int128, y::Int128) = BitIntegers.Int256(x) * BitIntegers.Int256(y)
+_widemul(x::UInt128, y::UInt128) = BitIntegers.UInt256(x) * BitIntegers.UInt256(y)
+
+# Custom widen implementation to avoid the cost of widening to BigInt.
+# FD{Int128} operations should widen to 256 bits internally, rather than to a BigInt.
+_widen(::Type{Int128}) = BitIntegers.Int256
+_widen(::Type{UInt128}) = BitIntegers.UInt256
+_widen(t) = widen(t)
+
+
 (::Type{T})(x::Real) where {T <: FD} = convert(T, x)
 
 floattype(::Type{<:FD{T}}) where {T<:Union{Int8, UInt8, Int16, UInt16}} = Float32
@@ -188,7 +206,7 @@ _round_to_nearest(q, r, d, m=RoundNearest) = _round_to_nearest(promote(q, r, d).
 # correctness test suite.
 function Base.:*(x::FD{T, f}, y::FD{T, f}) where {T, f}
     powt = coefficient(FD{T, f})
-    quotient, remainder = fldmodinline(widemul(x.i, y.i), powt)
+    quotient, remainder = fldmodinline(_widemul(x.i, y.i), powt)
     reinterpret(FD{T, f}, _round_to_nearest(quotient, remainder, powt))
 end
 
@@ -416,7 +434,7 @@ function Base.checked_sub(x::T, y::T) where {T<:FD}
 end
 function Base.checked_mul(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
     powt = coefficient(FD{T, f})
-    quotient, remainder = fldmodinline(widemul(x.i, y.i), powt)
+    quotient, remainder = fldmodinline(_widemul(x.i, y.i), powt)
     v = _round_to_nearest(quotient, remainder, powt)
     typemin(T) <= v <= typemax(T) || Base.Checked.throw_overflowerr_binaryop(:*, x, y)
     return reinterpret(FD{T, f}, T(v))
@@ -474,7 +492,7 @@ checked_rdiv(x::FD, y::FD) = checked_rdiv(promote(x, y)...)
 
 function checked_rdiv(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
     powt = coefficient(FD{T, f})
-    quotient, remainder = fldmod(widemul(x.i, powt), y.i)
+    quotient, remainder = fldmod(_widemul(x.i, powt), y.i)
     v = _round_to_nearest(quotient, remainder, y.i)
     typemin(T) <= v <= typemax(T) || Base.Checked.throw_overflowerr_binaryop(:/, x, y)
     return reinterpret(FD{T, f}, v)
@@ -484,8 +502,8 @@ end
 # FixedDecimal.
 function checked_rdiv(x::Integer, y::FD{T, f}) where {T<:Integer, f}
     powt = coefficient(FD{T, f})
-    powtsq = widemul(powt, powt)
-    quotient, remainder = fldmod(widemul(x, powtsq), y.i)
+    powtsq = _widemul(powt, powt)
+    quotient, remainder = fldmod(_widemul(x, powtsq), y.i)
     v = _round_to_nearest(quotient, remainder, y.i)
     typemin(T) <= v <= typemax(T) || Base.Checked.throw_overflowerr_binaryop(:/, x, y)
     reinterpret(FD{T, f}, v)
@@ -722,7 +740,7 @@ NOTE: This function is expensive, since it contains a while-loop, but it is actu
       This function does not have or depend on any side-effects.
 """
 function max_exp10(::Type{T}) where {T <: Integer}
-    W = widen(T)
+    W = _widen(T)
     type_max = W(typemax(T))
 
     powt = one(W)
@@ -759,4 +777,4 @@ value(fd::FD) = fd.i
 # for generic hashing
 Base.decompose(fd::FD) = decompose(Rational(fd))
 
-end
+end  # module
