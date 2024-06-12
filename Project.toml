@@ -9,6 +9,7 @@ Parsers = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
 
 [compat]
 Parsers = "2.7"
+BitIntegers = "0.3.1"
 julia = "1.6"
 
 [extras]
