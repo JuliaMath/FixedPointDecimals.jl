@@ -30,7 +30,7 @@ end
     return x - quotient * y
 end
 
-Base.@assume_effects :total function div_by_const(x::T, ::Val{C}) where {T, C}
+function div_by_const(x::T, ::Val{C}) where {T, C}
     # These checks will be compiled away during specialization.
     # While for `*(FixedDecimal, FixedDecimal)`, C will always be a power of 10, these
     # checks allow this function to work for any `C > 0`, in case that's useful in the

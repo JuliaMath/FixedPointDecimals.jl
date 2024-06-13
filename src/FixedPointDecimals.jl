@@ -39,7 +39,18 @@ using Base: decompose, BitInteger
 using BitIntegers: BitIntegers, UInt256, Int256
 import Parsers
 
-include("fldmod-by-const.jl")
+# The effects system in newer versions of Julia is necessary for the fldmod_by_const
+# optimization to take affect without adverse performance impacts.
+# For older versions of julia, we will fall back to the flmod implementation, which works
+# very fast for all FixedDecimals of size <= 64 bits.
+if isdefined(Base, Symbol("@assume_effects"))
+    include("fldmod-by-const.jl")
+else
+    # We force-inline this, to allow the fldmod operation to be specialized for a constant
+    # second argument (converting divide-by-power-of-ten instructions with the cheaper
+    # multiply-by-inverse-coefficient.) Sadly this doesn't work for Int128.
+    @inline fldmod_by_const(x,y) = (fld(x,y), mod(x,y))
+end
 
 # floats that support fma and are roughly IEEE-like
 const FMAFloat = Union{Float16, Float32, Float64, BigFloat}
