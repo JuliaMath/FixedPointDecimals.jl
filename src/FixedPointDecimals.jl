@@ -191,7 +191,8 @@ function _round_to_nearest(quotient::T,
     halfdivisor = divisor >> 1
     # PERF Note: Only need the last bit to check iseven, and default iseven(Int256)
     # allocates, so we truncate first.
-    if iseven((divisor % Int8)) && remainder == halfdivisor
+    _iseven(x) = (x & 0x1) == 0
+    if _iseven(divisor) && remainder == halfdivisor
         # `:NearestTiesAway` will tie away from zero, e.g. -8.5 ->
         # -9. `:NearestTiesUp` will always ties towards positive
         # infinity. `:Nearest` will tie towards the nearest even
@@ -199,7 +200,7 @@ function _round_to_nearest(quotient::T,
         if M == :NearestTiesAway
             ifelse(quotient < zero(quotient), quotient, quotient + one(quotient))
         elseif M == :Nearest
-            ifelse(iseven(quotient), quotient, quotient + one(quotient))
+            ifelse(_iseven(quotient), quotient, quotient + one(quotient))
         else
             quotient + one(quotient)
         end
