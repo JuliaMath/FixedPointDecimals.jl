@@ -36,7 +36,7 @@ export checked_abs, checked_add, checked_cld, checked_div, checked_fld,
 
 using Base: decompose, BitInteger
 
-using BitIntegers: BitIntegers, UInt256, Int256
+using BitIntegers: BitIntegers, Int256, Int512, UInt256, UInt512
 import Parsers
 
 # The effects system in newer versions of Julia is necessary for the fldmod_by_const
