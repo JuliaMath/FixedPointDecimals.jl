@@ -35,7 +35,7 @@ given integer type, you can define this overload for your integer type.
 You will also need to implement some parts of the interface below, including _widen().
 """
 ShouldUseCustomFldmodByConst(::Type{<:Base.BitInteger}) = true
-ShouldUseCustomFldmodByConst(::Type{<:Union{Int256,Int128}}) = true
+ShouldUseCustomFldmodByConst(::Type{<:Union{Int256,UInt256}}) = true
 ShouldUseCustomFldmodByConst(::Type) = false
 
 @inline function fldmod_by_const(x, y)
@@ -130,10 +130,12 @@ end
 
 # Annoyingly, Unsigned(T) isn't defined for BitIntegers types:
 # https://github.com/rfourquet/BitIntegers.jl/pull/2
+# Note: We do not need this for Int512, since we only widen to 512 _after_ calling
+# _unsigned, above. This code is only for supporting the built-in integer types, which only
+# go up to 128-bits (widened twice to 512). If a user wants to extend FixedDecimals for
+# other integer types, they will need to add methods to either _unsigned or unsigned.
 _unsigned(x) = unsigned(x)
 _unsigned(::Type{Int256}) = UInt256
 _unsigned(::Type{UInt256}) = UInt256
-_unsigned(::Type{Int128}) = UInt128
-_unsigned(::Type{UInt128}) = UInt128
 
 nbits(x) = sizeof(x) * 8
