@@ -12,7 +12,10 @@ include(joinpath(pkg_path, "test", "utils.jl"))
     include("FixedDecimal.jl")
 end
 
+
+if isdefined(Base, Symbol("@assume_effects"))
 @testset "FixedPointDecimals" begin
     include("fldmod-by-const_tests.jl")
+end
 end
 
