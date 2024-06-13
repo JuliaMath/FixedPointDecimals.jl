@@ -1,5 +1,18 @@
+# NOTE: We apply this optimization to values of type (U)Int128 and (U)Int256, which covers
+# FixedDecimal{(U)Int64} and FixedDecimal{(U)Int128}.
+# Julia+LLVM have built-in optimizations that apply this already for FD{(U)Int64}, however
+# this customized implementation appears to produce still even faster code than LLVM can
+# produce on its own. So we apply this for both sizes.
+# Before:
+# julia> @btime for _ in 1:10000 fd = fd * fd end setup = (fd = FixedDecimal{Int64,3}(1.234))
+#     247.709 μs (0 allocations: 0 bytes)
+#   FixedDecimal{Int64,3}(4230510070790917.029)
+# After:
+# julia> @btime for _ in 1:10000 fd = fd * fd end setup = (fd = FixedDecimal{Int64,3}(1.234))
+#     106.125 μs (0 allocations: 0 bytes)
+#   FixedDecimal{Int64,3}(4230510070790917.029)
 
-const BitInteger256 = Union{UInt256, Int256}
+const BigBitIntegers = Union{UInt128, Int128, UInt256, Int256}
 
 @inline function fldmod_by_const(x, y)
     # For small-to-normal integers, LLVM can correctly optimize away the division, if it
@@ -7,7 +20,7 @@ const BitInteger256 = Union{UInt256, Int256}
     # inlined, so here we have explictly inlined it instead.
     return (fld(x,y), mod(x,y))
 end
-@inline function fldmod_by_const(x::BitInteger256, y)
+@inline function fldmod_by_const(x::BigBitIntegers, y)
     # For large or non-standard Int types, LLVM doesn't optimize
     # well, so we use a custom implementation of fldmod.
     d = fld_by_const(x, Val(y))
@@ -17,8 +30,8 @@ end
 # Calculate fld(x,y) when y is a Val constant.
 # The implementation for fld_by_const was lifted directly from Base.fld(x,y), except that
 # it uses `div_by_const` instead of `div`.
-fld_by_const(x::T, y::Val{C}) where {T<:UInt256, C} = div_by_const(x, y)
-function fld_by_const(x::T, y::Val{C}) where {T<:Int256, C}
+fld_by_const(x::T, y::Val{C}) where {T<:Unsigned, C} = div_by_const(x, y)
+function fld_by_const(x::T, y::Val{C}) where {T<:Signed, C}
     d = div_by_const(x, y)
     return d - (signbit(x ⊻ C) & (d * C != x))
 end
@@ -26,7 +39,7 @@ end
 # Calculate `mod(x,y)` after you've already acquired quotient, the result of `fld(x,y)`.
 # REQUIRES:
 #   - `y != -1`
-@inline function manual_mod(x::T, y::T, quotient::T) where T<:BitInteger256
+@inline function manual_mod(x::T, y::T, quotient::T) where T<:BigBitIntegers
     return x - quotient * y
 end
 
@@ -94,5 +107,8 @@ end
 # https://github.com/rfourquet/BitIntegers.jl/pull/2
 _unsigned(x) = unsigned(x)
 _unsigned(::Type{Int256}) = UInt256
+_unsigned(::Type{UInt256}) = UInt256
+_unsigned(::Type{Int128}) = UInt128
+_unsigned(::Type{UInt128}) = UInt128
 
 nbits(x) = sizeof(x) * 8
