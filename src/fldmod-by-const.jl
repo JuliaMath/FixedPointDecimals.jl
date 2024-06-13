@@ -30,6 +30,8 @@ end
     return x - quotient * y
 end
 
+# This function is based on the native code produced by the following:
+# @code_native ((x)->div(x, 100))(Int64(2))
 function div_by_const(x::T, ::Val{C}) where {T, C}
     # These checks will be compiled away during specialization.
     # While for `*(FixedDecimal, FixedDecimal)`, C will always be a power of 10, these
