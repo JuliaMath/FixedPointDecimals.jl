@@ -1,30 +1,55 @@
-# NOTE: We apply this optimization to values of type (U)Int128 and (U)Int256, which covers
-# FixedDecimal{(U)Int64} and FixedDecimal{(U)Int128}.
-# Julia+LLVM have built-in optimizations that apply this already for FD{(U)Int64}, however
-# this customized implementation appears to produce still even faster code than LLVM can
-# produce on its own. So we apply this for both sizes.
+# NOTE: Surprisingly, even though LLVM implements a version of this optimization on its own
+# for smaller integer sizes (<=64-bits), using the code in this file produces faster
+# multiplications for *all* types of integers. So we use our custom fldmod_by_const for all
+# bit integer types.
 # Before:
+# julia> @btime for _ in 1:10000 fd = fd * fd end setup = (fd = FixedDecimal{Int32,3}(1.234))
+#     84.959 μs (0 allocations: 0 bytes)
+#   FixedDecimal{Int32,3}(1700943.280)
+#
 # julia> @btime for _ in 1:10000 fd = fd * fd end setup = (fd = FixedDecimal{Int64,3}(1.234))
 #     247.709 μs (0 allocations: 0 bytes)
 #   FixedDecimal{Int64,3}(4230510070790917.029)
+#
+#julia> @btime for _ in 1:10000 fd = fd * fd end setup = (fd = FixedDecimal{Int128,3}(1.234))
+#    4.077 ms (160798 allocations: 3.22 MiB)
+#  FixedDecimal{Int128,3}(-66726338547984585007169386718143307.324)
+#
 # After:
+# julia> @btime for _ in 1:10000 fd = fd * fd end setup = (fd = FixedDecimal{Int32,3}(1.234))
+#     68.416 μs (0 allocations: 0 bytes)
+#   FixedDecimal{Int32,3}(1700943.280)
+#
 # julia> @btime for _ in 1:10000 fd = fd * fd end setup = (fd = FixedDecimal{Int64,3}(1.234))
 #     106.125 μs (0 allocations: 0 bytes)
 #   FixedDecimal{Int64,3}(4230510070790917.029)
+#
+# julia> @btime for _ in 1:10000 fd = fd * fd end setup = (fd = FixedDecimal{Int128,3}(1.234))
+#     204.125 μs (0 allocations: 0 bytes)
+#   FixedDecimal{Int128,3}(-66726338547984585007169386718143307.324)
 
-const BigBitIntegers = Union{UInt128, Int128, UInt256, Int256}
+"""
+    ShouldUseCustomFldmodByConst(::Type{<:MyCustomIntType})) = true
+A trait to control opt-in for the custom `fldmod_by_const` implementation. To use this for a
+given integer type, you can define this overload for your integer type.
+You will also need to implement some parts of the interface below, including _widen().
+"""
+ShouldUseCustomFldmodByConst(::Type{<:Base.BitInteger}) = true
+ShouldUseCustomFldmodByConst(::Type{<:Union{Int256,Int128}}) = true
+ShouldUseCustomFldmodByConst(::Type) = false
 
 @inline function fldmod_by_const(x, y)
-    # For small-to-normal integers, LLVM can correctly optimize away the division, if it
-    # knows it's dividing by a const. We cannot call `Base.fldmod` since it's not
-    # inlined, so here we have explictly inlined it instead.
-    return (fld(x,y), mod(x,y))
-end
-@inline function fldmod_by_const(x::BigBitIntegers, y)
-    # For large or non-standard Int types, LLVM doesn't optimize
-    # well, so we use a custom implementation of fldmod.
-    d = fld_by_const(x, Val(y))
-    return d, manual_mod(promote(x, y, d)...)
+    if ShouldUseCustomFldmodByConst(typeof(x))
+        # For large Int types, LLVM doesn't optimize well, so we use a custom implementation
+        # of fldmod, which extends that optimization to those larger integer types.
+        d = fld_by_const(x, Val(y))
+        return d, manual_mod(promote(x, y, d)...)
+    else
+        # For other integers, LLVM might be able to correctly optimize away the division, if
+        # it knows it's dividing by a const. We cannot call `Base.fldmod` since it's not
+        # inlined, so here we have explictly inlined it instead.
+        return (fld(x,y), mod(x,y))
+    end
 end
 
 # Calculate fld(x,y) when y is a Val constant.
@@ -39,7 +64,7 @@ end
 # Calculate `mod(x,y)` after you've already acquired quotient, the result of `fld(x,y)`.
 # REQUIRES:
 #   - `y != -1`
-@inline function manual_mod(x::T, y::T, quotient::T) where T<:BigBitIntegers
+@inline function manual_mod(x::T, y::T, quotient::T) where T<:Integer
     return x - quotient * y
 end
 
