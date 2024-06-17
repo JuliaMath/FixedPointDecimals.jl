@@ -144,8 +144,8 @@ _widemul(x::Unsigned,y::Signed) = signed(_widen(x)) * _widen(y)
 # FD{Int128} operations should widen to 256 bits internally, rather than to a BigInt.
 _widen(::Type{Int128}) = Int256
 _widen(::Type{UInt128}) = UInt256
-_widen(::Type{Int256}) = BitIntegers.Int512
-_widen(::Type{UInt256}) = BitIntegers.UInt512
+_widen(::Type{Int256}) = Int512
+_widen(::Type{UInt256}) = UInt512
 _widen(t::Type) = widen(t)
 _widen(x::T) where {T} = (_widen(T))(x)
 
