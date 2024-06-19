@@ -67,8 +67,10 @@ end
                 big_mul = big * x
                 # This might overflow: ...
                 mul = fd * x
-                # ... so we truncate big to the same size
-                @test big_mul.i % T == mul.i % T
+                @testset "$fd * $x" begin
+                    # ... so we truncate big to the same size
+                    @test big_mul.i % T == mul.i % T
+                end
             end
             @testset for v in typemin(FD) : eps(FD) : typemax(FD)
                 test_multiplies_correctly(v, typemin(T))
@@ -95,8 +97,10 @@ end
                 big_mul = big * x
                 # This might overflow: ...
                 mul = fd * x
-                # ... so we truncate big to the same size
-                @test big_mul.i % T == mul.i % T
+                @testset "$fd * $x" begin
+                    # ... so we truncate big to the same size
+                    @test big_mul.i % T == mul.i % T
+                end
             end
             vals = FD[
                 typemin(FD), typemax(FD),
