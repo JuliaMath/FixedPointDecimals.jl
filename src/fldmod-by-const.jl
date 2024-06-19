@@ -119,7 +119,8 @@ Base.@assume_effects :foldable function calculate_inverse_coeff(::Type{T}, C) wh
     # Now, truncate to only the upper half of invcoeff, after we've shifted. Instead of
     # bitshifting, we round to maintain precision. (This is needed to prevent off-by-ones.)
     # -- This is equivalent to `invcoeff = T(invcoeff >> sizeof(T))`, except rounded. --
-    invcoeff = _round_to_nearest(fldmod(invcoeff, typemax(UT))..., typemax(UT)) % T
+    two_to_N = _widen(typemax(UT)) + UT(1) # Precise value for 2^nbits(T) (doesn't fit in T)
+    invcoeff = _round_to_nearest(fldmod(invcoeff, two_to_N)..., two_to_N ) % T
     return invcoeff, toshift
 end
 

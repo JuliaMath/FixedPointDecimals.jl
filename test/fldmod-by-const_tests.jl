@@ -57,6 +57,30 @@ end
     end
 end
 
+@testset "fixed decimal multiplication - exhaustive 8-bit" begin
+    @testset for P in (0,1)
+        @testset for T in (Int8, UInt8)
+            FD = FixedDecimal{T,P}
+
+            function test_multiplies_correctly(fd, x)
+                big = FixedDecimal{BigInt, P}(fd)
+                big_mul = big * x
+                # This might overflow: ...
+                mul = fd * x
+                @testset "$fd * $x" begin
+                    # ... so we truncate big to the same size
+                    @test big_mul.i % T == mul.i % T
+                end
+            end
+            @testset for v in typemin(FD) : eps(FD) : typemax(FD)
+                @testset for v2 in typemin(FD) : eps(FD) : typemax(FD)
+                    test_multiplies_correctly(v, v2)
+                end
+            end
+        end
+    end
+end
+
 @testset "fixed decimal multiplication - exhaustive 16-bit" begin
     @testset for P in (0,1,2,3,4)
         @testset for T in (Int16, UInt16)
