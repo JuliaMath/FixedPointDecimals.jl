@@ -136,6 +136,47 @@ function mul_hi(x::T, y::T) where T
     (xy >> nbits(T)) % T
 end
 
+
+
+# Unsigned magic number computation + divide by constant
+# Hacker's delight figure 10–4
+Base.@assume_effects :foldable function magicgu(nmax, d)
+    T = typeof(nmax)
+    nc = (nmax ÷ d) * d - 1
+    N = T(floor(log2(nmax) + 1))
+    for p in 0:2N
+        if 2^p > nc * (d - 1 - (2^p - 1) % d)
+            m = (2^p + d - 1 - (2^p - 1) % d) ÷ d
+            return (m%T, p)
+        end
+    end
+    error("Can't find p, something is wrong.")
+end
+function div_by_const(x::T, ::Val{C}) where {T<:Unsigned, C}
+    # These checks will be compiled away during specialization.
+    # While for `*(FixedDecimal, FixedDecimal)`, C will always be a power of 10, these
+    # checks allow this function to work for any `C > 0`, in case that's useful in the
+    # future.
+    if C == 1
+        return x
+    elseif ispow2(C)
+        return div(x, C)  # Will already do the right thing
+    elseif C <= 0
+        throw(DomainError("C must be > 0"))
+    end
+    # Calculate the magic number 2^N/C. Note that this is computed statically, not at
+    # runtime.
+    inverse_coeff, toshift = magicgu(typemax(T), C)
+    out = _widemul(x, inverse_coeff)  # support Int256 -> Int512 (!!)
+    out = out >> toshift
+    return out % T
+end
+
+
+
+
+
+
 # Annoyingly, Unsigned(T) isn't defined for BitIntegers types:
 # https://github.com/rfourquet/BitIntegers.jl/pull/2
 # Note: We do not need this for Int512, since we only widen to 512 _after_ calling

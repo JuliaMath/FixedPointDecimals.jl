@@ -53,7 +53,7 @@ end
     end
 end
 
-@testset "fixed decimal multiplication - exhaustive 8-bit" begin
+@testitem "fixed decimal multiplication - exhaustive 8-bit" begin
     @testset for P in (0,1)
         @testset for T in (Int8, UInt8)
             FD = FixedDecimal{T,P}
