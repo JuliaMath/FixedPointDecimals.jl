@@ -22,8 +22,6 @@ using FixedPointDecimals
     # (LLVM's magic number is shifted one bit less, then they shift by 2, instead of 3,
     #  but the result is the same.)
     @test calculate_inverse_coeff(Int64, 10) == (7378697629483820647 << 1, 3)
-
-    @test calculate_inverse_coeff(Int64, 1) == (1, 0)
 end
 
 @testset "calculate_inverse_coeff signed 4" begin
@@ -31,8 +29,6 @@ end
 
     # Same here, our magic number is shifted 2 bits more than LLVM's
     @test calculate_inverse_coeff(UInt64, 100) == (0xa3d70a3d70a3d70b, 6)
-
-    @test calculate_inverse_coeff(UInt64, 1) == (UInt64(0x1), 0)
 end
 
 @testset "div_by_const" begin

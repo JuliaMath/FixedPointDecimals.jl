@@ -105,6 +105,13 @@ function div_by_const(x::T, ::Val{C}) where {T, C}
     return T(out)
 end
 
+
+
+
+# REQUIRES: C must not be 0, 1, -1
+# See this implementation in LLVM:
+# https://llvm.org/doxygen/DivisionByConstantInfo_8cpp_source.html
+# which was taken from "Hacker's Delight".
 Base.@assume_effects :foldable function calculate_inverse_coeff(::Type{T}, C) where {T}
     # First, calculate 2^nbits(T)/C
     # We shift away leading zeros to preserve the most precision when we use it to multiply
