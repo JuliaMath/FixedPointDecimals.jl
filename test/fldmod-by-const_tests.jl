@@ -56,3 +56,68 @@ end
         end
     end
 end
+
+@testset "fixed decimal multiplication - exhaustive 16-bit" begin
+    @testset for P in (0,1,2,3,4)
+        @testset for T in (Int16, UInt16)
+            FD = FixedDecimal{T,P}
+
+            function test_multiplies_correctly(fd, x)
+                big = FixedDecimal{BigInt, P}(fd)
+                big_mul = big * x
+                # This might overflow: ...
+                mul = fd * x
+                # ... so we truncate big to the same size
+                @test big_mul.i % T == mul.i % T
+            end
+            @testset for v in typemin(FD) : eps(FD) : typemax(FD)
+                test_multiplies_correctly(v, typemin(T))
+                test_multiplies_correctly(v, -1)
+                test_multiplies_correctly(v, -eps(FD))
+                test_multiplies_correctly(v, 0)
+                test_multiplies_correctly(v, eps(FD))
+                test_multiplies_correctly(v, 1)
+                test_multiplies_correctly(v, 2)
+                test_multiplies_correctly(v, 3)
+                test_multiplies_correctly(v, typemax(T))
+            end
+        end
+    end
+end
+
+@testset "fixed decimal multiplication - 128-bit" begin
+    @testset for P in 0:37
+        @testset for T in (Int128, UInt128)
+            FD = FixedDecimal{T,P}
+
+            function test_multiplies_correctly(fd, x)
+                big = FixedDecimal{BigInt, P}(fd)
+                big_mul = big * x
+                # This might overflow: ...
+                mul = fd * x
+                # ... so we truncate big to the same size
+                @test big_mul.i % T == mul.i % T
+            end
+            vals = FD[
+                typemin(FD), typemax(FD),
+                typemin(FD) + eps(FD), typemax(FD) - eps(FD),
+                0.0, eps(FD), 0.1, 1.0, 2.0,
+                typemax(FD) ÷ 2,
+            ]
+            if T <: Signed
+                append!(vals, vals.*-1)
+            end
+            @testset for v in vals
+                test_multiplies_correctly(v, typemin(T))
+                test_multiplies_correctly(v, -1)
+                test_multiplies_correctly(v, -eps(FD))
+                test_multiplies_correctly(v, 0)
+                test_multiplies_correctly(v, eps(FD))
+                test_multiplies_correctly(v, 1)
+                test_multiplies_correctly(v, 2)
+                test_multiplies_correctly(v, 3)
+                test_multiplies_correctly(v, typemax(T))
+            end
+        end
+    end
+end
