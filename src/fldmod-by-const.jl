@@ -144,13 +144,15 @@ Base.@assume_effects :foldable function magicgu(nmax, d)
     T = typeof(nmax)
     nc = (nmax ÷ d) * d - 1
     N = T(floor(log2(nmax) + 1))
+    MathType = _widen(T)
+    two = MathType(2)
     for p in 0:2N
-        if 2^p > nc * (d - 1 - (2^p - 1) % d)
-            m = (2^p + d - 1 - (2^p - 1) % d) ÷ d
+        if two^p > nc * (d - 1 - (2^p - 1) % d)
+            m = (two^p + d - 1 - (2^p - 1) % d) ÷ d
             return (m%T, p)
         end
     end
-    error("Can't find p, something is wrong.")
+    error("Can't find p, something is wrong. nmax: $(repr(nmax)), d: $(repr(d)), N: $N")
 end
 function div_by_const(x::T, ::Val{C}) where {T<:Unsigned, C}
     # These checks will be compiled away during specialization.
