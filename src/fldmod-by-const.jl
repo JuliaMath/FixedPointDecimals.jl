@@ -68,8 +68,43 @@ end
     return x - quotient * y
 end
 
-# This function is based on the native code produced by the following:
-# @code_native ((x)->div(x, 100))(Int64(2))
+# Unsigned magic number computation + shift by constant
+# See Hacker's delight, equations (26) and (27) from Chapter 10-9.
+# nmax and divisor must be > 0.
+Base.@assume_effects :foldable function magicg(nmax::Unsigned, divisor)
+    T = typeof(nmax)
+    W = _widen(T)
+    d = W(divisor)
+
+    nc = div(W(nmax) + W(1), d) * d - W(1)
+    nbits = sizeof(nmax) * 8 - leading_zeros(nmax) # most significant bit
+    for p in 0:2nbits
+        if W(2)^p > nc * (d - W(1) - rem(W(2)^p - W(1), d))       # (27)
+            m = div(W(2)^p + d - W(1) - rem(W(2)^p - W(1), d), d) # (26)
+            return (m, p)
+        end
+    end
+    return W(0), 0 # Should never reach here
+end
+
+# See Hacker's delight, equations (5) and (6) from Chapter 10-4.
+# nmax and divisor must be > 0.
+Base.@assume_effects :foldable function magicg(nmax::Signed, divisor)
+    T = typeof(nmax)
+    W = _widen(T)
+    d = W(divisor)
+
+    nc = ((W(nmax) + W(1)) ÷ d) * d - W(1)
+    nbits = sizeof(nmax) * 8 - leading_zeros(nmax) # most significant bit
+    for p in 0:2nbits
+        if W(2)^p > nc * (d - rem(W(2)^p, d))       # (6)
+            m = div(W(2)^p + d - rem(W(2)^p, d), d) # (5)
+            return (m, p)
+        end
+    end
+    return W(0), 0 # Should never reach here
+end
+
 function div_by_const(x::T, ::Val{C}) where {T, C}
     # These checks will be compiled away during specialization.
     # While for `*(FixedDecimal, FixedDecimal)`, C will always be a power of 10, these
@@ -78,115 +113,14 @@ function div_by_const(x::T, ::Val{C}) where {T, C}
     if C == 1
         return x
     elseif ispow2(C)
-        return div(x, C)  # Will already do the right thing
+        return div(x, C) # Will already do the right thing
     elseif C <= 0
         throw(DomainError("C must be > 0"))
     end
-    # Calculate the magic number 2^N/C. Note that this is computed statically, not at
-    # runtime.
-    inverse_coeff, toshift = calculate_inverse_coeff(T, C)
-    # Compute the upper-half of widemul(x, 2^nbits(T)/C).
-    # By keeping only the upper half, we're essentially dividing by 2^nbits(T), undoing the
-    # numerator of the multiplication, so that the result is equal to x/C.
-    out = mul_hi(x, inverse_coeff)
-    # This condition will be compiled away during specialization.
-    if T <: Signed
-        # Because our magic number has a leading one (since we shift all-the-way left), the
-        # result is negative if it's Signed. We add x to give us the positive equivalent.
-        out += x
-        signshift = (nbits(x) - 1)
-        isnegative = T(out >>> signshift)  # 1 if < 0 else 0 (Unsigned bitshift to read top bit)
-    end
-    # Undo the bitshifts used to calculate the invoeff magic number with maximum precision.
-    out = out >> toshift
-    if T <: Signed
-        out =  out + isnegative
-    end
-    return T(out)
+    # Calculate the magic number and shift amount, based on Hacker's Delight, Chapter 10.
+    magic_number, shift = magicg(typemax(T), C)
+
+    out = _widemul(promote(x, magic_number)...)
+    out >>= shift
+    return (out % T) + (x < zero(T)) # TODO: Figure out why and if the + 1 if non-positive is necessary
 end
-
-
-
-
-# REQUIRES: C must not be 0, 1, -1
-# See this implementation in LLVM:
-# https://llvm.org/doxygen/DivisionByConstantInfo_8cpp_source.html
-# which was taken from "Hacker's Delight".
-Base.@assume_effects :foldable function calculate_inverse_coeff(::Type{T}, C) where {T}
-    # First, calculate 2^nbits(T)/C
-    # We shift away leading zeros to preserve the most precision when we use it to multiply
-    # in the next step. At the end, we will shift the final answer back to undo this
-    # operation (which is why we need to return `toshift`).
-    # Note, also, that we calculate invcoeff at double-precision so that the left-shift
-    # doesn't leave trailing zeros. We truncate to only the upper-half before returning.
-    UT = _unsigned(T)
-    invcoeff = typemax(_widen(UT)) ÷ C
-    toshift = leading_zeros(invcoeff)
-    invcoeff = invcoeff << toshift
-    # Now, truncate to only the upper half of invcoeff, after we've shifted. Instead of
-    # bitshifting, we round to maintain precision. (This is needed to prevent off-by-ones.)
-    # -- This is equivalent to `invcoeff = T(invcoeff >> sizeof(T))`, except rounded. --
-    two_to_N = _widen(typemax(UT)) + UT(1) # Precise value for 2^nbits(T) (doesn't fit in T)
-    invcoeff = _round_to_nearest(fldmod(invcoeff, two_to_N)..., two_to_N ) % T
-    return invcoeff, toshift
-end
-
-function mul_hi(x::T, y::T) where T
-    xy = _widemul(x, y)  # support Int256 -> Int512 (!!)
-    (xy >> nbits(T)) % T
-end
-
-
-
-# Unsigned magic number computation + divide by constant
-# Hacker's delight figure 10–4
-Base.@assume_effects :foldable function magicgu(nmax, d)
-    T = typeof(nmax)
-    nc = (nmax ÷ d) * d - 1
-    N = T(floor(log2(nmax) + 1))
-    MathType = _widen(T)
-    two = MathType(2)
-    for p in 0:2N
-        if two^p > nc * (d - 1 - (2^p - 1) % d)
-            m = (two^p + d - 1 - (2^p - 1) % d) ÷ d
-            return (m%T, p)
-        end
-    end
-    error("Can't find p, something is wrong. nmax: $(repr(nmax)), d: $(repr(d)), N: $N")
-end
-function div_by_const(x::T, ::Val{C}) where {T<:Unsigned, C}
-    # These checks will be compiled away during specialization.
-    # While for `*(FixedDecimal, FixedDecimal)`, C will always be a power of 10, these
-    # checks allow this function to work for any `C > 0`, in case that's useful in the
-    # future.
-    if C == 1
-        return x
-    elseif ispow2(C)
-        return div(x, C)  # Will already do the right thing
-    elseif C <= 0
-        throw(DomainError("C must be > 0"))
-    end
-    # Calculate the magic number 2^N/C. Note that this is computed statically, not at
-    # runtime.
-    inverse_coeff, toshift = magicgu(typemax(T), C)
-    out = _widemul(x, inverse_coeff)  # support Int256 -> Int512 (!!)
-    out = out >> toshift
-    return out % T
-end
-
-
-
-
-
-
-# Annoyingly, Unsigned(T) isn't defined for BitIntegers types:
-# https://github.com/rfourquet/BitIntegers.jl/pull/2
-# Note: We do not need this for Int512, since we only widen to 512 _after_ calling
-# _unsigned, above. This code is only for supporting the built-in integer types, which only
-# go up to 128-bits (widened twice to 512). If a user wants to extend FixedDecimals for
-# other integer types, they will need to add methods to either _unsigned or unsigned.
-_unsigned(x) = unsigned(x)
-_unsigned(::Type{Int256}) = UInt256
-_unsigned(::Type{UInt256}) = UInt256
-
-nbits(x) = sizeof(x) * 8
