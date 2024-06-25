@@ -70,15 +70,16 @@ end
 
 # Unsigned magic number computation + shift by constant
 # See Hacker's delight, equations (26) and (27) from Chapter 10-9.
-# nmax and divisor must be > 0.
+# requires nmax > divisor > 1.
 Base.@assume_effects :foldable function magicg(nmax::Unsigned, divisor)
     T = typeof(nmax)
     W = _widen(T)
     d = W(divisor)
 
-    nc = div(W(nmax) + W(1), d) * d - W(1)
-    nbits = sizeof(nmax) * 8 - leading_zeros(nmax) # most significant bit
-    for p in 0:2nbits
+    nc = div(W(nmax) + W(1), d) * d - W(1)      # largest multiple of d <= nmax, minus 1
+    nbits = 8sizeof(nmax) - leading_zeros(nmax) # most significant bit
+    # shift must be larger than int size because we want the high bits of the wide multiplication
+    for p in 8sizeof(nmax):2nbits
         if W(2)^p > nc * (d - W(1) - rem(W(2)^p - W(1), d))       # (27)
             m = div(W(2)^p + d - W(1) - rem(W(2)^p - W(1), d), d) # (26)
             return (m, p)
@@ -88,15 +89,16 @@ Base.@assume_effects :foldable function magicg(nmax::Unsigned, divisor)
 end
 
 # See Hacker's delight, equations (5) and (6) from Chapter 10-4.
-# nmax and divisor must be > 0.
+# requires nmax > divisor > 1.
 Base.@assume_effects :foldable function magicg(nmax::Signed, divisor)
     T = typeof(nmax)
     W = _widen(T)
     d = W(divisor)
 
-    nc = ((W(nmax) + W(1)) ÷ d) * d - W(1)
-    nbits = sizeof(nmax) * 8 - leading_zeros(nmax) # most significant bit
-    for p in 0:2nbits
+    nc = div(W(nmax) + W(1), d) * d - W(1)      # largest multiple of d <= nmax, minus 1
+    nbits = 8sizeof(nmax) - leading_zeros(nmax) # most significant bit
+    # shift must be larger than int size because we want the high bits of the wide multiplication
+    for p in 8sizeof(nmax):2nbits
         if W(2)^p > nc * (d - rem(W(2)^p, d))       # (6)
             m = div(W(2)^p + d - rem(W(2)^p, d), d) # (5)
             return (m, p)
@@ -122,5 +124,6 @@ function div_by_const(x::T, ::Val{C}) where {T, C}
 
     out = _widemul(promote(x, magic_number)...)
     out >>= shift
-    return (out % T) + (x < zero(T)) # TODO: Figure out why and if the + 1 if non-positive is necessary
+    # TODO: prove that we need to add 1 for negative numbers!
+    return (out % T) + (x < zero(T))
 end
