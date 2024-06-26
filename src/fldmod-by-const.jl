@@ -70,7 +70,7 @@ end
 
 # Unsigned magic number computation + shift by constant
 # See Hacker's delight, equations (26) and (27) from Chapter 10-9.
-# requires nmax > divisor > 1.
+# requires nmax >= divisor > 2. divisor must not be a power of 2.
 Base.@assume_effects :foldable function magicg(nmax::Unsigned, divisor)
     T = typeof(nmax)
     W = _widen(T)
@@ -79,7 +79,7 @@ Base.@assume_effects :foldable function magicg(nmax::Unsigned, divisor)
     nc = div(W(nmax) + W(1), d) * d - W(1)      # largest multiple of d <= nmax, minus 1
     nbits = 8sizeof(nmax) - leading_zeros(nmax) # most significant bit
     # shift must be larger than int size because we want the high bits of the wide multiplication
-    for p in 8sizeof(nmax):2nbits
+    for p in nbits-1:2nbits-1
         if W(2)^p > nc * (d - W(1) - rem(W(2)^p - W(1), d))       # (27)
             m = div(W(2)^p + d - W(1) - rem(W(2)^p - W(1), d), d) # (26)
             return (m, p)
@@ -89,7 +89,7 @@ Base.@assume_effects :foldable function magicg(nmax::Unsigned, divisor)
 end
 
 # See Hacker's delight, equations (5) and (6) from Chapter 10-4.
-# requires nmax > divisor > 1.
+# requires nmax >= divisor > 2. divisor must not be a power of 2.
 Base.@assume_effects :foldable function magicg(nmax::Signed, divisor)
     T = typeof(nmax)
     W = _widen(T)
@@ -98,7 +98,7 @@ Base.@assume_effects :foldable function magicg(nmax::Signed, divisor)
     nc = div(W(nmax) + W(1), d) * d - W(1)      # largest multiple of d <= nmax, minus 1
     nbits = 8sizeof(nmax) - leading_zeros(nmax) # most significant bit
     # shift must be larger than int size because we want the high bits of the wide multiplication
-    for p in 8sizeof(nmax):2nbits
+    for p in nbits-1:2nbits-1
         if W(2)^p > nc * (d - rem(W(2)^p, d))       # (6)
             m = div(W(2)^p + d - rem(W(2)^p, d), d) # (5)
             return (m, p)
@@ -124,6 +124,6 @@ function div_by_const(x::T, ::Val{C}) where {T, C}
 
     out = _widemul(promote(x, magic_number)...)
     out >>= shift
-    # TODO: prove that we need to add 1 for negative numbers!
+    # Adding one as implied by formula (1b) in Hacker's delight, Chapter 10-4.
     return (out % T) + (x < zero(T))
 end
