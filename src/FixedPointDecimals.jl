@@ -49,7 +49,13 @@ else
     # We force-inline this, to allow the fldmod operation to be specialized for a constant
     # second argument (converting divide-by-power-of-ten instructions with the cheaper
     # multiply-by-inverse-coefficient.) Sadly this doesn't work for Int128.
-    @inline fldmod_by_const(x,y) = (fld(x,y), mod(x,y))
+    if VERSION >= v"1.8.0-"
+        # Since julia 1.8+, the built-in fldmod optimizes for constant divisors, which is
+        # even better than computing the division twice.
+        @inline fldmod_by_const(x,y) = fldmod(x,y)
+    else
+        @inline fldmod_by_const(x,y) = (fld(x,y), mod(x,y))
+    end
 end
 
 # floats that support fma and are roughly IEEE-like
