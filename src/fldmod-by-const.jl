@@ -1,31 +1,35 @@
-# NOTE: Surprisingly, even though LLVM implements a version of this optimization on its own
-# for smaller integer sizes (<=64-bits), using the code in this file produces faster
-# multiplications for *all* types of integers. So we use our custom fldmod_by_const for all
-# bit integer types.
+# This file includes a manual implementation of the divide-by-constant optimization for
+# non-power-of-2 divisors. LLVM automatically includes this optimization, but only for
+# smaller integer sizes (<=64-bits on my 64-bit machine).
+#
+# NOTE: We use LLVM's built-in implementation for Int64 and smaller, to keep the code
+# simpler (though the code we produce is identical, verified in tests.) We apply this
+# optimization to (U)Int128 and (U)Int256, which result from multiplying FD{Int64}s and
+# FD{Int128}s.
 # Before:
 # julia> @btime for _ in 1:10000 fd = fd * fd end setup = (fd = FixedDecimal{Int32,3}(1.234))
-#     84.959 μs (0 allocations: 0 bytes)
+#     54.125 μs (0 allocations: 0 bytes)   # (Unchanged)
 #   FixedDecimal{Int32,3}(1700943.280)
 #
 # julia> @btime for _ in 1:10000 fd = fd * fd end setup = (fd = FixedDecimal{Int64,3}(1.234))
-#     247.709 μs (0 allocations: 0 bytes)
-#   FixedDecimal{Int64,3}(4230510070790917.029)
-#
-#julia> @btime for _ in 1:10000 fd = fd * fd end setup = (fd = FixedDecimal{Int128,3}(1.234))
-#    4.077 ms (160798 allocations: 3.22 MiB)
-#  FixedDecimal{Int128,3}(-66726338547984585007169386718143307.324)
-#
-# After:
-# julia> @btime for _ in 1:10000 fd = fd * fd end setup = (fd = FixedDecimal{Int32,3}(1.234))
-#     68.416 μs (0 allocations: 0 bytes)
-#   FixedDecimal{Int32,3}(1700943.280)
-#
-# julia> @btime for _ in 1:10000 fd = fd * fd end setup = (fd = FixedDecimal{Int64,3}(1.234))
-#     106.125 μs (0 allocations: 0 bytes)
+#     174.625 μs (0 allocations: 0 bytes)
 #   FixedDecimal{Int64,3}(4230510070790917.029)
 #
 # julia> @btime for _ in 1:10000 fd = fd * fd end setup = (fd = FixedDecimal{Int128,3}(1.234))
-#     204.125 μs (0 allocations: 0 bytes)
+#     2.119 ms (79986 allocations: 1.60 MiB)
+#   FixedDecimal{Int128,3}(-66726338547984585007169386718143307.324)
+#
+# After:
+# julia> @btime for _ in 1:10000 fd = fd * fd end setup = (fd = FixedDecimal{Int32,3}(1.234))
+#     56.958 μs (0 allocations: 0 bytes)   # (Unchanged)
+#   FixedDecimal{Int32,3}(1700943.280)
+#
+# julia> @btime for _ in 1:10000 fd = fd * fd end setup = (fd = FixedDecimal{Int64,3}(1.234))
+#     90.708 μs (0 allocations: 0 bytes)
+#   FixedDecimal{Int64,3}(4230510070790917.029)
+#
+# julia> @btime for _ in 1:10000 fd = fd * fd end setup = (fd = FixedDecimal{Int128,3}(1.234))
+#     180.167 μs (0 allocations: 0 bytes)
 #   FixedDecimal{Int128,3}(-66726338547984585007169386718143307.324)
 
 """
@@ -34,8 +38,8 @@ A trait to control opt-in for the custom `fldmod_by_const` implementation. To us
 given integer type, you can define this overload for your integer type.
 You will also need to implement some parts of the interface below, including _widen().
 """
-ShouldUseCustomFldmodByConst(::Type{<:Base.BitInteger}) = true
-ShouldUseCustomFldmodByConst(::Type{<:Union{Int256,UInt256}}) = true
+ShouldUseCustomFldmodByConst(::Type{<:Union{Int128,UInt128}}) = true  # For FD{Int64}
+ShouldUseCustomFldmodByConst(::Type{<:Union{Int256,UInt256}}) = true  # For FD{Int128}
 ShouldUseCustomFldmodByConst(::Type) = false
 
 @inline function fldmod_by_const(x, y)
@@ -43,12 +47,12 @@ ShouldUseCustomFldmodByConst(::Type) = false
         # For large Int types, LLVM doesn't optimize well, so we use a custom implementation
         # of fldmod, which extends that optimization to those larger integer types.
         d = fld_by_const(x, Val(y))
-        return d, manual_mod(promote(x, y, d)...)
+        return d, (x - d * y)
     else
         # For other integers, LLVM might be able to correctly optimize away the division, if
-        # it knows it's dividing by a const. We cannot call `Base.fldmod` since it's not
-        # inlined, so here we have explictly inlined it instead.
-        return (fld(x,y), mod(x,y))
+        # it knows it's dividing by a const.
+        # Since julia 1.8+, fldmod(x,y) automatically optimizes for constant divisors.
+        return fldmod(x, y)
     end
 end
 
@@ -61,15 +65,9 @@ function fld_by_const(x::T, y::Val{C}) where {T<:Signed, C}
     return d - (signbit(x ⊻ C) & (d * C != x))
 end
 
-# Calculate `mod(x,y)` after you've already acquired quotient, the result of `fld(x,y)`.
-# REQUIRES:
-#   - `y != -1`
-@inline function manual_mod(x::T, y::T, quotient::T) where T<:Integer
-    return x - quotient * y
-end
-
 # Unsigned magic number computation + shift by constant
 # See Hacker's delight, equations (26) and (27) from Chapter 10-9.
+# (See also the errata on https://web.archive.org/web/20190915025154/http://www.hackersdelight.org/)
 # requires nmax >= divisor > 2. divisor must not be a power of 2.
 Base.@assume_effects :foldable function magicg(nmax::Unsigned, divisor)
     T = typeof(nmax)
@@ -89,6 +87,7 @@ Base.@assume_effects :foldable function magicg(nmax::Unsigned, divisor)
 end
 
 # See Hacker's delight, equations (5) and (6) from Chapter 10-4.
+# (See also the errata on https://web.archive.org/web/20190915025154/http://www.hackersdelight.org/)
 # requires nmax >= divisor > 2. divisor must not be a power of 2.
 Base.@assume_effects :foldable function magicg(nmax::Signed, divisor)
     T = typeof(nmax)
