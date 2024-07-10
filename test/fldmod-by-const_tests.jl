@@ -23,33 +23,25 @@ end
     end
 end
 
-@testset "fixed decimal multiplication - exhaustive 8-bit" begin
-    @testset for P in (0,1)
-        @testset for T in (Int8, UInt8)
-            FD = FixedDecimal{T,P}
-
-            function test_multiplies_correctly(fd, x)
-                big = FixedDecimal{BigInt, P}(fd)
-                big_mul = big * x
-                # This might overflow: ...
-                mul = fd * x
-                @testset "$fd * $x" begin
-                    # ... so we truncate big to the same size
-                    @test big_mul.i % T == mul.i % T
-                end
-            end
-            @testset for v in typemin(FD) : eps(FD) : typemax(FD)
-                @testset for v2 in typemin(FD) : eps(FD) : typemax(FD)
-                    test_multiplies_correctly(v, v2)
+@testset "flmdod_by_const - exhaustive 8-bit" begin
+    @testset for T in (Int8, UInt8)
+        @testset for x in typemin(T) : typemax(T)
+            @testset for y in typemin(T) : typemax(T)
+                y == 0 && continue
+                y == -1 && continue
+                @testset "fldmod($x, $y)" begin
+                    @test fldmod(x, y) == FixedPointDecimals.fldmod_by_const(x, y)
                 end
             end
         end
     end
 end
 
-@testset "fixed decimal multiplication - exhaustive 16-bit" begin
+# 64-bit FD multiplication uses the custom fldmod_by_const implementation.
+# Test a few various different cases to try to ensure it works correctly.
+@testset "fixed decimal multiplication - 64-bit" begin
     @testset for P in (0,1,2,3,4)
-        @testset for T in (Int16, UInt16)
+        @testset for T in (Int64, UInt64)
             FD = FixedDecimal{T,P}
 
             function test_multiplies_correctly(fd, x)
@@ -62,7 +54,10 @@ end
                     @test big_mul.i % T == mul.i % T
                 end
             end
-            @testset for v in typemin(FD) : eps(FD) : typemax(FD)
+            num_tests = 2<<11
+            # Add one to avoid powers-of-2 to get hopefully better tests
+            epsilon = (typemax(FD) ÷ num_tests) + eps(FD)
+            @testset for v in typemin(FD) : epsilon : typemax(FD)
                 test_multiplies_correctly(v, typemin(T))
                 test_multiplies_correctly(v, -1)
                 test_multiplies_correctly(v, -eps(FD))
