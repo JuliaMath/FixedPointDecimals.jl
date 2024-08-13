@@ -103,7 +103,9 @@ Base.@assume_effects :foldable function magicg(nmax::Unsigned, divisor)
             return (m, p)
         end
     end
-    return W(0), 0 # Should never reach here
+    @assert false """magicg bug: Unreachable reached. divisor=$divisor, nmax=$nmax.
+        Please report an issue to https://github.com/JuliaMath/FixedPointDecimals.jl
+        """
 end
 
 # See Hacker's delight, equations (5) and (6) from Chapter 10-4.
@@ -123,5 +125,7 @@ Base.@assume_effects :foldable function magicg(nmax::Signed, divisor)
             return (m, p)
         end
     end
-    return W(0), 0 # Should never reach here
+    @assert false """magicg bug: Unreachable reached. divisor=$divisor, nmax=$nmax.
+        Please report an issue to https://github.com/JuliaMath/FixedPointDecimals.jl
+        """
 end
