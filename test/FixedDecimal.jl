@@ -1408,3 +1408,25 @@ end
     @test hash(FD2(1//10)) ≠ hash(0.1)
 end
 
+@testset "_widemul" begin
+    _widemul = FixedPointDecimals._widemul
+    Int256, UInt256 = FixedPointDecimals.Int256, FixedPointDecimals.UInt256
+    Int512, UInt512 = FixedPointDecimals.Int512, FixedPointDecimals.UInt512
+
+    @test _widemul(UInt8(3), UInt8(2)) === widemul(UInt8(3), UInt8(2)) === UInt16(6)
+    @test _widemul(Int8(3), UInt8(2)) === widemul(Int8(3), UInt8(2)) === Int16(6)
+    @test _widemul(UInt8(3), Int8(2)) === widemul(UInt8(3), Int8(2)) === Int16(6)
+
+    @test _widemul(UInt16(3), UInt8(2)) === widemul(UInt16(3), UInt8(2)) === UInt32(6)
+    @test _widemul(UInt16(3), Int8(2)) === widemul(UInt16(3), Int8(2)) === Int32(6)
+    @test _widemul(Int16(3), UInt8(2)) === widemul(Int16(3), UInt8(2)) === Int32(6)
+
+    # Custom widenings
+    @test _widemul(UInt128(3), UInt128(2)) === UInt256(6)
+    @test _widemul(Int128(3), UInt128(2)) === Int256(6)
+    @test _widemul(UInt128(3), Int128(2)) === Int256(6)
+
+    @test _widemul(UInt256(3), UInt256(2)) === UInt512(6)
+    @test _widemul(Int256(3), UInt256(2)) === Int512(6)
+    @test _widemul(UInt256(3), Int256(2)) === Int512(6)
+end
