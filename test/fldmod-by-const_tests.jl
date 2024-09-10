@@ -23,6 +23,9 @@ end
     end
 end
 
+# We don't actually use fldmod_by_const with 8-bit ints, but they're useful because
+# we can exhaustively test every possible combination, to increase our confidence in
+# the implementation.
 @testset "flmdod_by_const - exhaustive 8-bit" begin
     @testset for T in (Int8, UInt8)
         @testset for x in typemin(T) : typemax(T)
