@@ -417,11 +417,7 @@ function Base.Checked.mul_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Intege
     powt = coefficient(FD{T, f})
     quotient, remainder = fldmodinline(_widemul(x.i, y.i), powt)
     v = _round_to_nearest(quotient, remainder, powt)
-    return if typemin(T) <= v <= typemax(T)
-        return (reinterpret(FD{T,f}, T(v)), false)
-    else
-        return (reinterpret(FD{T,f}, Base.trunc_int(T, v)), true)
-    end
+    return (reinterpret(FD{T,f}, Base.trunc_int(T, v)), v < typemin(T) || v > typemax(T))
 end
 Base.Checked.mul_with_overflow(x::FD, y::FD) = Base.Checked.mul_with_overflow(promote(x, y)...)
 Base.Checked.mul_with_overflow(x::FD, y) = Base.Checked.mul_with_overflow(promote(x, y)...)
