@@ -834,7 +834,7 @@ end
             end
         end
 
-        @testset "non-overflow with_overflow math" begin
+        @testset "non-overflowing with_overflow math" begin
             @test Base.Checked.add_with_overflow(1, FD{Int8,1}(1.1)) == (FD{Int8,1}(2.1), false)
             @test Base.Checked.add_with_overflow(FD{Int8,1}(1.1), 1) == (FD{Int8,1}(2.1), false)
             @test Base.Checked.add_with_overflow(FD{Int64,8}(30.123), FD{Int64,8}(30)) == (FD{Int64,8}(60.123), false)
