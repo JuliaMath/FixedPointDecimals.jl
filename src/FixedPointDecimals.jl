@@ -289,6 +289,10 @@ for fn in [:trunc, :floor, :ceil]
         val = _apply_exact_float($(Symbol(fn, "mul")), T, x, powt)
         reinterpret(FD{T, f}, val)
     end
+    # needed to avoid ambiguity
+    @eval function Base.$fn(::Type{FD{T, f}}, x::Rational) where {T, f}
+        reinterpret(FD{T, f}, $fn(T, x * coefficient(FD{T, f})))
+    end
 end
 function Base.round(::Type{TI}, x::FD, m::RoundingMode=RoundNearest) where {TI <: Integer}
     convert(TI, round(x,m))::TI
