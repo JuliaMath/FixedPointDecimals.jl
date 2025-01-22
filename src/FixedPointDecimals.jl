@@ -562,6 +562,8 @@ function Base.convert(::Type{TR}, x::FD{T, f}) where {TR <: Rational, T, f}
 end
 
 (::Type{T})(x::FD) where {T<:Union{AbstractFloat,Integer,Rational}} = convert(T, x)
+# Need to avoid ambiguity:
+Bool(x::FD) = convert(Bool, x)
 
 Base.promote_rule(::Type{FD{T, f}}, ::Type{<:Integer}) where {T, f} = FD{T, f}
 Base.promote_rule(::Type{<:FD}, ::Type{TF}) where {TF <: AbstractFloat} = TF

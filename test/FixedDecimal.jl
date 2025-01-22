@@ -1484,3 +1484,7 @@ end
     @test hash(FD2(1//10)) ≠ hash(0.1)
 end
 
+
+@testset "ambiguities" begin
+    @test Bool(FixedDecimal{Int,4}(1))
+end
