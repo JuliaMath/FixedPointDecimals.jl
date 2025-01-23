@@ -1491,7 +1491,7 @@ end
     @test widemul(FD3(1.5), true) == FD3(1.5)
     @test trunc(FD3, 4//3) == FD3(1.333)
     @test floor(FD3, 4//3) == FD3(1.333)
-    @test ceil(FD3, 4//3) == FD3(1.3334)
+    @test ceil(FD3, 4//3) == FD3(1.334)
     @test round(FD3, true) == FD3(1.000)
     @test round(FD3, 4//3) == FD3(1.333)
     @test Bool(FixedDecimal{Int,4}(1))
