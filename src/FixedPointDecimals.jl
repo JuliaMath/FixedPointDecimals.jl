@@ -25,6 +25,9 @@ __precompile__()
 
 module FixedPointDecimals
 
+using Base: checked_abs, checked_add, checked_cld, checked_div, checked_fld,
+    checked_mod, checked_mul, checked_neg, checked_rem, checked_sub
+
 export FixedDecimal, RoundThrows
 
 # (Re)export checked_* arithmetic functions
@@ -158,6 +161,10 @@ function Base.widemul(x::FD{T, f}, y::Integer) where {T, f}
     reinterpret(FD{typeof(i), f}, i)
 end
 Base.widemul(x::Integer, y::FD) = widemul(y, x)
+# Need to avoid ambiguity:
+Base.widemul(x::Bool, y::FD) = widemul(y, x)
+# Need to avoid ambiguity:
+Base.widemul(x::FD{T, f}, y::Bool) where {T, f} = widemul(x, Int(y))
 
 """
     _round_to_nearest(quotient, remainder, divisor, ::RoundingMode{M})
@@ -305,6 +312,13 @@ end
 function Base.round(::Type{FD{T, f}}, x::Rational, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
     reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
 end
+function Base.round(::Type{FD{T, f}}, x::Rational{Bool}, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
+    reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
+end
+function Base.round(::Type{FD{T, f}}, x::Rational{Tr}, ::RoundingMode{:Nearest}=RoundNearest) where {T, f, Tr}
+    reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
+end
+
 
 # conversions and promotions
 Base.convert(::Type{FD{T, f}}, x::FD{T, f}) where {T, f} = x  # Converting an FD to itself is a no-op
