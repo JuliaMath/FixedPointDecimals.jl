@@ -25,6 +25,9 @@ __precompile__()
 
 module FixedPointDecimals
 
+using Base: checked_abs, checked_add, checked_cld, checked_div, checked_fld,
+    checked_mod, checked_mul, checked_neg, checked_rem, checked_sub
+
 export FixedDecimal, RoundThrows
 
 # (Re)export checked_* arithmetic functions
@@ -158,6 +161,10 @@ function Base.widemul(x::FD{T, f}, y::Integer) where {T, f}
     reinterpret(FD{typeof(i), f}, i)
 end
 Base.widemul(x::Integer, y::FD) = widemul(y, x)
+# Need to avoid ambiguity:
+Base.widemul(x::Bool, y::FD) = widemul(y, x)
+# Need to avoid ambiguity:
+Base.widemul(x::FD{T, f}, y::Bool) where {T, f} = widemul(x, Int(y))
 
 """
     _round_to_nearest(quotient, remainder, divisor, ::RoundingMode{M})
@@ -289,6 +296,10 @@ for fn in [:trunc, :floor, :ceil]
         val = _apply_exact_float($(Symbol(fn, "mul")), T, x, powt)
         reinterpret(FD{T, f}, val)
     end
+    # needed to avoid ambiguity
+    @eval function Base.$fn(::Type{FD{T, f}}, x::Rational) where {T, f}
+        reinterpret(FD{T, f}, $fn(T, x * coefficient(FD{T, f})))
+    end
 end
 function Base.round(::Type{TI}, x::FD, m::RoundingMode=RoundNearest) where {TI <: Integer}
     convert(TI, round(x,m))::TI
@@ -301,6 +312,13 @@ end
 function Base.round(::Type{FD{T, f}}, x::Rational, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
     reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
 end
+function Base.round(::Type{FD{T, f}}, x::Rational{Bool}, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
+    reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
+end
+function Base.round(::Type{FD{T, f}}, x::Rational{Tr}, ::RoundingMode{:Nearest}=RoundNearest) where {T, f, Tr}
+    reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
+end
+
 
 # conversions and promotions
 Base.convert(::Type{FD{T, f}}, x::FD{T, f}) where {T, f} = x  # Converting an FD to itself is a no-op
@@ -562,6 +580,8 @@ function Base.convert(::Type{TR}, x::FD{T, f}) where {TR <: Rational, T, f}
 end
 
 (::Type{T})(x::FD) where {T<:Union{AbstractFloat,Integer,Rational}} = convert(T, x)
+# Need to avoid ambiguity:
+Bool(x::FD) = convert(Bool, x)
 
 Base.promote_rule(::Type{FD{T, f}}, ::Type{<:Integer}) where {T, f} = FD{T, f}
 Base.promote_rule(::Type{<:FD}, ::Type{TF}) where {TF <: AbstractFloat} = TF

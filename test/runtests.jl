@@ -10,4 +10,5 @@ include(joinpath(pkg_path, "test", "utils.jl"))
 
 @testset "FixedPointDecimals" begin
     include("FixedDecimal.jl")
+    include("aqua_test.jl")
 end  # global testset

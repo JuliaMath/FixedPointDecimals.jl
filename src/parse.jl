@@ -172,7 +172,7 @@ end
 # the scaling means padding the backing integer with zeros or rounding them as necessary.
 # We overloaded the "scale" and "noscale" methods to produce backing integers for FixedDecimals.
 # We return a value of T -- i.e. the _integer_ backing the FixedDecimal, the reintrpret needs to happen later
-@inline function Parsers.typeparser(conf::FixedDecimalConf{T}, source, pos, len, b, code, pl, options) where {T<:Integer}
+@inline function Parsers.typeparser(conf::FixedDecimalConf{T}, source, pos, len, b, code, pl, options::Parsers.Options) where {T<:Integer}
     if !(options.rounding in (nothing, RoundNearest, RoundToZero, RoundThrows))
         throw(ArgumentError("Unhandled rounding mode $(options.rounding)"))
     end
