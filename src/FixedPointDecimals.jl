@@ -419,17 +419,11 @@ function Base.add_with_overflow(x::T, y::T) where {T<:FD}
     z, b = Base.add_with_overflow(x.i, y.i)
     return (reinterpret(T, z), b)
 end
-Base.Checked.add_with_overflow(x::FD, y::FD) = Base.Checked.add_with_overflow(promote(x, y)...)
-Base.Checked.add_with_overflow(x::FD, y) = Base.Checked.add_with_overflow(promote(x, y)...)
-Base.Checked.add_with_overflow(x, y::FD) = Base.Checked.add_with_overflow(promote(x, y)...)
 
 function Base.sub_with_overflow(x::T, y::T) where {T<:FD}
     z, b = Base.sub_with_overflow(x.i, y.i)
     return (reinterpret(T, z), b)
 end
-Base.Checked.sub_with_overflow(x::FD, y::FD) = Base.Checked.sub_with_overflow(promote(x, y)...)
-Base.Checked.sub_with_overflow(x::FD, y) = Base.Checked.sub_with_overflow(promote(x, y)...)
-Base.Checked.sub_with_overflow(x, y::FD) = Base.Checked.sub_with_overflow(promote(x, y)...)
 
 function Base.Checked.mul_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
     powt = coefficient(FD{T, f})
@@ -437,9 +431,6 @@ function Base.Checked.mul_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Intege
     v = _round_to_nearest(quotient, remainder, powt)
     return (reinterpret(FD{T,f}, Base.trunc_int(T, v)), v < typemin(T) || v > typemax(T))
 end
-Base.Checked.mul_with_overflow(x::FD, y::FD) = Base.Checked.mul_with_overflow(promote(x, y)...)
-Base.Checked.mul_with_overflow(x::FD, y) = Base.Checked.mul_with_overflow(promote(x, y)...)
-Base.Checked.mul_with_overflow(x, y::FD) = Base.Checked.mul_with_overflow(promote(x, y)...)
 
 Base.checked_add(x::FD, y::FD) = Base.checked_add(promote(x, y)...)
 Base.checked_sub(x::FD, y::FD) = Base.checked_sub(promote(x, y)...)
