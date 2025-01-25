@@ -1,20 +1,24 @@
 name = "FixedPointDecimals"
 uuid = "fb4d412d-6eee-574d-9565-ede6634db7b0"
 authors = ["Fengyang Wang <fengyang.wang.0@gmail.com>", "Curtis Vogt <curtis.vogt@gmail.com>"]
-version = "0.5.3"
+version = "0.5.5"
 
 [deps]
 BitIntegers = "c3b6d118-76ef-56ca-8cc7-ebb389d030a1"
 Parsers = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
 
 [compat]
-Parsers = "2.7"
+Aqua = "0.7, 0.8"
 BitIntegers = "0.3.1"
+Parsers = "2.7"
+Printf = "1.6"
+Test = "1.6"
 julia = "1.6"
 
 [extras]
+Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Printf", "Test"]
+test = ["Aqua", "Printf", "Test"]
