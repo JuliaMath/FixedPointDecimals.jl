@@ -32,7 +32,7 @@ export FixedDecimal, RoundThrows
 
 # (Re)export checked_* arithmetic functions
 # - Defined in this package:
-export checked_rdiv
+export checked_rdiv, div_with_overflow
 # - Reexported from Base:
 export checked_abs, checked_add, checked_cld, checked_div, checked_fld,
     checked_mod, checked_mul, checked_neg, checked_rem, checked_sub
@@ -430,6 +430,29 @@ function Base.Checked.mul_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Intege
     quotient, remainder = fldmodinline(_widemul(x.i, y.i), powt)
     v = _round_to_nearest(quotient, remainder, powt)
     return (reinterpret(FD{T,f}, Base.trunc_int(T, v)), v < typemin(T) || v > typemax(T))
+end
+
+# This does not exist in Base so is just part of this package.
+# Throws on divide by zero.
+@doc """
+    div_with_overflow(x::FixedDecimal{T,f}, y::FixedDecimal{T,f})::(FixedDecimal{T,f}, Bool)
+        where {T<:Integer, f}
+
+Return the result of div (wrapping on overflow/underflow) and a boolean indicating whether
+overflow/underflow did in fact happen. Throws on divide-by-zero.
+"""
+function div_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
+    C = coefficient(FD{T, f})
+    # This case will break the div call below.
+    if x.i == typemin(T) && y.i == -1
+        # To perform the div and overflow means reaching the max and adding 1, so typemin.
+        return (typemin(FD{T,f}), true)
+    end
+    # Note: The div() will throw for divide-by-zero, that's not an overflow.
+    v, b = Base.Checked.mul_with_overflow(C, div(x.i, y.i))
+    # div the result by 1 to drop the decimal part which could come about because
+    # of the wrapping in mul_with_overflow.
+    return (div(reinterpret(FD{T,f}, v), 1), b)
 end
 
 Base.checked_add(x::FD, y::FD) = Base.checked_add(promote(x, y)...)
