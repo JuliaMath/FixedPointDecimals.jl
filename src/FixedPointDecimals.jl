@@ -448,7 +448,7 @@ Base.Checked.mul_with_overflow(x, y::FD) = Base.Checked.mul_with_overflow(promot
         where {T<:Integer, f}
 
 Return the result of div (wrapping on overflow/underflow) and a boolean indicating whether
-overflow/underflow did in fact happen. Throws on divide-by-zero.
+overflow/underflow did in fact happen. Throws a DivideError on divide-by-zero.
 """
 function div_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
     C = coefficient(FD{T, f})
@@ -461,7 +461,7 @@ function div_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
     v, b = Base.Checked.mul_with_overflow(C, div(x.i, y.i))
     # div the result by 1 to drop the decimal part which could come about because
     # of the wrapping in mul_with_overflow.
-    return (div(reinterpret(FD{T,f}, v), 1), b)
+    return (reinterpret(FD{T,f}, v), b)
 end
 
 Base.checked_add(x::FD, y::FD) = Base.checked_add(promote(x, y)...)

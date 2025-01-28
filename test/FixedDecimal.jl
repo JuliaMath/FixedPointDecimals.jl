@@ -791,9 +791,9 @@ end
         @test Base.Checked.mul_with_overflow(FD{Int8,0}(120), 2) == (FD{Int8,0}(-16), true)
         @test Base.Checked.mul_with_overflow(120, FD{Int8,0}(2)) == (FD{Int8,0}(-16), true)
 
-        @test div_with_overflow(FD{Int8,2}(1), FD{Int8,2}(0.5)) == (FD{Int8,2}(0), true)
+        @test div_with_overflow(FD{Int8,2}(1), FD{Int8,2}(0.5)) == (FD{Int8,2}(-0.56), true)
         @test div_with_overflow(typemin(FD{Int32,0}), FD{Int32,0}(-1)) == (typemin(FD{Int32,0}), true)
-        @test div_with_overflow(FD{Int16,1}(1639), FD{Int16,1}(0.5)) == (FD{Int16,1}(-3275), true)
+        @test div_with_overflow(FD{Int16,1}(1639), FD{Int16,1}(0.5)) == (FD{Int16,1}(-3275.6), true)
 
         @testset "with_overflow math corner cases" begin
             @testset for I in (Int128, UInt128, Int8, UInt8), f in (0,2)
