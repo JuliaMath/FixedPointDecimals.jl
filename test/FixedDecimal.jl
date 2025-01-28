@@ -787,6 +787,9 @@ end
         @test Base.Checked.sub_with_overflow(FD{Int8,2}(-1), FD{Int8,2}(0.4)) == (FD{Int8,2}(1.16), true)
 
         @test Base.Checked.mul_with_overflow(FD{Int8,2}(1.2), FD{Int8,2}(1.2)) == (FD{Int8,2}(-1.12), true)
+        @test Base.Checked.mul_with_overflow(FD{Int8,1}(12), 2) == (FD{Int8,1}(-1.6), true)
+        @test Base.Checked.mul_with_overflow(FD{Int8,0}(120), 2) == (FD{Int8,0}(-16), true)
+        @test Base.Checked.mul_with_overflow(120, FD{Int8,0}(2)) == (FD{Int8,0}(-16), true)
 
         @test div_with_overflow(FD{Int8,2}(1), FD{Int8,2}(0.5)) == (FD{Int8,2}(0), true)
         @test div_with_overflow(typemin(FD{Int32,0}), FD{Int32,0}(-1)) == (typemin(FD{Int32,0}), true)
@@ -859,7 +862,7 @@ end
             @test Base.Checked.mul_with_overflow(4, FD{Int64,6}(2.22)) == (FD{Int64,6}(8.88), false)
             @test Base.Checked.mul_with_overflow(FD{Int64,6}(2.22), 4) == (FD{Int64,6}(8.88), false)
             @test Base.Checked.mul_with_overflow(FD{Int128,14}(10), FD{Int128,14}(20.1)) == (FD{Int128,14}(201), false)
-            @test Base.Checked.mul_with_overflow(FD{Int128,30}(10.1), FD{Int128,30}(1)) == (FD{Int128,30}(10.1), false)
+            @test Base.Checked.mul_with_overflow(FD{Int128,30}(10.11), FD{Int128,30}(1)) == (FD{Int128,30}(10.11), false)
 
             @test div_with_overflow(FD{Int64,6}(4), FD{Int64,6}(2)) == (FD{Int64,6}(2), false)
             @test div_with_overflow(FD{Int32,6}(4), FD{Int32,6}(2.1)) == (FD{Int32,6}(1), false)
