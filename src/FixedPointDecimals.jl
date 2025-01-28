@@ -459,8 +459,6 @@ function div_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
     end
     # Note: The div() will throw for divide-by-zero, that's not an overflow.
     v, b = Base.Checked.mul_with_overflow(C, div(x.i, y.i))
-    # div the result by 1 to drop the decimal part which could come about because
-    # of the wrapping in mul_with_overflow.
     return (reinterpret(FD{T,f}, v), b)
 end
 
