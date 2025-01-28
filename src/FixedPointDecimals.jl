@@ -455,7 +455,7 @@ function div_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
     # This case will break the div call below.
     if x.i == typemin(T) && y.i == -1
         # To perform the div and overflow means reaching the max and adding 1, so typemin.
-        return (typemin(FD{T,f}), true)
+        return (x, true)
     end
     # Note: The div() will throw for divide-by-zero, that's not an overflow.
     v, b = Base.Checked.mul_with_overflow(C, div(x.i, y.i))
