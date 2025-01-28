@@ -862,7 +862,7 @@ end
             @test Base.Checked.mul_with_overflow(4, FD{Int64,6}(2.22)) == (FD{Int64,6}(8.88), false)
             @test Base.Checked.mul_with_overflow(FD{Int64,6}(2.22), 4) == (FD{Int64,6}(8.88), false)
             @test Base.Checked.mul_with_overflow(FD{Int128,14}(10), FD{Int128,14}(20.1)) == (FD{Int128,14}(201), false)
-            @test Base.Checked.mul_with_overflow(FD{Int128,30}(10.11), FD{Int128,30}(1)) == (FD{Int128,30}(10.11), false)
+            @test Base.Checked.mul_with_overflow(FD{Int128,30}(10.11), FD{Int128,0}(1)) == (FD{Int128,30}(10.11), false)
 
             @test div_with_overflow(FD{Int64,6}(4), FD{Int64,6}(2)) == (FD{Int64,6}(2), false)
             @test div_with_overflow(FD{Int32,6}(4), FD{Int32,6}(2.1)) == (FD{Int32,6}(1), false)
