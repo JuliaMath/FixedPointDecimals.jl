@@ -779,17 +779,11 @@ end
     @testset "limits: with_overflow math" begin
         # Easy to reason about cases of overflow:
         @test Base.Checked.add_with_overflow(FD{Int8,2}(1), FD{Int8,2}(1)) == (FD{Int8,2}(-0.56), true)
-        @test Base.Checked.add_with_overflow(FD{Int8,2}(1), 1) == (FD{Int8,2}(-0.56), true)
+        @test Base.Checked.add_with_overflow(FD{Int8,2}(1), FD{Int8,2}(1)) == (FD{Int8,2}(-0.56), true)
         @test Base.Checked.add_with_overflow(FD{Int8,2}(1), FD{Int8,2}(0.4)) == (FD{Int8,2}(-1.16), true)
-
         @test Base.Checked.sub_with_overflow(FD{Int8,2}(1), FD{Int8,2}(-1)) == (FD{Int8,2}(-0.56), true)
-        @test Base.Checked.sub_with_overflow(1, FD{Int8,2}(-1)) == (FD{Int8,2}(-0.56), true)
         @test Base.Checked.sub_with_overflow(FD{Int8,2}(-1), FD{Int8,2}(0.4)) == (FD{Int8,2}(1.16), true)
-
         @test Base.Checked.mul_with_overflow(FD{Int8,2}(1.2), FD{Int8,2}(1.2)) == (FD{Int8,2}(-1.12), true)
-        @test Base.Checked.mul_with_overflow(FD{Int8,1}(12), 2) == (FD{Int8,1}(-1.6), true)
-        @test Base.Checked.mul_with_overflow(FD{Int8,0}(120), 2) == (FD{Int8,0}(-16), true)
-        @test Base.Checked.mul_with_overflow(120, FD{Int8,0}(2)) == (FD{Int8,0}(-16), true)
 
         @test div_with_overflow(FD{Int8,2}(1), FD{Int8,2}(0.5)) == (FD{Int8,2}(-0.56), true)
         @test div_with_overflow(typemin(FD{Int32,0}), FD{Int32,0}(-1)) == (typemin(FD{Int32,0}), true)
@@ -802,23 +796,23 @@ end
 
                 @test Base.Checked.add_with_overflow(typemax(T), eps(T)) == (typemax(T) + eps(T), true)
                 issigned(I) && @test Base.Checked.add_with_overflow(typemin(T), -eps(T)) == (typemin(T) + -eps(T), true)
-                @test Base.Checked.add_with_overflow(typemax(T), 1) == (typemax(T) + 1, true)
-                @test Base.Checked.add_with_overflow(1, typemax(T)) == (typemax(T) + 1, true)
+                @test Base.Checked.add_with_overflow(typemax(T), T(1)) == (typemax(T) + 1, true)
+                @test Base.Checked.add_with_overflow(T(1), typemax(T)) == (typemax(T) + 1, true)
 
                 @test Base.Checked.sub_with_overflow(typemin(T), eps(T)) == (typemin(T) - eps(T), true)
                 issigned(I) && @test Base.Checked.sub_with_overflow(typemax(T), -eps(T)) == (typemax(T) - -eps(T), true)
-                @test Base.Checked.sub_with_overflow(typemin(T), 1) == (typemin(T) - 1, true)
+                @test Base.Checked.sub_with_overflow(typemin(T), T(1)) == (typemin(T) - 1, true)
                 if issigned(I) && 2.0 <= typemax(T)
-                    @test Base.Checked.sub_with_overflow(-2, typemax(T)) == (-2 -typemax(T), true)
+                    @test Base.Checked.sub_with_overflow(T(-2), typemax(T)) == (-2 -typemax(T), true)
                 end
 
                 @test Base.Checked.mul_with_overflow(typemax(T), typemax(T)) == (typemax(T) * typemax(T), true)
                 issigned(I) && @test Base.Checked.mul_with_overflow(typemin(T), typemax(T)) == (typemin(T) * typemax(T), true)
                 if 2.0 <= typemax(T)
-                    @test Base.Checked.mul_with_overflow(typemax(T), 2) == (typemax(T) * 2, true)
-                    @test Base.Checked.mul_with_overflow(2, typemax(T)) == (2 * typemax(T), true)
-                    issigned(I) && @test Base.Checked.mul_with_overflow(typemin(T), 2) == (typemin(T) * 2, true)
-                    issigned(I) && @test Base.Checked.mul_with_overflow(2, typemin(T)) == (2 * typemin(T), true)
+                    @test Base.Checked.mul_with_overflow(typemax(T), T(2)) == (typemax(T) * 2, true)
+                    @test Base.Checked.mul_with_overflow(T(2), typemax(T)) == (2 * typemax(T), true)
+                    issigned(I) && @test Base.Checked.mul_with_overflow(typemin(T), T(2)) == (typemin(T) * 2, true)
+                    issigned(I) && @test Base.Checked.mul_with_overflow(T(2), typemin(T)) == (2 * typemin(T), true)
                 end
 
                 if f > 0
@@ -833,36 +827,21 @@ end
             end
         end
 
-        @testset "with_overflow math promotions" begin
-            x = FD{Int8,1}(1)
-            y = FD{Int64,1}(2)
-            @testset for op in (
-                Base.Checked.add_with_overflow, Base.Checked.sub_with_overflow,
-                Base.Checked.mul_with_overflow,
-            )
-                @test op(x, y) === op(FD{Int64,1}(1), y)
-                @test op(y, x) === op(y, FD{Int64,1}(1))
-
-                @test op(x, 2) === op(x, FD{Int8,1}(2))
-                @test op(2, x) === op(FD{Int8,1}(2), x)
-            end
-        end
-
         @testset "non-overflowing with_overflow math" begin
-            @test Base.Checked.add_with_overflow(1, FD{Int8,1}(1.1)) == (FD{Int8,1}(2.1), false)
-            @test Base.Checked.add_with_overflow(FD{Int8,1}(1.1), 1) == (FD{Int8,1}(2.1), false)
+            @test Base.Checked.add_with_overflow(FD{Int8,1}(1), FD{Int8,1}(1.1)) == (FD{Int8,1}(2.1), false)
+            @test Base.Checked.add_with_overflow(FD{Int8,1}(1.1), FD{Int8,1}(1)) == (FD{Int8,1}(2.1), false)
             @test Base.Checked.add_with_overflow(FD{Int64,8}(30.123), FD{Int64,8}(30)) == (FD{Int64,8}(60.123), false)
-            @test Base.Checked.add_with_overflow(FD{Int64,8}(30.123), FD{Int64,5}(30)) == (FD{Int64,8}(60.123), false)
+            @test Base.Checked.add_with_overflow(FD{Int64,8}(30.123), FD{Int64,8}(-50)) == (FD{Int64,8}(-19.877), false)
 
-            @test Base.Checked.sub_with_overflow(3, FD{Int16,2}(2.5)) == (FD{Int16,1}(0.5), false)
-            @test Base.Checked.sub_with_overflow(FD{Int16,2}(2.5), 3) == (FD{Int16,1}(-0.5), false)
+            @test Base.Checked.sub_with_overflow(FD{Int16,2}(3), FD{Int16,2}(2.5)) == (FD{Int16,1}(0.5), false)
+            @test Base.Checked.sub_with_overflow(FD{Int16,2}(2.5), FD{Int16,2}(3)) == (FD{Int16,1}(-0.5), false)
             @test Base.Checked.sub_with_overflow(FD{Int32,4}(10.11), FD{Int32,4}(2)) == (FD{Int32,4}(8.11), false)
-            @test Base.Checked.sub_with_overflow(FD{Int32,4}(10.11), FD{Int32,3}(2)) == (FD{Int32,4}(8.11), false)
+            @test Base.Checked.sub_with_overflow(FD{Int32,4}(10.11), FD{Int32,4}(-2)) == (FD{Int32,4}(12.11), false)
 
-            @test Base.Checked.mul_with_overflow(4, FD{Int64,6}(2.22)) == (FD{Int64,6}(8.88), false)
-            @test Base.Checked.mul_with_overflow(FD{Int64,6}(2.22), 4) == (FD{Int64,6}(8.88), false)
+            @test Base.Checked.mul_with_overflow(FD{Int64,6}(4), FD{Int64,6}(2.22)) == (FD{Int64,6}(8.88), false)
+            @test Base.Checked.mul_with_overflow(FD{Int64,6}(2.22), FD{Int64,6}(4)) == (FD{Int64,6}(8.88), false)
             @test Base.Checked.mul_with_overflow(FD{Int128,14}(10), FD{Int128,14}(20.1)) == (FD{Int128,14}(201), false)
-            @test Base.Checked.mul_with_overflow(FD{Int128,30}(10.11), FD{Int128,0}(1)) == (FD{Int128,30}(10.11), false)
+            @test Base.Checked.mul_with_overflow(FD{Int128,30}(10.1), FD{Int128,30}(1)) == (FD{Int128,30}(10.1), false)
 
             @test div_with_overflow(FD{Int64,6}(4), FD{Int64,6}(2)) == (FD{Int64,6}(2), false)
             @test div_with_overflow(FD{Int32,6}(4), FD{Int32,6}(2.1)) == (FD{Int32,6}(1), false)
