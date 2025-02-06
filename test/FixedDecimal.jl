@@ -843,6 +843,13 @@ end
 
                 @test_throws DivideError rdiv_with_overflow(typemax(T), T(0))
                 @test_throws DivideError rdiv_with_overflow(typemin(T), T(0))
+                @test_throws DivideError rdiv_with_overflow(eps(T), T(0))
+                @test_throws DivideError rdiv_with_overflow(-eps(T), T(0))
+
+                @test_throws DivideError fld_with_overflow(typemax(T), T(0))
+                @test_throws DivideError fld_with_overflow(typemin(T), T(0))
+                @test_throws DivideError fld_with_overflow(eps(T), T(0))
+                @test_throws DivideError fld_with_overflow(-eps(T), T(0))
             end
         end
 
