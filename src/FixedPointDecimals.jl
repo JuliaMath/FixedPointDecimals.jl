@@ -471,7 +471,7 @@ function fld_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
     C = coefficient(FD{T, f})
     # This case will break the fld call below. This can only happen when f is 0 as y.i
     # cannot be -1 otherwise.
-    if x.i == typemin(T) && y.i == -1
+    if T <: Signed && x.i == typemin(T) && y.i == -1
         # To fld and overflow means reaching the max and adding 1, so typemin (x).
         return (x, true)
     end
