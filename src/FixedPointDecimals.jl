@@ -47,11 +47,12 @@ const FMAFloat = Union{Float16, Float32, Float64, BigFloat}
 
 for fn in [:trunc, :floor, :ceil]
     fnname = Symbol(fn, "mul")
+    fnname_str = String(fnname)
     opp_fn = fn == :floor ? :ceil : :floor
 
     @eval begin
         @doc """
-            $($fnname)(I, x, y) :: I
+            $($fnname_str)(I, x, y) :: I
 
         Compute `$($fn)(I, x * y)`, returning the result as type `I`. For
         floating point values, this function can be more accurate than
