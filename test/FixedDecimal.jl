@@ -777,6 +777,8 @@ end
     end
 
     @testset "limits: with_overflow math" begin
+        using FixedPointDecimals: rdiv_with_overflow, fld_with_overflow
+
         # Easy to reason about cases of overflow:
         @test Base.Checked.add_with_overflow(FD{Int8,2}(1), FD{Int8,2}(1)) == (FD{Int8,2}(-0.56), true)
         @test Base.Checked.add_with_overflow(FD{Int8,2}(1), FD{Int8,2}(1)) == (FD{Int8,2}(-0.56), true)
@@ -788,6 +790,16 @@ end
         @test div_with_overflow(FD{Int8,2}(1), FD{Int8,2}(0.5)) == (FD{Int8,2}(-0.56), true)
         @test div_with_overflow(typemin(FD{Int32,0}), FD{Int32,0}(-1)) == (typemin(FD{Int32,0}), true)
         @test div_with_overflow(FD{Int16,1}(1639), FD{Int16,1}(0.5)) == (FD{Int16,1}(-3275.6), true)
+
+        @test rdiv_with_overflow(Int8(1), FD{Int8,2}(0.7)) == (FD{Int8,2}(-1.13), true)
+        @test rdiv_with_overflow(FD{Int16,2}(165), FD{Int16,2}(0.5)) == (FD{Int16,2}(-325.36), true)
+        @test rdiv_with_overflow(FD{Int16,2}(-165), FD{Int16,2}(0.5)) == (FD{Int16,2}(325.36), true)
+        @test rdiv_with_overflow(typemin(FD{Int64,8}), Int32(-1)) == (typemin(FD{Int64,8}), true)
+        @test rdiv_with_overflow(typemin(FD{Int64,0}), FD{Int64,0}(-1)) == (typemin(FD{Int64,0}), true)
+
+        @test fld_with_overflow(FD{Int8,2}(-1), FD{Int8,2}(0.9)) == (FD{Int8,2}(0.56), true)
+        @test fld_with_overflow(typemin(FD{Int64,0}), FD{Int64,0}(-1)) == (typemin(FD{Int64,0}), true)
+        @test fld_with_overflow(FD{Int8,1}(7), FD{Int8,1}(0.5)) == (FD{Int8,1}(-11.6), true)
 
         @testset "with_overflow math corner cases" begin
             @testset for I in (Int128, UInt128, Int8, UInt8), f in (0,2)
@@ -823,7 +835,14 @@ end
                     issigned(I) && @test_throws DivideError div_with_overflow(typemax(T), T(0))
                     issigned(I) && @test_throws DivideError div_with_overflow(typemin(T), T(0))
                     issigned(I) && @test div_with_overflow(typemin(T), -eps(T))[2]
+
+                    @test fld_with_overflow(typemax(T), eps(T))[2]
+                    issigned(I) && @test fld_with_overflow(typemin(T), eps(T))[2]
+                    issigned(I) && @test fld_with_overflow(typemax(T), -eps(T))[2]
                 end
+
+                @test_throws DivideError rdiv_with_overflow(typemax(T), T(0))
+                @test_throws DivideError rdiv_with_overflow(typemin(T), T(0))
             end
         end
 
@@ -848,6 +867,16 @@ end
             @test div_with_overflow(FD{Int128,14}(10), FD{Int128,14}(20.1)) == (FD{Int128,14}(0), false)
             @test div_with_overflow(FD{Int128,30}(10.1), FD{Int128,30}(1)) == (FD{Int128,30}(10), false)
             @test div_with_overflow(typemin(FD{Int32,8}(1)), FD{Int32,8}(-1)) == (21, false)
+
+            @test rdiv_with_overflow(Int8(1), FD{Int8,2}(0.8)) == (FD{Int8,2}(1.25), false)
+            @test rdiv_with_overflow(FD{Int64,8}(5), FD{Int64,8}(2)) == (FD{Int64,8}(2.5), false)
+            @test rdiv_with_overflow(FD{Int64,8}(5), FD{Int64,8}(0.5)) == (FD{Int64,8}(10), false)
+            @test rdiv_with_overflow(FD{Int128,0}(20000), Int32(5000)) == (FD{Int128,0}(4), false)
+
+            @test fld_with_overflow(typemax(FD{Int128,38}), FD{Int128,38}(1)) == (FD{Int128,38}(1), false)
+            @test fld_with_overflow(FD{Int64,8}(20.5), FD{Int64,8}(2.1)) == (FD{Int64,8}(9), false)
+            @test fld_with_overflow(FD{Int8,0}(-5), FD{Int8,0}(-1)) == (FD{Int8,0}(5), false)
+            @test fld_with_overflow(FD{Int8,2}(0.99), FD{Int8,2}(0.5)) == (FD{Int8,2}(1), false)
         end
     end
 
