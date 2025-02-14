@@ -445,7 +445,7 @@ overflow/underflow did in fact happen. Throws a DivideError on divide-by-zero.
 function div_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
     C = coefficient(FD{T, f})
     # This case will break the div call below.
-    if x.i == typemin(T) && y.i == -1
+    if T <: Signed && x.i == typemin(T) && y.i == -1
         # To perform the div and overflow means reaching the max and adding 1, so typemin.
         return (x, true)
     end
