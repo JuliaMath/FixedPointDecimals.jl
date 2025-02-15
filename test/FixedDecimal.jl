@@ -796,6 +796,7 @@ end
         @test rdiv_with_overflow(FD{Int16,2}(-165), FD{Int16,2}(0.5)) == (FD{Int16,2}(325.36), true)
         @test rdiv_with_overflow(typemin(FD{Int64,8}), Int32(-1)) == (typemin(FD{Int64,8}), true)
         @test rdiv_with_overflow(typemin(FD{Int64,0}), FD{Int64,0}(-1)) == (typemin(FD{Int64,0}), true)
+        @test rdiv_with_overflow(typemin(FD{Int8,2}), FD{Int8,2}(-1)) == (typemin(FD{Int8,2}), true)
 
         @test fld_with_overflow(FD{Int8,2}(-1), FD{Int8,2}(0.9)) == (FD{Int8,2}(0.56), true)
         @test fld_with_overflow(typemin(FD{Int64,0}), FD{Int64,0}(-1)) == (typemin(FD{Int64,0}), true)
@@ -884,6 +885,7 @@ end
             @test fld_with_overflow(FD{Int64,8}(20.5), FD{Int64,8}(2.1)) == (FD{Int64,8}(9), false)
             @test fld_with_overflow(FD{Int8,0}(-5), FD{Int8,0}(-1)) == (FD{Int8,0}(5), false)
             @test fld_with_overflow(FD{Int8,2}(0.99), FD{Int8,2}(0.5)) == (FD{Int8,2}(1), false)
+            @test fld_with_overflow(typemin(FD{Int8,2}), FD{Int8,2}(-1)) == (FD{Int8,2}(1), false)
         end
     end
 
