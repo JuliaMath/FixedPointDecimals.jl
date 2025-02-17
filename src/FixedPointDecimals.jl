@@ -445,13 +445,84 @@ overflow/underflow did in fact happen. Throws a DivideError on divide-by-zero.
 function div_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
     C = coefficient(FD{T, f})
     # This case will break the div call below.
-    if T <: Signed && x.i == typemin(T) && y.i == -1
+    if y.i == -1 && T <: Signed && hasmethod(typemin, (Type{T},)) && x.i == typemin(T)
         # To perform the div and overflow means reaching the max and adding 1, so typemin.
         return (x, true)
     end
     # Note: The div() will throw for divide-by-zero, that's not an overflow.
     v, b = Base.Checked.mul_with_overflow(C, div(x.i, y.i))
     return (reinterpret(FD{T,f}, v), b)
+end
+
+# Does not exist in Base.Checked, so just exists in this package.
+@doc """
+    FixedPointDecimals.fld_with_overflow(x::FD, y::FD)::Tuple{FD,Bool}
+
+Calculates the largest integer less than or equal to `x / y`, checking for overflow errors
+where applicable, returning the result and a boolean indicating whether overflow occured.
+Throws a DivideError on divide-by-zero.
+
+The overflow protection may impose a perceptible performance penalty.
+
+See also:
+- `Base.checked_fld`.
+"""
+function fld_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
+    C = coefficient(FD{T, f})
+    # This case will break the fld call below.
+    if y.i == -1 && T <: Signed && hasmethod(typemin, (Type{T},)) && x.i == typemin(T)
+        # To fld and overflow means reaching the max and adding 1, so typemin (x).
+        return (x, true)
+    end
+    # Note: The fld() will already throw for divide-by-zero, that's not an overflow.
+    v, b = Base.Checked.mul_with_overflow(C, fld(x.i, y.i))
+    return (reinterpret(FD{T, f}, v), b)
+end
+
+"""
+    FixedPointDecimals.rdiv_with_overflow(x::FD, y::FD)::Tuple{FD,Bool}
+
+Calculates `x / y`, checking for overflow errors where applicable, returning the result
+and a boolean indicating whether overflow occured. Throws a DivideError on divide-by-zero.
+
+The overflow protection may impose a perceptible performance penalty.
+
+See also:
+- `Base.checked_rdiv`.
+"""
+function rdiv_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
+    powt = coefficient(FD{T, f})
+    # No multiplication can reach the typemax/typemin of a wider type, thus no typemin / -1.
+    quotient, remainder = fldmod(_widemul(x.i, powt), y.i)
+    # quotient is necessarily not typemax/typemin. x.i * powt cannot reach typemax/typemin
+    # of the widened type and y.i is an integer. Thus the following call cannot overflow.
+    v = _round_to_nearest(quotient, remainder, y.i)
+    return (reinterpret(FD{T,f}, rem(v, T)), v < typemin(T) || v > typemax(T))
+end
+
+# These functions allow us to perform division with integers outside of the range of the
+# FixedDecimal.
+function rdiv_with_overflow(x::Integer, y::FD{T, f}) where {T<:Integer, f}
+    powt = coefficient(FD{T, f})
+    powtsq = _widemul(powt, powt)
+    # No multiplication can reach the typemax/typemin of a wider type, thus no typemin / -1.
+    quotient, remainder = fldmod(_widemul(x, powtsq), y.i)
+    # Same deal as previous overload as to why this will not overload. Note that all
+    # multiplication operations were widemuls.
+    v = _round_to_nearest(quotient, remainder, y.i)
+    return (reinterpret(FD{T,f}, rem(v, T)), v < typemin(T) || v > typemax(T))
+end
+function rdiv_with_overflow(x::FD{T, f}, y::Integer) where {T<:Integer, f}
+    if y == -1 && T <: Signed && hasmethod(typemin, (Type{T},)) && x.i == typemin(T)
+        # typemin / -1 for signed integers wraps, giving typemin (x) again.
+        return (x, true)
+    end
+
+    quotient, remainder = fldmod(x.i, y)
+    # It is impossible for both the quotient to be typemax/typemin AND remainder to be
+    # non-zero because y is an integer. Thus the following call cannot overflow.
+    v = _round_to_nearest(quotient, remainder, y)
+    return (reinterpret(FD{T, f}, v), false)
 end
 
 Base.checked_add(x::FD, y::FD) = Base.checked_add(promote(x, y)...)
@@ -547,28 +618,22 @@ See also:
 checked_rdiv(x::FD, y::FD) = checked_rdiv(promote(x, y)...)
 
 function checked_rdiv(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
-    powt = coefficient(FD{T, f})
-    quotient, remainder = fldmod(_widemul(x.i, powt), y.i)
-    v = _round_to_nearest(quotient, remainder, y.i)
-    typemin(T) <= v <= typemax(T) || Base.Checked.throw_overflowerr_binaryop(:/, x, y)
-    return reinterpret(FD{T, f}, v)
+    (z, b) = rdiv_with_overflow(x, y)
+    b && Base.Checked.throw_overflowerr_binaryop(:/, x, y)
+    return z
 end
 
 # These functions allow us to perform division with integers outside of the range of the
 # FixedDecimal.
 function checked_rdiv(x::Integer, y::FD{T, f}) where {T<:Integer, f}
-    powt = coefficient(FD{T, f})
-    powtsq = _widemul(powt, powt)
-    quotient, remainder = fldmod(_widemul(x, powtsq), y.i)
-    v = _round_to_nearest(quotient, remainder, y.i)
-    typemin(T) <= v <= typemax(T) || Base.Checked.throw_overflowerr_binaryop(:/, x, y)
-    reinterpret(FD{T, f}, v)
+    (z, b) = rdiv_with_overflow(x, y)
+    b && Base.Checked.throw_overflowerr_binaryop(:/, x, y)
+    return z
 end
 function checked_rdiv(x::FD{T, f}, y::Integer) where {T<:Integer, f}
-    quotient, remainder = fldmod(x.i, y)
-    v = _round_to_nearest(quotient, remainder, y)
-    typemin(T) <= v <= typemax(T) || Base.Checked.throw_overflowerr_binaryop(:/, x, y)
-    reinterpret(FD{T, f}, v)
+    (z, b) = rdiv_with_overflow(x, y)
+    b && Base.Checked.throw_overflowerr_binaryop(:/, x, y)
+    return z
 end
 
 
