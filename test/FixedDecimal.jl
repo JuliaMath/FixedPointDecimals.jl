@@ -797,10 +797,12 @@ end
         @test rdiv_with_overflow(typemin(FD{Int64,8}), Int32(-1)) == (typemin(FD{Int64,8}), true)
         @test rdiv_with_overflow(typemin(FD{Int64,0}), FD{Int64,0}(-1)) == (typemin(FD{Int64,0}), true)
         @test rdiv_with_overflow(typemin(FD{Int8,2}), FD{Int8,2}(-1)) == (typemin(FD{Int8,2}), true)
+        @test rdiv_with_overflow(typemin(FD{Int8,2}), FD{Int8,2}(-0.01)) == (FD{Int8,2}(0), true)
 
         @test fld_with_overflow(FD{Int8,2}(-1), FD{Int8,2}(0.9)) == (FD{Int8,2}(0.56), true)
         @test fld_with_overflow(typemin(FD{Int64,0}), FD{Int64,0}(-1)) == (typemin(FD{Int64,0}), true)
         @test fld_with_overflow(FD{Int8,1}(7), FD{Int8,1}(0.5)) == (FD{Int8,1}(-11.6), true)
+        @test FixedPointDecimals.fld_with_overflow(typemin(FD{Int8,2}), FD{Int8,2}(-0.01)) == (typemin(FD{Int8,2}), true)
 
         @testset "with_overflow math corner cases" begin
             @testset for I in (Int128, UInt128, Int8, UInt8), f in (0,2)
