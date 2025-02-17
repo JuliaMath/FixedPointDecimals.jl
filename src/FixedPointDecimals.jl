@@ -297,7 +297,7 @@ for fn in [:trunc, :floor, :ceil]
         val = _apply_exact_float($(Symbol(fn, "mul")), T, x, powt)
         reinterpret(FD{T, f}, val)
     end
-    # needed to avoid ambiguity
+    # needed to avoid ambiguity with e.g. `floor(::Type{T}, x::Rational)`
     @eval function Base.$fn(::Type{FD{T, f}}, x::Rational) where {T, f}
         reinterpret(FD{T, f}, $fn(T, x * coefficient(FD{T, f})))
     end
@@ -309,15 +309,12 @@ function Base.round(::Type{FD{T, f}}, x::Real, ::RoundingMode{:Nearest}=RoundNea
     reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
 end
 
-# needed to avoid ambiguity
-function Base.round(::Type{FD{T, f}}, x::Rational, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
-    reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
-end
+# needed to avoid ambiguity with `round(::Type{T}, x::Rational{Bool}, ::RoundingMode)`
 function Base.round(::Type{FD{T, f}}, x::Rational{Bool}, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
-    reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
+   reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
 end
 function Base.round(::Type{FD{T, f}}, x::Rational{Tr}, ::RoundingMode{:Nearest}=RoundNearest) where {T, f, Tr}
-    reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
+   reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
 end
 
 
