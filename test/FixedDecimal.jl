@@ -1275,113 +1275,116 @@ end
 @testset "round_with_overflow" begin
     using FixedPointDecimals: round_with_overflow
 
+    FD642 = FixedDecimal{Int64,2}
+    FD643 = FixedDecimal{Int64,3}
+
     # Is alias for `ceil`.
     @testset "up" begin
-        @test round_with_overflow(FD2(-0.51), RoundUp) === (FD2(0), false)
-        @test round_with_overflow(FD2(-0.50), RoundUp) === (FD2(0), false)
-        @test round_with_overflow(FD2(-0.49), RoundUp) === (FD2(0), false)
-        @test round_with_overflow(FD2(0.50), RoundUp) === (FD2(1), false)
-        @test round_with_overflow(FD2(0.51), RoundUp) === (FD2(1), false)
-        @test round_with_overflow(FD2(1.50), RoundUp) === (FD2(2), false)
-        @test round_with_overflow(typemin(FD2), RoundUp) ===
-            (parse(FD2, "-92233720368547758"), false)
+        @test round_with_overflow(FD642(-0.51), RoundUp) === (FD642(0), false)
+        @test round_with_overflow(FD642(-0.50), RoundUp) === (FD642(0), false)
+        @test round_with_overflow(FD642(-0.49), RoundUp) === (FD642(0), false)
+        @test round_with_overflow(FD642(0.50), RoundUp) === (FD642(1), false)
+        @test round_with_overflow(FD642(0.51), RoundUp) === (FD642(1), false)
+        @test round_with_overflow(FD642(1.50), RoundUp) === (FD642(2), false)
+        @test round_with_overflow(typemin(FD642), RoundUp) ===
+            (parse(FD642, "-92233720368547758"), false)
 
         @testset "overflowing" begin
-            @test round_with_overflow(typemax(FD2), RoundUp) ===
-                (parse(FD2, "-92233720368547757.16"), true)
-            @test round_with_overflow(parse(FD2, "92233720368547758.01"), RoundUp) ===
-                (parse(FD2, "-92233720368547757.16"), true)
+            @test round_with_overflow(typemax(FD642), RoundUp) ===
+                (parse(FD642, "-92233720368547757.16"), true)
+            @test round_with_overflow(parse(FD642, "92233720368547758.01"), RoundUp) ===
+                (parse(FD642, "-92233720368547757.16"), true)
         end
     end
 
     # Is alias for `floor`.
     @testset "down" begin
-        @test round_with_overflow(FD2(-0.51), RoundDown) === (FD2(-1), false)
-        @test round_with_overflow(FD2(-0.50), RoundDown) === (FD2(-1), false)
-        @test round_with_overflow(FD2(-0.49), RoundDown) === (FD2(-1), false)
-        @test round_with_overflow(FD2(0.50), RoundDown) === (FD2(0), false)
-        @test round_with_overflow(FD2(0.51), RoundDown) === (FD2(0), false)
-        @test round_with_overflow(FD2(1.50), RoundDown) === (FD2(1), false)
-        @test round_with_overflow(typemax(FD2), RoundDown) ===
-            (parse(FD2, "92233720368547758"), false)
+        @test round_with_overflow(FD642(-0.51), RoundDown) === (FD642(-1), false)
+        @test round_with_overflow(FD642(-0.50), RoundDown) === (FD642(-1), false)
+        @test round_with_overflow(FD642(-0.49), RoundDown) === (FD642(-1), false)
+        @test round_with_overflow(FD642(0.50), RoundDown) === (FD642(0), false)
+        @test round_with_overflow(FD642(0.51), RoundDown) === (FD642(0), false)
+        @test round_with_overflow(FD642(1.50), RoundDown) === (FD642(1), false)
+        @test round_with_overflow(typemax(FD642), RoundDown) ===
+            (parse(FD642, "92233720368547758"), false)
 
         @testset "overflowing" begin
-            @test round_with_overflow(typemin(FD2), RoundDown) ===
-                (parse(FD2, "92233720368547757.16"), true)
-            @test round_with_overflow(parse(FD2, "-92233720368547758.01"), RoundDown) ===
-                (parse(FD2, "92233720368547757.16"), true)
+            @test round_with_overflow(typemin(FD642), RoundDown) ===
+                (parse(FD642, "92233720368547757.16"), true)
+            @test round_with_overflow(parse(FD642, "-92233720368547758.01"), RoundDown) ===
+                (parse(FD642, "92233720368547757.16"), true)
         end
     end
 
     # Is alias for `trunc`.
     @testset "to zero" begin
-        @test round_with_overflow(FD2(-0.51), RoundToZero) === (FD2(0), false)
-        @test round_with_overflow(FD2(-0.50), RoundToZero) === (FD2(0), false)
-        @test round_with_overflow(FD2(-0.49), RoundToZero) === (FD2(0), false)
-        @test round_with_overflow(FD2(0.50), RoundToZero) === (FD2(0), false)
-        @test round_with_overflow(FD2(0.51), RoundToZero) === (FD2(0), false)
-        @test round_with_overflow(FD2(1.50), RoundToZero) === (FD2(1), false)
+        @test round_with_overflow(FD642(-0.51), RoundToZero) === (FD642(0), false)
+        @test round_with_overflow(FD642(-0.50), RoundToZero) === (FD642(0), false)
+        @test round_with_overflow(FD642(-0.49), RoundToZero) === (FD642(0), false)
+        @test round_with_overflow(FD642(0.50), RoundToZero) === (FD642(0), false)
+        @test round_with_overflow(FD642(0.51), RoundToZero) === (FD642(0), false)
+        @test round_with_overflow(FD642(1.50), RoundToZero) === (FD642(1), false)
 
-        @test round_with_overflow(typemin(FD2), RoundToZero) ===
-            (parse(FD2, "-92233720368547758"), false)
-        @test round_with_overflow(typemax(FD2), RoundToZero) ===
-            (parse(FD2, "92233720368547758"), false)
+        @test round_with_overflow(typemin(FD642), RoundToZero) ===
+            (parse(FD642, "-92233720368547758"), false)
+        @test round_with_overflow(typemax(FD642), RoundToZero) ===
+            (parse(FD642, "92233720368547758"), false)
 
         # Cannot overflow.
     end
 
     @testset "tie away" begin
-        @test round_with_overflow(FD2(-0.51), RoundNearestTiesAway) === (FD2(-1), false)
-        @test round_with_overflow(FD2(-0.50), RoundNearestTiesAway) === (FD2(-1), false)
-        @test round_with_overflow(FD2(-0.49), RoundNearestTiesAway) === (FD2(0), false)
-        @test round_with_overflow(FD2(0.50), RoundNearestTiesAway) === (FD2(1), false)
-        @test round_with_overflow(FD2(0.51), RoundNearestTiesAway) === (FD2(1), false)
-        @test round_with_overflow(FD2(1.50), RoundNearestTiesAway) === (FD2(2), false)
+        @test round_with_overflow(FD642(-0.51), RoundNearestTiesAway) === (FD642(-1), false)
+        @test round_with_overflow(FD642(-0.50), RoundNearestTiesAway) === (FD642(-1), false)
+        @test round_with_overflow(FD642(-0.49), RoundNearestTiesAway) === (FD642(0), false)
+        @test round_with_overflow(FD642(0.50), RoundNearestTiesAway) === (FD642(1), false)
+        @test round_with_overflow(FD642(0.51), RoundNearestTiesAway) === (FD642(1), false)
+        @test round_with_overflow(FD642(1.50), RoundNearestTiesAway) === (FD642(2), false)
 
-        @test round_with_overflow(typemin(FD2), RoundNearestTiesAway) ===
-            (parse(FD2, "-92233720368547758"), false)
-        @test round_with_overflow(typemax(FD2), RoundNearestTiesAway) ===
-            (parse(FD2, "92233720368547758"), false)
+        @test round_with_overflow(typemin(FD642), RoundNearestTiesAway) ===
+            (parse(FD642, "-92233720368547758"), false)
+        @test round_with_overflow(typemax(FD642), RoundNearestTiesAway) ===
+            (parse(FD642, "92233720368547758"), false)
 
         @testset "overflowing" begin
-            # For max, FD2 has fractional .07 so use FD3 which has .807.
-            @test round_with_overflow(typemin(FD3), RoundNearestTiesAway) ===
-                (parse(FD3, "9223372036854775.616"), true)
-            @test round_with_overflow(typemax(FD3), RoundNearestTiesAway) ===
-                (parse(FD3, "-9223372036854775.616"), true)
+            # For max, FD642 has fractional .07 so use FD643 which has .807.
+            @test round_with_overflow(typemin(FD643), RoundNearestTiesAway) ===
+                (parse(FD643, "9223372036854775.616"), true)
+            @test round_with_overflow(typemax(FD643), RoundNearestTiesAway) ===
+                (parse(FD643, "-9223372036854775.616"), true)
 
-            @test round_with_overflow(parse(FD3, "9223372036854775.5"), RoundNearestTiesAway) ===
-                (parse(FD3, "-9223372036854775.616"), true)
-            @test round_with_overflow(parse(FD3, "-9223372036854775.5"), RoundNearestTiesAway) ===
-                (parse(FD3, "9223372036854775.616"), true)
+            @test round_with_overflow(parse(FD643, "9223372036854775.5"), RoundNearestTiesAway) ===
+                (parse(FD643, "-9223372036854775.616"), true)
+            @test round_with_overflow(parse(FD643, "-9223372036854775.5"), RoundNearestTiesAway) ===
+                (parse(FD643, "9223372036854775.616"), true)
         end
     end
 
     @testset "tie up" begin
-        @test round_with_overflow(FD2(-0.51), RoundNearestTiesUp) === (FD2(-1), false)
-        @test round_with_overflow(FD2(-0.50), RoundNearestTiesUp) === (FD2(0), false)
-        @test round_with_overflow(FD2(-0.49), RoundNearestTiesUp) === (FD2(0), false)
-        @test round_with_overflow(FD2(0.50), RoundNearestTiesUp) === (FD2(1), false)
-        @test round_with_overflow(FD2(0.51), RoundNearestTiesUp) === (FD2(1), false)
-        @test round_with_overflow(FD2(1.50), RoundNearestTiesUp) === (FD2(2), false)
+        @test round_with_overflow(FD642(-0.51), RoundNearestTiesUp) === (FD642(-1), false)
+        @test round_with_overflow(FD642(-0.50), RoundNearestTiesUp) === (FD642(0), false)
+        @test round_with_overflow(FD642(-0.49), RoundNearestTiesUp) === (FD642(0), false)
+        @test round_with_overflow(FD642(0.50), RoundNearestTiesUp) === (FD642(1), false)
+        @test round_with_overflow(FD642(0.51), RoundNearestTiesUp) === (FD642(1), false)
+        @test round_with_overflow(FD642(1.50), RoundNearestTiesUp) === (FD642(2), false)
 
-        @test round_with_overflow(typemin(FD2), RoundNearestTiesUp) ===
-            (parse(FD2, "-92233720368547758"), false)
-        @test round_with_overflow(typemax(FD2), RoundNearestTiesUp) ===
-            (parse(FD2, "92233720368547758"), false)
+        @test round_with_overflow(typemin(FD642), RoundNearestTiesUp) ===
+            (parse(FD642, "-92233720368547758"), false)
+        @test round_with_overflow(typemax(FD642), RoundNearestTiesUp) ===
+            (parse(FD642, "92233720368547758"), false)
 
-        # For max, FD2 has fractional .07 so use FD3 which has .807.
-        @test round_with_overflow(parse(FD3, "-9223372036854775.5"), RoundNearestTiesUp) ===
-            (FD3(-9223372036854775), false)
+        # For max, FD642 has fractional .07 so use FD643 which has .807.
+        @test round_with_overflow(parse(FD643, "-9223372036854775.5"), RoundNearestTiesUp) ===
+            (FD643(-9223372036854775), false)
 
         @testset "overflowing" begin
-            @test round_with_overflow(typemin(FD3), RoundNearestTiesUp) ===
-                (parse(FD3, "9223372036854775.616"), true)
-            @test round_with_overflow(typemax(FD3), RoundNearestTiesUp) ===
-                (parse(FD3, "-9223372036854775.616"), true)
+            @test round_with_overflow(typemin(FD643), RoundNearestTiesUp) ===
+                (parse(FD643, "9223372036854775.616"), true)
+            @test round_with_overflow(typemax(FD643), RoundNearestTiesUp) ===
+                (parse(FD643, "-9223372036854775.616"), true)
 
-            @test round_with_overflow(parse(FD3, "9223372036854775.5"), RoundNearestTiesUp) ===
-                (parse(FD3, "-9223372036854775.616"), true)
+            @test round_with_overflow(parse(FD643, "9223372036854775.5"), RoundNearestTiesUp) ===
+                (parse(FD643, "-9223372036854775.616"), true)
         end
     end
 end
