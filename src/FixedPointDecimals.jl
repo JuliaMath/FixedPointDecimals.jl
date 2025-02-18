@@ -430,7 +430,7 @@ function Base.Checked.mul_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Intege
     powt = coefficient(FD{T, f})
     quotient, remainder = fldmodinline(_widemul(x.i, y.i), powt)
     v = _round_to_nearest(quotient, remainder, powt)
-    return (reinterpret(FD{T,f}, Base.trunc_int(T, v)), v < typemin(T) || v > typemax(T))
+    return (reinterpret(FD{T,f}, rem(v, T)), v < typemin(T) || v > typemax(T))
 end
 
 # This does not exist in Base so is just part of this package.
@@ -445,7 +445,7 @@ overflow/underflow did in fact happen. Throws a DivideError on divide-by-zero.
 function div_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
     C = coefficient(FD{T, f})
     # This case will break the div call below.
-    if x.i == typemin(T) && y.i == -1
+    if y.i == -1 && T <: Signed && hasmethod(typemin, (Type{T},)) && x.i == typemin(T)
         # To perform the div and overflow means reaching the max and adding 1, so typemin.
         return (x, true)
     end
@@ -469,9 +469,8 @@ See also:
 """
 function fld_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
     C = coefficient(FD{T, f})
-    # This case will break the fld call below. This can only happen when f is 0 as y.i
-    # cannot be -1 otherwise.
-    if T <: Signed && x.i == typemin(T) && y.i == -1
+    # This case will break the fld call below.
+    if y.i == -1 && T <: Signed && hasmethod(typemin, (Type{T},)) && x.i == typemin(T)
         # To fld and overflow means reaching the max and adding 1, so typemin (x).
         return (x, true)
     end
@@ -514,7 +513,7 @@ function rdiv_with_overflow(x::Integer, y::FD{T, f}) where {T<:Integer, f}
     return (reinterpret(FD{T,f}, rem(v, T)), v < typemin(T) || v > typemax(T))
 end
 function rdiv_with_overflow(x::FD{T, f}, y::Integer) where {T<:Integer, f}
-    if T <: Signed && x.i == typemin(T) && y == -1
+    if y == -1 && T <: Signed && hasmethod(typemin, (Type{T},)) && x.i == typemin(T)
         # typemin / -1 for signed integers wraps, giving typemin (x) again.
         return (x, true)
     end
