@@ -1533,5 +1533,8 @@ end
     @test ceil(FD3, 4//3) == FD3(1.334)
     @test round(FD3, true) == FD3(1.000)
     @test round(FD3, 4//3) == FD3(1.333)
+    @test round(FD3, 1 // 1) == FD3(1)
+    @test round(FD3, BigInt(1) // 1) == FD3(1)
+    @test round(FD3, true // true) == FD3(1)
     @test Bool(FixedDecimal{Int,4}(1))
 end
