@@ -523,10 +523,10 @@ function rdiv_with_overflow(x::FD{T, f}, y::Integer) where {T<:Integer, f}
 end
 
 # Does not exist in Base.Checked, so just exists in this package.
-@doc """
+"""
     FixedPointDecimals.ceil_with_overflow(x::FD)::Tuple{FD,Bool}
 
-Calculates the nearest integral value of the same type as x that is greater than or equal
+Calculate the nearest integral value of the same type as x that is greater than or equal
 to x, returning it and a boolean indicating whether overflow has occurred.
 
 The overflow protection may impose a perceptible performance penalty.
@@ -546,10 +546,10 @@ function ceil_with_overflow(x::FD{T,f}) where {T<:Integer,f}
 end
 
 # Does not exist in Base.Checked, so just exists in this package.
-@doc """
+"""
     FixedPointDecimals.floor_with_overflow(x::FD)::Tuple{FD,Bool}
 
-Calculates the nearest integral value of the same type as x that is less than or equal
+Calculate the nearest integral value of the same type as x that is less than or equal
 to x, returning it and a boolean indicating whether overflow has occurred.
 
 The overflow protection may impose a perceptible performance penalty.
@@ -564,6 +564,16 @@ function floor_with_overflow(x::FD{T, f}) where {T, f}
     return (reinterpret(FD{T, f}, backing), overflowed)
 end
 
+# Does not exist in Base.Checked, so just exists in this package.
+"""
+    FixedPointDecimals.round_with_overflow(x::FD, mode=RoundNearest)::Tuple{FD,Bool}
+
+Calculate the nearest integral value of the same type as x, breaking ties using the
+specified RoundingModes, returning it and a boolean indicating whether overflow has
+occurred.
+
+The overflow protection may impose a perceptible performance penalty.
+"""
 round_with_overflow(fd::FD, ::RoundingMode{:Up}) = ceil_with_overflow(fd)
 round_with_overflow(fd::FD, ::RoundingMode{:Down}) = floor_with_overflow(fd)
 # trunc cannot overflow.
