@@ -522,6 +522,77 @@ function rdiv_with_overflow(x::FD{T, f}, y::Integer) where {T<:Integer, f}
     return (reinterpret(FD{T, f}, v), false)
 end
 
+# Does not exist in Base.Checked, so just exists in this package.
+"""
+    FixedPointDecimals.ceil_with_overflow(x::FD)::Tuple{FD,Bool}
+
+Calculate the nearest integral value of the same type as x that is greater than or equal
+to x, returning it and a boolean indicating whether overflow has occurred.
+
+The overflow protection may impose a perceptible performance penalty.
+"""
+function ceil_with_overflow(x::FD{T,f}) where {T<:Integer,f}
+    powt = coefficient(FD{T, f})
+    quotient, remainder = fldmodinline(x.i, powt)
+    return if remainder > 0
+        # Could overflow when powt is 1 (f is 0) and x/x.i is typemax.
+        v, add_overflowed = Base.Checked.add_with_overflow(quotient, one(quotient))
+        # Could overflow when x is close to typemax (max quotient) independent of f.
+        backing, mul_overflowed = Base.Checked.mul_with_overflow(v, powt)
+        (reinterpret(FD{T, f}, backing), add_overflowed || mul_overflowed)
+    else
+        (FD{T, f}(quotient), false)
+    end
+end
+
+# Does not exist in Base.Checked, so just exists in this package.
+"""
+    FixedPointDecimals.floor_with_overflow(x::FD)::Tuple{FD,Bool}
+
+Calculate the nearest integral value of the same type as x that is less than or equal
+to x, returning it and a boolean indicating whether overflow has occurred.
+
+The overflow protection may impose a perceptible performance penalty.
+"""
+function floor_with_overflow(x::FD{T, f}) where {T, f}
+    powt = coefficient(FD{T, f})
+    # Won't underflow, powt is an integer.
+    quotient = fld(x.i, powt)
+    # When we convert it back to the backing format it might though. Occurs when
+    # the integer part of x is at its maximum.
+    backing, overflowed = Base.Checked.mul_with_overflow(quotient, powt)
+    return (reinterpret(FD{T, f}, backing), overflowed)
+end
+
+# Does not exist in Base.Checked, so just exists in this package.
+"""
+    FixedPointDecimals.round_with_overflow(x::FD, mode=RoundNearest)::Tuple{FD,Bool}
+
+Calculate the nearest integral value of the same type as x, breaking ties using the
+specified RoundingModes, returning it and a boolean indicating whether overflow has
+occurred.
+
+The overflow protection may impose a perceptible performance penalty.
+"""
+round_with_overflow(fd::FD, ::RoundingMode{:Up}) = ceil_with_overflow(fd)
+round_with_overflow(fd::FD, ::RoundingMode{:Down}) = floor_with_overflow(fd)
+# trunc cannot overflow.
+round_with_overflow(fd::FD, ::RoundingMode{:ToZero}) = (trunc(fd), false)
+function round_with_overflow(
+    x::FD{T, f},
+    m::Union{
+        RoundingMode{:Nearest},
+        RoundingMode{:NearestTiesUp},
+        RoundingMode{:NearestTiesAway}
+    }=RoundNearest,
+) where {T, f}
+    powt = coefficient(FD{T, f})
+    quotient, remainder = fldmodinline(x.i, powt)
+    v = _round_to_nearest(quotient, remainder, powt, m)
+    backing, overflowed = Base.Checked.mul_with_overflow(v, powt)
+    (reinterpret(FD{T, f}, backing), overflowed)
+end
+
 Base.checked_add(x::FD, y::FD) = Base.checked_add(promote(x, y)...)
 Base.checked_sub(x::FD, y::FD) = Base.checked_sub(promote(x, y)...)
 Base.checked_mul(x::FD, y::FD) = Base.checked_mul(promote(x, y)...)
