@@ -45,8 +45,11 @@ import Parsers
 # floats that support fma and are roughly IEEE-like
 const FMAFloat = Union{Float16, Float32, Float64, BigFloat}
 
-_has_typemax(::Type{T}) where T = hasmethod(typemax, (Type{T},))
+# Is typemin(T) defined?
 _has_typemin(::Type{T}) where T = hasmethod(typemin, (Type{T},))
+# Is typemax(T) defined?
+_has_typemax(::Type{T}) where T = hasmethod(typemax, (Type{T},))
+# Can v be represented by T?
 function _fits(v::Integer, ::Type{T}) where T <: Integer
     limitless = !(_has_typemax(T) && _has_typemin(T))
     return limitless || typemin(T) <= v <= typemax(T)
