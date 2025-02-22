@@ -45,6 +45,13 @@ import Parsers
 # floats that support fma and are roughly IEEE-like
 const FMAFloat = Union{Float16, Float32, Float64, BigFloat}
 
+_has_typemax(::Type{T}) where T = hasmethod(typemax, (Type{T},))
+_has_typemin(::Type{T}) where T = hasmethod(typemin, (Type{T},))
+function _fits(v::Integer, ::Type{T}) where T <: Integer
+    limitless = !(_has_typemax(T) && _has_typemin(T))
+    return limitless || typemin(T) <= v <= typemax(T)
+end
+
 for fn in [:trunc, :floor, :ceil]
     fnname = Symbol(fn, "mul")
     fnname_str = String(fnname)
@@ -324,7 +331,7 @@ Base.convert(::Type{FD{T, f}}, x::FD{T, f}) where {T, f} = x  # Converting an FD
 function Base.convert(::Type{FD{T, f}}, x::Integer) where {T, f}
     C = coefficient(FD{T, f})
     throw_inexact() = throw(InexactError(:convert, FD{T, f}, x))
-    typemin(T) <= x <= typemax(T) || throw_inexact()
+    _fits(x, T) || throw_inexact()
     xT = convert(T, x)  # This won't throw, since we already checked, above.
     # Perform x * C, and check for overflow. This is cheaper than a widemul, especially for
     # 128-bit T, since those widen into a BigInt.
@@ -427,7 +434,7 @@ function Base.Checked.mul_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Intege
     powt = coefficient(FD{T, f})
     quotient, remainder = fldmodinline(_widemul(x.i, y.i), powt)
     v = _round_to_nearest(quotient, remainder, powt)
-    return (reinterpret(FD{T,f}, rem(v, T)), v < typemin(T) || v > typemax(T))
+    return (reinterpret(FD{T,f}, rem(v, T)), !_fits(v, T))
 end
 
 # This does not exist in Base so is just part of this package.
@@ -442,7 +449,7 @@ overflow/underflow did in fact happen. Throws a DivideError on divide-by-zero.
 function div_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
     C = coefficient(FD{T, f})
     # This case will break the div call below.
-    if y.i == -1 && T <: Signed && hasmethod(typemin, (Type{T},)) && x.i == typemin(T)
+    if y.i == -1 && T <: Signed && _has_typemin(T) && x.i == typemin(T)
         # To perform the div and overflow means reaching the max and adding 1, so typemin.
         return (x, true)
     end
@@ -467,7 +474,7 @@ See also:
 function fld_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
     C = coefficient(FD{T, f})
     # This case will break the fld call below.
-    if y.i == -1 && T <: Signed && hasmethod(typemin, (Type{T},)) && x.i == typemin(T)
+    if y.i == -1 && T <: Signed && _has_typemin(T) && x.i == typemin(T)
         # To fld and overflow means reaching the max and adding 1, so typemin (x).
         return (x, true)
     end
@@ -494,7 +501,7 @@ function rdiv_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
     # quotient is necessarily not typemax/typemin. x.i * powt cannot reach typemax/typemin
     # of the widened type and y.i is an integer. Thus the following call cannot overflow.
     v = _round_to_nearest(quotient, remainder, y.i)
-    return (reinterpret(FD{T,f}, rem(v, T)), v < typemin(T) || v > typemax(T))
+    return (reinterpret(FD{T,f}, rem(v, T)), !_fits(v, T))
 end
 
 # These functions allow us to perform division with integers outside of the range of the
@@ -510,7 +517,7 @@ function rdiv_with_overflow(x::Integer, y::FD{T, f}) where {T<:Integer, f}
     return (reinterpret(FD{T,f}, rem(v, T)), v < typemin(T) || v > typemax(T))
 end
 function rdiv_with_overflow(x::FD{T, f}, y::Integer) where {T<:Integer, f}
-    if y == -1 && T <: Signed && hasmethod(typemin, (Type{T},)) && x.i == typemin(T)
+    if y == -1 && T <: Signed && _has_typemin(T) && x.i == typemin(T)
         # typemin / -1 for signed integers wraps, giving typemin (x) again.
         return (x, true)
     end
@@ -806,11 +813,11 @@ for comp_op in (:(==), :(<), :(<=))
             return $comp_op(x, y.i)
         else
             if !(x isa T)
-                if x > typemax(T)
+                if _has_typemax(T) && x > typemax(T)
                     # If x is too big to fit in T, then we know already that it's bigger
                     # than y, so not equal and not less than.
                     return false
-                elseif x < typemin(T)
+                elseif _has_typemin(T) && x < typemin(T)
                     # Similarly, if too small, it's definitely less than y (and not equal).
                     return $(comp_op == :(==)) ? false : true
                 end
@@ -840,11 +847,11 @@ for comp_op in (:(==), :(<), :(<=))
             return $comp_op(x.i, y)
         else
             if !(y isa T)
-                if y > typemax(T)
+                if _has_typemax(T) && y > typemax(T)
                     # If y is too big to fit in T, then we know already that x is smaller
                     # than y. So not equal, but definitely x < y.
                     return $(comp_op == :(==)) ? false : true
-                elseif y < typemin(T)
+                elseif _has_typemin(T) && y < typemin(T)
                     # Similarly, if y is too small, definitely x > y (and not equal).
                     return false
                 end
