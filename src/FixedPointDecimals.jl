@@ -128,7 +128,7 @@ else
     const _BIGINT_10s = BigInt[] # buffer for "remainders" in _divpow10!, accessed via `access_threaded`
     const _BIGINT_Rs = BigInt[]  # buffer for "remainders" in _divpow10!, accessed via `access_threaded`
 
-    _get_bigint10s() = access_threaded(() -> (@static VERSION > v"1.5" ? BigInt(; nbits=256) : BigInt()), _BIGIN_10s)
+    _get_bigint10s() = access_threaded(() -> (@static VERSION > v"1.5" ? BigInt(; nbits=256) : BigInt()), _BIGINT_10s)
     _get_bigintRs() = access_threaded(() -> (@static VERSION > v"1.5" ? BigInt(; nbits=256) : BigInt()), _BIGINT_Rs)
 
     function access_threaded(f, v::Vector)
