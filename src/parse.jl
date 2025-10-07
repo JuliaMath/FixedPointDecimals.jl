@@ -31,12 +31,6 @@ const OPTIONS_ROUND_THROWS = Parsers.Options(rounding=nothing)
 # TODO: a lookup table per type would be faster
 @inline _shift(n::T, decpos) where {T} = T(10)^decpos * n
 
-const _BIGINT1 = BigInt(1)
-const _BIGINT2 = BigInt(2)
-const _BIGINT10 = BigInt(10)
-const _BIGINT_10s = BigInt[] # buffer for "remainders" in _divpow10!, accessed via `Parsers.access_threaded`
-const _BIGINT_Rs = BigInt[]  # buffer for "remainders" in _divpow10!, accessed via `Parsers.access_threaded`
-
 for T in (Base.BitSigned_types..., Base.BitUnsigned_types...)
     let bytes = Tuple(codeunits(string(typemax(T))))
         # The number of digits an integer of type T can hold
@@ -74,8 +68,8 @@ function _divpow10!(x::T, code, pow, ::RoundingMode{:Throw}) where {T}
 end
 function _divpow10!(x::BigInt, code, pow, ::RoundingMode{:Nearest})
     # adapted from https://github.com/JuliaLang/julia/blob/112554e1a533cebad4cb0daa27df59636405c075/base/div.jl#L217
-    @inbounds r = Parsers.access_threaded(() -> (@static VERSION > v"1.5" ? BigInt(; nbits=256) : BigInt()), _BIGINT_Rs)  # we must not yield here!
-    @inbounds y = Parsers.access_threaded(() -> (@static VERSION > v"1.5" ? BigInt(; nbits=256) : BigInt()), _BIGINT_10s) # we must not yield here!
+    r = _get_bigintRs()  # we must not yield here!
+    y = _get_bigint10s() # we must not yield here!
     Base.GMP.MPZ.set!(y, _BIGINT10)             # y = 10
     Base.GMP.MPZ.pow_ui!(y, pow)                # y = y^pow
     Base.GMP.MPZ.tdiv_qr!(x, r, x, y)           # x, r = divrem(x, y)
@@ -87,7 +81,7 @@ function _divpow10!(x::BigInt, code, pow, ::RoundingMode{:Nearest})
     return x, code
 end
 function _divpow10!(x::BigInt, code, pow, ::RoundingMode{:ToZero})
-    @inbounds y = Parsers.access_threaded(() -> (@static VERSION > v"1.5" ? BigInt(; nbits=256) : BigInt()), _BIGINT_10s) # we must not yield here!
+    y = _get_bigint10s() # we must not yield here!
     Base.GMP.MPZ.set!(y, _BIGINT10) # y = 10
     Base.GMP.MPZ.pow_ui!(y, pow)    # y = y^pow
     Base.GMP.MPZ.tdiv_q!(x, y)      # x = div(x, y)
@@ -95,7 +89,7 @@ function _divpow10!(x::BigInt, code, pow, ::RoundingMode{:ToZero})
 end
 
 function _divpow10!(x::BigInt, code, pow, ::RoundingMode{:Throw})
-    @inbounds y = Parsers.access_threaded(() -> (@static VERSION > v"1.5" ? BigInt(; nbits=256) : BigInt()), _BIGINT_10s) # we must not yield here!
+    y = _get_bigint10s() # we must not yield here!
     Base.GMP.MPZ.set!(y, _BIGINT10)   # y = 10
     Base.GMP.MPZ.pow_ui!(y, pow)      # y = y^pow
     Base.GMP.MPZ.tdiv_qr!(x, y, x, y) # x, y = divrem(x, y)
