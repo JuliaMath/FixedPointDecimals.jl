@@ -907,6 +907,9 @@ Base.eps(x::FD) = eps(typeof(x))
 Base.floatmin(::Type{T}) where {T <: FD} = eps(T)
 Base.floatmax(::Type{T}) where {T <: FD} = typemax(T)
 
+# the default implementation of signbit is slow for BigInts and Int128s
+Base.signbit(x::FD) = signbit(x.i)
+
 # printing
 function Base.print(io::IO, x::FD{T, 0}) where T
     print(io, x.i)
