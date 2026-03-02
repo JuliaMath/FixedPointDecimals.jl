@@ -81,7 +81,8 @@ function div_by_const(x::T, ::Val{C}) where {T, C}
 
     out = _widemul(promote(x, magic_number)...)
     out >>= shift
-    # Adding one as implied by formula (1b) in Hacker's delight, Chapter 10-4.
+    # Add one if x was negative as implied by formula (1b) in Hacker's delight, 
+    # Chapter 10-4. (Note that of course if x is Unsigned, this compiles away.)
     return (out % T) + (x < zero(T))
 end
 
