@@ -25,11 +25,14 @@ __precompile__()
 
 module FixedPointDecimals
 
+using Base: checked_abs, checked_add, checked_cld, checked_div, checked_fld,
+    checked_mod, checked_mul, checked_neg, checked_rem, checked_sub
+
 export FixedDecimal, RoundThrows
 
 # (Re)export checked_* arithmetic functions
 # - Defined in this package:
-export checked_rdiv
+export checked_rdiv, div_with_overflow
 # - Reexported from Base:
 export checked_abs, checked_add, checked_cld, checked_div, checked_fld,
     checked_mod, checked_mul, checked_neg, checked_rem, checked_sub
@@ -63,11 +66,12 @@ const FMAFloat = Union{Float16, Float32, Float64, BigFloat}
 
 for fn in [:trunc, :floor, :ceil]
     fnname = Symbol(fn, "mul")
+    fnname_str = String(fnname)
     opp_fn = fn == :floor ? :ceil : :floor
 
     @eval begin
         @doc """
-            $($fnname)(I, x, y) :: I
+            $($fnname_str)(I, x, y) :: I
 
         Compute `$($fn)(I, x * y)`, returning the result as type `I`. For
         floating point values, this function can be more accurate than
@@ -131,12 +135,41 @@ const FD = FixedDecimal
 
 include("parse.jl")
 
-function __init__()
-    nt = isdefined(Base.Threads, :maxthreadid) ? Threads.maxthreadid() : Threads.nthreads()
-    # Buffers used in parsing when dealing with BigInts, see _divpow10! in parse.jl
-    resize!(empty!(_BIGINT_10s), nt)
-    resize!(empty!(_BIGINT_Rs), nt)
-    return
+const _BIGINT1 = BigInt(1)
+const _BIGINT2 = BigInt(2)
+const _BIGINT10 = BigInt(10)
+# Adapted from Parsers.jl, see https://github.com/JuliaData/Parsers.jl/pull/195
+@static if isdefined(Base, :OncePerTask)
+    const _get_bigint10s = OncePerTask{BigInt}(() -> BigInt(; nbits=256))
+    const _get_bigintRs = OncePerTask{BigInt}(() -> BigInt(; nbits=256))
+else
+    # N.B This code is not thread safe in the presence of thread migration
+    const _BIGINT_10s = BigInt[] # buffer for "remainders" in _divpow10!, accessed via `access_threaded`
+    const _BIGINT_Rs = BigInt[]  # buffer for "remainders" in _divpow10!, accessed via `access_threaded`
+
+    _get_bigint10s() = access_threaded(() -> (@static VERSION > v"1.5" ? BigInt(; nbits=256) : BigInt()), _BIGINT_10s)
+    _get_bigintRs() = access_threaded(() -> (@static VERSION > v"1.5" ? BigInt(; nbits=256) : BigInt()), _BIGINT_Rs)
+
+    function access_threaded(f, v::Vector)
+        tid = Threads.threadid()
+        0 < tid <= length(v) || _length_assert()
+        if @inbounds isassigned(v, tid)
+            @inbounds x = v[tid]
+        else
+            x = f()
+            @inbounds v[tid] = x
+        end
+        return x
+    end
+    @noinline _length_assert() = @assert false "0 < tid <= v"
+
+    function __init__()
+        nt = isdefined(Base.Threads, :maxthreadid) ? Threads.maxthreadid() : Threads.nthreads()
+        # Buffers used in parsing when dealing with BigInts, see _divpow10! in parse.jl
+        resize!(empty!(_BIGINT_10s), nt)
+        resize!(empty!(_BIGINT_Rs), nt)
+        return
+    end
 end
 
 # Custom widemul implementation to avoid the cost of widening to BigInt.
@@ -179,6 +212,10 @@ function Base.widemul(x::FD{T, f}, y::Integer) where {T, f}
     reinterpret(FD{typeof(i), f}, i)
 end
 Base.widemul(x::Integer, y::FD) = widemul(y, x)
+# Need to avoid ambiguity:
+Base.widemul(x::Bool, y::FD) = widemul(y, x)
+# Need to avoid ambiguity:
+Base.widemul(x::FD{T, f}, y::Bool) where {T, f} = widemul(x, Int(y))
 
 """
     _round_to_nearest(quotient, remainder, divisor, ::RoundingMode{M})
@@ -305,6 +342,10 @@ for fn in [:trunc, :floor, :ceil]
         val = _apply_exact_float($(Symbol(fn, "mul")), T, x, powt)
         reinterpret(FD{T, f}, val)
     end
+    # needed to avoid ambiguity with e.g. `floor(::Type{T}, x::Rational)`
+    @eval function Base.$fn(::Type{FD{T, f}}, x::Rational) where {T, f}
+        reinterpret(FD{T, f}, $fn(T, x * coefficient(FD{T, f})))
+    end
 end
 function Base.round(::Type{TI}, x::FD, m::RoundingMode=RoundNearest) where {TI <: Integer}
     convert(TI, round(x,m))::TI
@@ -313,10 +354,14 @@ function Base.round(::Type{FD{T, f}}, x::Real, ::RoundingMode{:Nearest}=RoundNea
     reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
 end
 
-# needed to avoid ambiguity
-function Base.round(::Type{FD{T, f}}, x::Rational, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
-    reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
+# needed to avoid ambiguity with `round(::Type{T}, x::Rational{Bool}, ::RoundingMode)`
+function Base.round(::Type{FD{T, f}}, x::Rational{Bool}, ::RoundingMode{:Nearest}=RoundNearest) where {T, f}
+   reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
 end
+function Base.round(::Type{FD{T, f}}, x::Rational{Tr}, ::RoundingMode{:Nearest}=RoundNearest) where {T, f, Tr}
+   reinterpret(FD{T, f}, round(T, x * coefficient(FD{T, f})))
+end
+
 
 # conversions and promotions
 Base.convert(::Type{FD{T, f}}, x::FD{T, f}) where {T, f} = x  # Converting an FD to itself is a no-op
@@ -413,6 +458,186 @@ end
 
 # --- Checked arithmetic ---
 
+function Base.add_with_overflow(x::T, y::T) where {T<:FD}
+    z, b = Base.add_with_overflow(x.i, y.i)
+    return (reinterpret(T, z), b)
+end
+
+function Base.sub_with_overflow(x::T, y::T) where {T<:FD}
+    z, b = Base.sub_with_overflow(x.i, y.i)
+    return (reinterpret(T, z), b)
+end
+
+function Base.Checked.mul_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
+    powt = coefficient(FD{T, f})
+    quotient, remainder = fldmodinline(_widemul(x.i, y.i), powt)
+    v = _round_to_nearest(quotient, remainder, powt)
+    return (reinterpret(FD{T,f}, rem(v, T)), v < typemin(T) || v > typemax(T))
+end
+
+# This does not exist in Base so is just part of this package.
+# Throws on divide by zero.
+@doc """
+    div_with_overflow(x::FixedDecimal{T,f}, y::FixedDecimal{T,f})::(FixedDecimal{T,f}, Bool)
+        where {T<:Integer, f}
+
+Return the result of div (wrapping on overflow/underflow) and a boolean indicating whether
+overflow/underflow did in fact happen. Throws a DivideError on divide-by-zero.
+"""
+function div_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
+    C = coefficient(FD{T, f})
+    # This case will break the div call below.
+    if y.i == -1 && T <: Signed && hasmethod(typemin, (Type{T},)) && x.i == typemin(T)
+        # To perform the div and overflow means reaching the max and adding 1, so typemin.
+        return (x, true)
+    end
+    # Note: The div() will throw for divide-by-zero, that's not an overflow.
+    v, b = Base.Checked.mul_with_overflow(C, div(x.i, y.i))
+    return (reinterpret(FD{T,f}, v), b)
+end
+
+# Does not exist in Base.Checked, so just exists in this package.
+@doc """
+    FixedPointDecimals.fld_with_overflow(x::FD, y::FD)::Tuple{FD,Bool}
+
+Calculates the largest integer less than or equal to `x / y`, checking for overflow errors
+where applicable, returning the result and a boolean indicating whether overflow occured.
+Throws a DivideError on divide-by-zero.
+
+The overflow protection may impose a perceptible performance penalty.
+
+See also:
+- `Base.checked_fld`.
+"""
+function fld_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
+    C = coefficient(FD{T, f})
+    # This case will break the fld call below.
+    if y.i == -1 && T <: Signed && hasmethod(typemin, (Type{T},)) && x.i == typemin(T)
+        # To fld and overflow means reaching the max and adding 1, so typemin (x).
+        return (x, true)
+    end
+    # Note: The fld() will already throw for divide-by-zero, that's not an overflow.
+    v, b = Base.Checked.mul_with_overflow(C, fld(x.i, y.i))
+    return (reinterpret(FD{T, f}, v), b)
+end
+
+"""
+    FixedPointDecimals.rdiv_with_overflow(x::FD, y::FD)::Tuple{FD,Bool}
+
+Calculates `x / y`, checking for overflow errors where applicable, returning the result
+and a boolean indicating whether overflow occured. Throws a DivideError on divide-by-zero.
+
+The overflow protection may impose a perceptible performance penalty.
+
+See also:
+- `Base.checked_rdiv`.
+"""
+function rdiv_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
+    powt = coefficient(FD{T, f})
+    # No multiplication can reach the typemax/typemin of a wider type, thus no typemin / -1.
+    quotient, remainder = fldmod(_widemul(x.i, powt), y.i)
+    # quotient is necessarily not typemax/typemin. x.i * powt cannot reach typemax/typemin
+    # of the widened type and y.i is an integer. Thus the following call cannot overflow.
+    v = _round_to_nearest(quotient, remainder, y.i)
+    return (reinterpret(FD{T,f}, rem(v, T)), v < typemin(T) || v > typemax(T))
+end
+
+# These functions allow us to perform division with integers outside of the range of the
+# FixedDecimal.
+function rdiv_with_overflow(x::Integer, y::FD{T, f}) where {T<:Integer, f}
+    powt = coefficient(FD{T, f})
+    powtsq = _widemul(powt, powt)
+    # No multiplication can reach the typemax/typemin of a wider type, thus no typemin / -1.
+    quotient, remainder = fldmod(_widemul(x, powtsq), y.i)
+    # Same deal as previous overload as to why this will not overload. Note that all
+    # multiplication operations were widemuls.
+    v = _round_to_nearest(quotient, remainder, y.i)
+    return (reinterpret(FD{T,f}, rem(v, T)), v < typemin(T) || v > typemax(T))
+end
+function rdiv_with_overflow(x::FD{T, f}, y::Integer) where {T<:Integer, f}
+    if y == -1 && T <: Signed && hasmethod(typemin, (Type{T},)) && x.i == typemin(T)
+        # typemin / -1 for signed integers wraps, giving typemin (x) again.
+        return (x, true)
+    end
+
+    quotient, remainder = fldmod(x.i, y)
+    # It is impossible for both the quotient to be typemax/typemin AND remainder to be
+    # non-zero because y is an integer. Thus the following call cannot overflow.
+    v = _round_to_nearest(quotient, remainder, y)
+    return (reinterpret(FD{T, f}, v), false)
+end
+
+# Does not exist in Base.Checked, so just exists in this package.
+"""
+    FixedPointDecimals.ceil_with_overflow(x::FD)::Tuple{FD,Bool}
+
+Calculate the nearest integral value of the same type as x that is greater than or equal
+to x, returning it and a boolean indicating whether overflow has occurred.
+
+The overflow protection may impose a perceptible performance penalty.
+"""
+function ceil_with_overflow(x::FD{T,f}) where {T<:Integer,f}
+    powt = coefficient(FD{T, f})
+    quotient, remainder = fldmodinline(x.i, powt)
+    return if remainder > 0
+        # Could overflow when powt is 1 (f is 0) and x/x.i is typemax.
+        v, add_overflowed = Base.Checked.add_with_overflow(quotient, one(quotient))
+        # Could overflow when x is close to typemax (max quotient) independent of f.
+        backing, mul_overflowed = Base.Checked.mul_with_overflow(v, powt)
+        (reinterpret(FD{T, f}, backing), add_overflowed || mul_overflowed)
+    else
+        (FD{T, f}(quotient), false)
+    end
+end
+
+# Does not exist in Base.Checked, so just exists in this package.
+"""
+    FixedPointDecimals.floor_with_overflow(x::FD)::Tuple{FD,Bool}
+
+Calculate the nearest integral value of the same type as x that is less than or equal
+to x, returning it and a boolean indicating whether overflow has occurred.
+
+The overflow protection may impose a perceptible performance penalty.
+"""
+function floor_with_overflow(x::FD{T, f}) where {T, f}
+    powt = coefficient(FD{T, f})
+    # Won't underflow, powt is an integer.
+    quotient = fld(x.i, powt)
+    # When we convert it back to the backing format it might though. Occurs when
+    # the integer part of x is at its maximum.
+    backing, overflowed = Base.Checked.mul_with_overflow(quotient, powt)
+    return (reinterpret(FD{T, f}, backing), overflowed)
+end
+
+# Does not exist in Base.Checked, so just exists in this package.
+"""
+    FixedPointDecimals.round_with_overflow(x::FD, mode=RoundNearest)::Tuple{FD,Bool}
+
+Calculate the nearest integral value of the same type as x, breaking ties using the
+specified RoundingModes, returning it and a boolean indicating whether overflow has
+occurred.
+
+The overflow protection may impose a perceptible performance penalty.
+"""
+round_with_overflow(fd::FD, ::RoundingMode{:Up}) = ceil_with_overflow(fd)
+round_with_overflow(fd::FD, ::RoundingMode{:Down}) = floor_with_overflow(fd)
+# trunc cannot overflow.
+round_with_overflow(fd::FD, ::RoundingMode{:ToZero}) = (trunc(fd), false)
+function round_with_overflow(
+    x::FD{T, f},
+    m::Union{
+        RoundingMode{:Nearest},
+        RoundingMode{:NearestTiesUp},
+        RoundingMode{:NearestTiesAway}
+    }=RoundNearest,
+) where {T, f}
+    powt = coefficient(FD{T, f})
+    quotient, remainder = fldmodinline(x.i, powt)
+    v = _round_to_nearest(quotient, remainder, powt, m)
+    backing, overflowed = Base.Checked.mul_with_overflow(v, powt)
+    (reinterpret(FD{T, f}, backing), overflowed)
+end
+
 Base.checked_add(x::FD, y::FD) = Base.checked_add(promote(x, y)...)
 Base.checked_sub(x::FD, y::FD) = Base.checked_sub(promote(x, y)...)
 Base.checked_mul(x::FD, y::FD) = Base.checked_mul(promote(x, y)...)
@@ -440,21 +665,19 @@ Base.checked_mod(x::FD, y) = Base.checked_mod(promote(x, y)...)
 Base.checked_mod(x, y::FD) = Base.checked_mod(promote(x, y)...)
 
 function Base.checked_add(x::T, y::T) where {T<:FD}
-    z, b = Base.add_with_overflow(x.i, y.i)
+    z, b = Base.Checked.add_with_overflow(x, y)
     b && Base.Checked.throw_overflowerr_binaryop(:+, x, y)
-    return reinterpret(T, z)
+    return z
 end
 function Base.checked_sub(x::T, y::T) where {T<:FD}
-    z, b = Base.sub_with_overflow(x.i, y.i)
+    z, b = Base.Checked.sub_with_overflow(x, y)
     b && Base.Checked.throw_overflowerr_binaryop(:-, x, y)
-    return reinterpret(T, z)
+    return z
 end
 function Base.checked_mul(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
-    powt = coefficient(FD{T, f})
-    quotient, remainder = fldmod_by_const(_widemul(x.i, y.i), powt)
-    v = _round_to_nearest(quotient, remainder, powt)
-    typemin(T) <= v <= typemax(T) || Base.Checked.throw_overflowerr_binaryop(:*, x, y)
-    return reinterpret(FD{T, f}, T(v))
+    z, b = Base.Checked.mul_with_overflow(x, y)
+    b && Base.Checked.throw_overflowerr_binaryop(:*, x, y)
+    return z
 end
 # Checked division functions
 for divfn in [:div, :fld, :cld]
@@ -508,28 +731,22 @@ See also:
 checked_rdiv(x::FD, y::FD) = checked_rdiv(promote(x, y)...)
 
 function checked_rdiv(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
-    powt = coefficient(FD{T, f})
-    quotient, remainder = fldmod(_widemul(x.i, powt), y.i)
-    v = _round_to_nearest(quotient, remainder, y.i)
-    typemin(T) <= v <= typemax(T) || Base.Checked.throw_overflowerr_binaryop(:/, x, y)
-    return reinterpret(FD{T, f}, v)
+    (z, b) = rdiv_with_overflow(x, y)
+    b && Base.Checked.throw_overflowerr_binaryop(:/, x, y)
+    return z
 end
 
 # These functions allow us to perform division with integers outside of the range of the
 # FixedDecimal.
 function checked_rdiv(x::Integer, y::FD{T, f}) where {T<:Integer, f}
-    powt = coefficient(FD{T, f})
-    powtsq = _widemul(powt, powt)
-    quotient, remainder = fldmod(_widemul(x, powtsq), y.i)
-    v = _round_to_nearest(quotient, remainder, y.i)
-    typemin(T) <= v <= typemax(T) || Base.Checked.throw_overflowerr_binaryop(:/, x, y)
-    reinterpret(FD{T, f}, v)
+    (z, b) = rdiv_with_overflow(x, y)
+    b && Base.Checked.throw_overflowerr_binaryop(:/, x, y)
+    return z
 end
 function checked_rdiv(x::FD{T, f}, y::Integer) where {T<:Integer, f}
-    quotient, remainder = fldmod(x.i, y)
-    v = _round_to_nearest(quotient, remainder, y)
-    typemin(T) <= v <= typemax(T) || Base.Checked.throw_overflowerr_binaryop(:/, x, y)
-    reinterpret(FD{T, f}, v)
+    (z, b) = rdiv_with_overflow(x, y)
+    b && Base.Checked.throw_overflowerr_binaryop(:/, x, y)
+    return z
 end
 
 
@@ -554,6 +771,8 @@ function Base.convert(::Type{TR}, x::FD{T, f}) where {TR <: Rational, T, f}
 end
 
 (::Type{T})(x::FD) where {T<:Union{AbstractFloat,Integer,Rational}} = convert(T, x)
+# Need to avoid ambiguity:
+Base.Bool(x::FD) = convert(Bool, x)
 
 Base.promote_rule(::Type{FD{T, f}}, ::Type{<:Integer}) where {T, f} = FD{T, f}
 Base.promote_rule(::Type{<:FD}, ::Type{TF}) where {TF <: AbstractFloat} = TF

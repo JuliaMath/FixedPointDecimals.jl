@@ -12,4 +12,5 @@ include(joinpath(pkg_path, "test", "utils.jl"))
     include("FixedDecimal.jl")
     isdefined(Base, Symbol("@assume_effects")) && include("fldmod-by-const_tests.jl")
 end
-
+    include("aqua_test.jl")
+end  # global testset

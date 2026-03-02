@@ -776,6 +776,121 @@ end
         @test FD{Int8,1}(2) / Int8(20) == FD{Int8,1}(0.1)
     end
 
+    @testset "limits: with_overflow math" begin
+        using FixedPointDecimals: rdiv_with_overflow, fld_with_overflow
+
+        # Easy to reason about cases of overflow:
+        @test Base.Checked.add_with_overflow(FD{Int8,2}(1), FD{Int8,2}(1)) == (FD{Int8,2}(-0.56), true)
+        @test Base.Checked.add_with_overflow(FD{Int8,2}(1), FD{Int8,2}(1)) == (FD{Int8,2}(-0.56), true)
+        @test Base.Checked.add_with_overflow(FD{Int8,2}(1), FD{Int8,2}(0.4)) == (FD{Int8,2}(-1.16), true)
+        @test Base.Checked.sub_with_overflow(FD{Int8,2}(1), FD{Int8,2}(-1)) == (FD{Int8,2}(-0.56), true)
+        @test Base.Checked.sub_with_overflow(FD{Int8,2}(-1), FD{Int8,2}(0.4)) == (FD{Int8,2}(1.16), true)
+        @test Base.Checked.mul_with_overflow(FD{Int8,2}(1.2), FD{Int8,2}(1.2)) == (FD{Int8,2}(-1.12), true)
+
+        @test div_with_overflow(FD{Int8,2}(1), FD{Int8,2}(0.5)) == (FD{Int8,2}(-0.56), true)
+        @test div_with_overflow(typemin(FD{Int32,0}), FD{Int32,0}(-1)) == (typemin(FD{Int32,0}), true)
+        @test div_with_overflow(FD{Int16,1}(1639), FD{Int16,1}(0.5)) == (FD{Int16,1}(-3275.6), true)
+
+        @test rdiv_with_overflow(Int8(1), FD{Int8,2}(0.7)) == (FD{Int8,2}(-1.13), true)
+        @test rdiv_with_overflow(FD{Int16,2}(165), FD{Int16,2}(0.5)) == (FD{Int16,2}(-325.36), true)
+        @test rdiv_with_overflow(FD{Int16,2}(-165), FD{Int16,2}(0.5)) == (FD{Int16,2}(325.36), true)
+        @test rdiv_with_overflow(typemin(FD{Int64,8}), Int32(-1)) == (typemin(FD{Int64,8}), true)
+        @test rdiv_with_overflow(typemin(FD{Int64,0}), FD{Int64,0}(-1)) == (typemin(FD{Int64,0}), true)
+        @test rdiv_with_overflow(typemin(FD{Int8,2}), FD{Int8,2}(-1)) == (typemin(FD{Int8,2}), true)
+        @test rdiv_with_overflow(typemin(FD{Int8,2}), FD{Int8,2}(-0.01)) == (FD{Int8,2}(0), true)
+
+        @test fld_with_overflow(FD{Int8,2}(-1), FD{Int8,2}(0.9)) == (FD{Int8,2}(0.56), true)
+        @test fld_with_overflow(typemin(FD{Int64,0}), FD{Int64,0}(-1)) == (typemin(FD{Int64,0}), true)
+        @test fld_with_overflow(FD{Int8,1}(7), FD{Int8,1}(0.5)) == (FD{Int8,1}(-11.6), true)
+        @test FixedPointDecimals.fld_with_overflow(typemin(FD{Int8,2}), FD{Int8,2}(-0.01)) == (typemin(FD{Int8,2}), true)
+
+        @testset "with_overflow math corner cases" begin
+            @testset for I in (Int128, UInt128, Int8, UInt8), f in (0,2)
+            T = FD{I, f}
+                issigned(I) = signed(I) === I
+
+                @test Base.Checked.add_with_overflow(typemax(T), eps(T)) == (typemax(T) + eps(T), true)
+                issigned(I) && @test Base.Checked.add_with_overflow(typemin(T), -eps(T)) == (typemin(T) + -eps(T), true)
+                @test Base.Checked.add_with_overflow(typemax(T), T(1)) == (typemax(T) + 1, true)
+                @test Base.Checked.add_with_overflow(T(1), typemax(T)) == (typemax(T) + 1, true)
+
+                @test Base.Checked.sub_with_overflow(typemin(T), eps(T)) == (typemin(T) - eps(T), true)
+                issigned(I) && @test Base.Checked.sub_with_overflow(typemax(T), -eps(T)) == (typemax(T) - -eps(T), true)
+                @test Base.Checked.sub_with_overflow(typemin(T), T(1)) == (typemin(T) - 1, true)
+                if issigned(I) && 2.0 <= typemax(T)
+                    @test Base.Checked.sub_with_overflow(T(-2), typemax(T)) == (-2 -typemax(T), true)
+                end
+
+                @test Base.Checked.mul_with_overflow(typemax(T), typemax(T)) == (typemax(T) * typemax(T), true)
+                issigned(I) && @test Base.Checked.mul_with_overflow(typemin(T), typemax(T)) == (typemin(T) * typemax(T), true)
+                if 2.0 <= typemax(T)
+                    @test Base.Checked.mul_with_overflow(typemax(T), T(2)) == (typemax(T) * 2, true)
+                    @test Base.Checked.mul_with_overflow(T(2), typemax(T)) == (2 * typemax(T), true)
+                    issigned(I) && @test Base.Checked.mul_with_overflow(typemin(T), T(2)) == (typemin(T) * 2, true)
+                    issigned(I) && @test Base.Checked.mul_with_overflow(T(2), typemin(T)) == (2 * typemin(T), true)
+                end
+
+                if f > 0
+                    @test div_with_overflow(typemax(T), eps(T))[2]
+                    issigned(I) && @test div_with_overflow(typemin(T), eps(T))[2]
+                    issigned(I) && @test div_with_overflow(typemax(T), -eps(T))[2]
+
+                    issigned(I) && @test_throws DivideError div_with_overflow(typemax(T), T(0))
+                    issigned(I) && @test_throws DivideError div_with_overflow(typemin(T), T(0))
+                    issigned(I) && @test div_with_overflow(typemin(T), -eps(T))[2]
+
+                    @test fld_with_overflow(typemax(T), eps(T))[2]
+                    issigned(I) && @test fld_with_overflow(typemin(T), eps(T))[2]
+                    issigned(I) && @test fld_with_overflow(typemax(T), -eps(T))[2]
+                end
+
+                @test_throws DivideError rdiv_with_overflow(typemax(T), T(0))
+                @test_throws DivideError rdiv_with_overflow(typemin(T), T(0))
+                @test_throws DivideError rdiv_with_overflow(eps(T), T(0))
+                @test_throws DivideError rdiv_with_overflow(-eps(T), T(0))
+
+                @test_throws DivideError fld_with_overflow(typemax(T), T(0))
+                @test_throws DivideError fld_with_overflow(typemin(T), T(0))
+                @test_throws DivideError fld_with_overflow(eps(T), T(0))
+                @test_throws DivideError fld_with_overflow(-eps(T), T(0))
+            end
+        end
+
+        @testset "non-overflowing with_overflow math" begin
+            @test Base.Checked.add_with_overflow(FD{Int8,1}(1), FD{Int8,1}(1.1)) == (FD{Int8,1}(2.1), false)
+            @test Base.Checked.add_with_overflow(FD{Int8,1}(1.1), FD{Int8,1}(1)) == (FD{Int8,1}(2.1), false)
+            @test Base.Checked.add_with_overflow(FD{Int64,8}(30.123), FD{Int64,8}(30)) == (FD{Int64,8}(60.123), false)
+            @test Base.Checked.add_with_overflow(FD{Int64,8}(30.123), FD{Int64,8}(-50)) == (FD{Int64,8}(-19.877), false)
+
+            @test Base.Checked.sub_with_overflow(FD{Int16,2}(3), FD{Int16,2}(2.5)) == (FD{Int16,1}(0.5), false)
+            @test Base.Checked.sub_with_overflow(FD{Int16,2}(2.5), FD{Int16,2}(3)) == (FD{Int16,1}(-0.5), false)
+            @test Base.Checked.sub_with_overflow(FD{Int32,4}(10.11), FD{Int32,4}(2)) == (FD{Int32,4}(8.11), false)
+            @test Base.Checked.sub_with_overflow(FD{Int32,4}(10.11), FD{Int32,4}(-2)) == (FD{Int32,4}(12.11), false)
+
+            @test Base.Checked.mul_with_overflow(FD{Int64,6}(4), FD{Int64,6}(2.22)) == (FD{Int64,6}(8.88), false)
+            @test Base.Checked.mul_with_overflow(FD{Int64,6}(2.22), FD{Int64,6}(4)) == (FD{Int64,6}(8.88), false)
+            @test Base.Checked.mul_with_overflow(FD{Int128,14}(10), FD{Int128,14}(20.1)) == (FD{Int128,14}(201), false)
+            @test Base.Checked.mul_with_overflow(FD{Int128,30}(10.1), FD{Int128,30}(1)) == (FD{Int128,30}(10.1), false)
+
+            @test div_with_overflow(FD{Int64,6}(4), FD{Int64,6}(2)) == (FD{Int64,6}(2), false)
+            @test div_with_overflow(FD{Int32,6}(4), FD{Int32,6}(2.1)) == (FD{Int32,6}(1), false)
+            @test div_with_overflow(FD{Int128,14}(10), FD{Int128,14}(20.1)) == (FD{Int128,14}(0), false)
+            @test div_with_overflow(FD{Int128,30}(10.1), FD{Int128,30}(1)) == (FD{Int128,30}(10), false)
+            @test div_with_overflow(typemin(FD{Int32,8}(1)), FD{Int32,8}(-1)) == (21, false)
+
+            @test rdiv_with_overflow(Int8(1), FD{Int8,2}(0.8)) == (FD{Int8,2}(1.25), false)
+            @test rdiv_with_overflow(FD{Int64,8}(5), FD{Int64,8}(2)) == (FD{Int64,8}(2.5), false)
+            @test rdiv_with_overflow(FD{Int64,8}(5), FD{Int64,8}(0.5)) == (FD{Int64,8}(10), false)
+            @test rdiv_with_overflow(FD{Int128,0}(20000), Int32(5000)) == (FD{Int128,0}(4), false)
+
+            @test fld_with_overflow(typemax(FD{Int128,38}), FD{Int128,38}(1)) == (FD{Int128,38}(1), false)
+            @test fld_with_overflow(FD{Int64,8}(20.5), FD{Int64,8}(2.1)) == (FD{Int64,8}(9), false)
+            @test fld_with_overflow(FD{Int8,0}(-5), FD{Int8,0}(-1)) == (FD{Int8,0}(5), false)
+            @test fld_with_overflow(FD{Int8,2}(0.99), FD{Int8,2}(0.5)) == (FD{Int8,2}(1), false)
+            @test fld_with_overflow(typemin(FD{Int8,2}), FD{Int8,2}(-1)) == (FD{Int8,2}(1), false)
+        end
+    end
+
     @testset "limits: overflow checked math" begin
         # Easy to reason about cases of overflow:
         @test_throws OverflowError Base.checked_add(FD{Int8,2}(1), FD{Int8,2}(1))
@@ -1157,6 +1272,123 @@ end
     end
 end
 
+@testset "round_with_overflow" begin
+    using FixedPointDecimals: round_with_overflow
+
+    FD642 = FixedDecimal{Int64,2}
+    FD643 = FixedDecimal{Int64,3}
+
+    # Is alias for `ceil`.
+    @testset "up" begin
+        @test round_with_overflow(FD642(-0.51), RoundUp) === (FD642(0), false)
+        @test round_with_overflow(FD642(-0.50), RoundUp) === (FD642(0), false)
+        @test round_with_overflow(FD642(-0.49), RoundUp) === (FD642(0), false)
+        @test round_with_overflow(FD642(0.50), RoundUp) === (FD642(1), false)
+        @test round_with_overflow(FD642(0.51), RoundUp) === (FD642(1), false)
+        @test round_with_overflow(FD642(1.50), RoundUp) === (FD642(2), false)
+        @test round_with_overflow(typemin(FD642), RoundUp) ===
+            (parse(FD642, "-92233720368547758"), false)
+
+        @testset "overflowing" begin
+            @test round_with_overflow(typemax(FD642), RoundUp) ===
+                (parse(FD642, "-92233720368547757.16"), true)
+            @test round_with_overflow(parse(FD642, "92233720368547758.01"), RoundUp) ===
+                (parse(FD642, "-92233720368547757.16"), true)
+        end
+    end
+
+    # Is alias for `floor`.
+    @testset "down" begin
+        @test round_with_overflow(FD642(-0.51), RoundDown) === (FD642(-1), false)
+        @test round_with_overflow(FD642(-0.50), RoundDown) === (FD642(-1), false)
+        @test round_with_overflow(FD642(-0.49), RoundDown) === (FD642(-1), false)
+        @test round_with_overflow(FD642(0.50), RoundDown) === (FD642(0), false)
+        @test round_with_overflow(FD642(0.51), RoundDown) === (FD642(0), false)
+        @test round_with_overflow(FD642(1.50), RoundDown) === (FD642(1), false)
+        @test round_with_overflow(typemax(FD642), RoundDown) ===
+            (parse(FD642, "92233720368547758"), false)
+
+        @testset "overflowing" begin
+            @test round_with_overflow(typemin(FD642), RoundDown) ===
+                (parse(FD642, "92233720368547757.16"), true)
+            @test round_with_overflow(parse(FD642, "-92233720368547758.01"), RoundDown) ===
+                (parse(FD642, "92233720368547757.16"), true)
+        end
+    end
+
+    # Is alias for `trunc`.
+    @testset "to zero" begin
+        @test round_with_overflow(FD642(-0.51), RoundToZero) === (FD642(0), false)
+        @test round_with_overflow(FD642(-0.50), RoundToZero) === (FD642(0), false)
+        @test round_with_overflow(FD642(-0.49), RoundToZero) === (FD642(0), false)
+        @test round_with_overflow(FD642(0.50), RoundToZero) === (FD642(0), false)
+        @test round_with_overflow(FD642(0.51), RoundToZero) === (FD642(0), false)
+        @test round_with_overflow(FD642(1.50), RoundToZero) === (FD642(1), false)
+
+        @test round_with_overflow(typemin(FD642), RoundToZero) ===
+            (parse(FD642, "-92233720368547758"), false)
+        @test round_with_overflow(typemax(FD642), RoundToZero) ===
+            (parse(FD642, "92233720368547758"), false)
+
+        # Cannot overflow.
+    end
+
+    @testset "tie away" begin
+        @test round_with_overflow(FD642(-0.51), RoundNearestTiesAway) === (FD642(-1), false)
+        @test round_with_overflow(FD642(-0.50), RoundNearestTiesAway) === (FD642(-1), false)
+        @test round_with_overflow(FD642(-0.49), RoundNearestTiesAway) === (FD642(0), false)
+        @test round_with_overflow(FD642(0.50), RoundNearestTiesAway) === (FD642(1), false)
+        @test round_with_overflow(FD642(0.51), RoundNearestTiesAway) === (FD642(1), false)
+        @test round_with_overflow(FD642(1.50), RoundNearestTiesAway) === (FD642(2), false)
+
+        @test round_with_overflow(typemin(FD642), RoundNearestTiesAway) ===
+            (parse(FD642, "-92233720368547758"), false)
+        @test round_with_overflow(typemax(FD642), RoundNearestTiesAway) ===
+            (parse(FD642, "92233720368547758"), false)
+
+        @testset "overflowing" begin
+            # For max, FD642 has fractional .07 so use FD643 which has .807.
+            @test round_with_overflow(typemin(FD643), RoundNearestTiesAway) ===
+                (parse(FD643, "9223372036854775.616"), true)
+            @test round_with_overflow(typemax(FD643), RoundNearestTiesAway) ===
+                (parse(FD643, "-9223372036854775.616"), true)
+
+            @test round_with_overflow(parse(FD643, "9223372036854775.5"), RoundNearestTiesAway) ===
+                (parse(FD643, "-9223372036854775.616"), true)
+            @test round_with_overflow(parse(FD643, "-9223372036854775.5"), RoundNearestTiesAway) ===
+                (parse(FD643, "9223372036854775.616"), true)
+        end
+    end
+
+    @testset "tie up" begin
+        @test round_with_overflow(FD642(-0.51), RoundNearestTiesUp) === (FD642(-1), false)
+        @test round_with_overflow(FD642(-0.50), RoundNearestTiesUp) === (FD642(0), false)
+        @test round_with_overflow(FD642(-0.49), RoundNearestTiesUp) === (FD642(0), false)
+        @test round_with_overflow(FD642(0.50), RoundNearestTiesUp) === (FD642(1), false)
+        @test round_with_overflow(FD642(0.51), RoundNearestTiesUp) === (FD642(1), false)
+        @test round_with_overflow(FD642(1.50), RoundNearestTiesUp) === (FD642(2), false)
+
+        @test round_with_overflow(typemin(FD642), RoundNearestTiesUp) ===
+            (parse(FD642, "-92233720368547758"), false)
+        @test round_with_overflow(typemax(FD642), RoundNearestTiesUp) ===
+            (parse(FD642, "92233720368547758"), false)
+
+        # For max, FD642 has fractional .07 so use FD643 which has .807.
+        @test round_with_overflow(parse(FD643, "-9223372036854775.5"), RoundNearestTiesUp) ===
+            (FD643(-9223372036854775), false)
+
+        @testset "overflowing" begin
+            @test round_with_overflow(typemin(FD643), RoundNearestTiesUp) ===
+                (parse(FD643, "9223372036854775.616"), true)
+            @test round_with_overflow(typemax(FD643), RoundNearestTiesUp) ===
+                (parse(FD643, "-9223372036854775.616"), true)
+
+            @test round_with_overflow(parse(FD643, "9223372036854775.5"), RoundNearestTiesUp) ===
+                (parse(FD643, "-9223372036854775.616"), true)
+        end
+    end
+end
+
 @testset "trunc" begin
     @test trunc(Int, FD2(0.99)) === 0
     @test trunc(Int, FD2(-0.99)) === 0
@@ -1305,6 +1537,105 @@ epsi(::Type{T}) where T = eps(T)
     end
 end
 
+@testset "floor_with_overflow" begin
+    using FixedPointDecimals: floor_with_overflow
+
+    @testset "non-overflowing" begin
+        @test floor_with_overflow(FD{Int8,2}(1.02)) == (FD{Int8,2}(1), false)
+        @test floor_with_overflow(FD{Int8,2}(-0.02)) == (FD{Int8,2}(-1), false)
+        @test floor_with_overflow(FD{Int8,2}(-1)) == (FD{Int8,2}(-1), false)
+
+        @test floor_with_overflow(FD{Int16,1}(5.2)) == (FD{Int16,1}(5), false)
+        @test floor_with_overflow(FD{Int16,1}(-5.2)) == (FD{Int16,1}(-6), false)
+
+        @test floor_with_overflow(typemax(FD{Int32,0})) == (typemax(FD{Int32,0}), false)
+        @test floor_with_overflow(typemin(FD{Int32,0})) == (typemin(FD{Int32,0}), false)
+
+        @test floor_with_overflow(FD{Int64,8}(40.054672)) == (FD{Int64,8}(40), false)
+        @test floor_with_overflow(FD{Int64,8}(-40.054672)) == (FD{Int64,8}(-41), false)
+        @test floor_with_overflow(FD{Int64,8}(-92233720368)) ==
+            (FD{Int64,8}(-92233720368), false)
+
+        @test floor_with_overflow(typemax(FD{Int128,18})) ==
+            (FD{Int128,18}(170141183460469231731), false)
+        @test floor_with_overflow(FD{Int128,18}(-400.0546798232)) ==
+            (FD{Int128,18}(-401), false)
+    end
+
+    @testset "overflowing" begin
+        @test floor_with_overflow(typemin(FD{Int8,2})) == (FD{Int8,2}(0.56), true)
+        @test floor_with_overflow(FD{Int8,2}(-1.02)) == (FD{Int8,2}(0.56), true)
+
+        @test floor_with_overflow(typemin(FD{Int16,3})) == (FD{Int16,3}(32.536), true)
+        @test floor_with_overflow(FD{Int16,3}(-32.111)) == (FD{Int16,3}(32.536), true)
+
+        @test floor_with_overflow(typemin(FD{Int32,1})) == (FD{Int32,1}(214748364.6), true)
+        @test floor_with_overflow(FD{Int32,1}(-214748364.7)) ==
+            (FD{Int32,1}(214748364.6), true)
+
+        @test floor_with_overflow(typemin(FD{Int64,8})) ==
+            (parse(FD{Int64,8}, "92233720368.09551616"), true)
+        @test floor_with_overflow(FD{Int64,8}(-92233720368.5)) ==
+            (parse(FD{Int64,8}, "92233720368.09551616"), true)
+
+        @test floor_with_overflow(typemin(FD{Int128,2})) ==
+            (parse(FD{Int128,2}, "1701411834604692317316873037158841056.56"), true)
+        @test floor_with_overflow(parse(FD{Int128,2}, "-1701411834604692317316873037158841057.27")) ==
+            (parse(FD{Int128,2}, "1701411834604692317316873037158841056.56"), true)
+    end
+end
+
+@testset "ceil_with_overflow" begin
+    using FixedPointDecimals: ceil_with_overflow
+
+    @testset "non-overflowing" begin
+        @test ceil_with_overflow(FD{Int8,2}(-1.02)) == (FD{Int8,2}(-1), false)
+        @test ceil_with_overflow(FD{Int8,2}(-0.02)) == (FD{Int8,2}(0), false)
+        @test ceil_with_overflow(FD{Int8,2}(0.49)) == (FD{Int8,2}(1), false)
+        @test ceil_with_overflow(FD{Int8,2}(1)) == (FD{Int8,2}(1), false)
+
+        @test ceil_with_overflow(FD{Int16,1}(5.2)) == (FD{Int16,1}(6), false)
+        @test ceil_with_overflow(FD{Int16,1}(-5.2)) == (FD{Int16,1}(-5), false)
+
+        @test ceil_with_overflow(typemax(FD{Int32,0})) == (typemax(FD{Int32,0}), false)
+        @test ceil_with_overflow(typemin(FD{Int32,0})) == (typemin(FD{Int32,0}), false)
+
+        @test ceil_with_overflow(FD{Int64,8}(40.054672)) == (FD{Int64,8}(41), false)
+        @test ceil_with_overflow(FD{Int64,8}(-40.054672)) == (FD{Int64,8}(-40), false)
+        @test ceil_with_overflow(FD{Int64,8}(-92233720368)) ==
+            (FD{Int64,8}(-92233720368), false)
+        @test ceil_with_overflow(FD{Int64,8}(92233720368)) ==
+            (FD{Int64,8}(92233720368), false)
+
+        @test ceil_with_overflow(typemin(FD{Int128,18})) ==
+            (FD{Int128,18}(-170141183460469231731), false)
+        @test ceil_with_overflow(FD{Int128,18}(-400.0546798232)) ==
+            (FD{Int128,18}(-400), false)
+    end
+
+    @testset "overflowing" begin
+        @test ceil_with_overflow(typemax(FD{Int8,2})) == (FD{Int8,2}(-0.56), true)
+        @test ceil_with_overflow(FD{Int8,2}(1.02)) == (FD{Int8,2}(-0.56), true)
+
+        @test ceil_with_overflow(typemax(FD{Int16,3})) == (FD{Int16,3}(-32.536), true)
+        @test ceil_with_overflow(FD{Int16,3}(32.111)) == (FD{Int16,3}(-32.536), true)
+
+        @test ceil_with_overflow(typemax(FD{Int32,1})) == (FD{Int32,1}(-214748364.6), true)
+        @test ceil_with_overflow(FD{Int32,1}(214748364.7)) ==
+            (FD{Int32,1}(-214748364.6), true)
+
+        @test ceil_with_overflow(typemax(FD{Int64,8})) ==
+            (parse(FD{Int64,8}, "-92233720368.09551616"), true)
+        @test ceil_with_overflow(FD{Int64,8}(92233720368.5)) ==
+            (parse(FD{Int64,8}, "-92233720368.09551616"), true)
+
+        @test ceil_with_overflow(typemax(FD{Int128,2})) ==
+            (parse(FD{Int128,2}, "-1701411834604692317316873037158841056.56"), true)
+        @test ceil_with_overflow(parse(FD{Int128,2}, "1701411834604692317316873037158841057.27")) ==
+            (parse(FD{Int128,2}, "-1701411834604692317316873037158841056.56"), true)
+    end
+end
+
 @testset "type stability" begin
     # Test that basic operations are type stable for all the basic integer types.
     fs = [0, 1, 2, 7, 16, 38]  # To save time, don't test all possible combinations.
@@ -1429,4 +1760,18 @@ end
     @test _widemul(UInt256(3), UInt256(2)) === UInt512(6)
     @test _widemul(Int256(3), UInt256(2)) === Int512(6)
     @test _widemul(UInt256(3), Int256(2)) === Int512(6)
+
+@testset "ambiguities" begin
+    # Unit tests for the methods added to resolve Aqua-detected ambiguities.
+    @test widemul(true, FD3(1.5)) == FD3(1.5)
+    @test widemul(FD3(1.5), true) == FD3(1.5)
+    @test trunc(FD3, 4//3) == FD3(1.333)
+    @test floor(FD3, 4//3) == FD3(1.333)
+    @test ceil(FD3, 4//3) == FD3(1.334)
+    @test round(FD3, true) == FD3(1.000)
+    @test round(FD3, 4//3) == FD3(1.333)
+    @test round(FD3, 1 // 1) == FD3(1)
+    @test round(FD3, BigInt(1) // 1) == FD3(1)
+    @test round(FD3, true // true) == FD3(1)
+    @test Bool(FixedDecimal{Int,4}(1))
 end
