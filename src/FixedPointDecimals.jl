@@ -470,7 +470,7 @@ end
 
 function Base.Checked.mul_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
     powt = coefficient(FD{T, f})
-    quotient, remainder = fldmodinline(_widemul(x.i, y.i), powt)
+    quotient, remainder = fldmod_by_const(_widemul(x.i, y.i), powt)
     v = _round_to_nearest(quotient, remainder, powt)
     return (reinterpret(FD{T,f}, rem(v, T)), v < typemin(T) || v > typemax(T))
 end
@@ -578,7 +578,7 @@ The overflow protection may impose a perceptible performance penalty.
 """
 function ceil_with_overflow(x::FD{T,f}) where {T<:Integer,f}
     powt = coefficient(FD{T, f})
-    quotient, remainder = fldmodinline(x.i, powt)
+    quotient, remainder = fldmod_by_const(x.i, powt)
     return if remainder > 0
         # Could overflow when powt is 1 (f is 0) and x/x.i is typemax.
         v, add_overflowed = Base.Checked.add_with_overflow(quotient, one(quotient))
@@ -632,7 +632,7 @@ function round_with_overflow(
     }=RoundNearest,
 ) where {T, f}
     powt = coefficient(FD{T, f})
-    quotient, remainder = fldmodinline(x.i, powt)
+    quotient, remainder = fldmod_by_const(x.i, powt)
     v = _round_to_nearest(quotient, remainder, powt, m)
     backing, overflowed = Base.Checked.mul_with_overflow(v, powt)
     (reinterpret(FD{T, f}, backing), overflowed)

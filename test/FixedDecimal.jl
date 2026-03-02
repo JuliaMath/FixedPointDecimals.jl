@@ -1760,6 +1760,7 @@ end
     @test _widemul(UInt256(3), UInt256(2)) === UInt512(6)
     @test _widemul(Int256(3), UInt256(2)) === Int512(6)
     @test _widemul(UInt256(3), Int256(2)) === Int512(6)
+end
 
 @testset "ambiguities" begin
     # Unit tests for the methods added to resolve Aqua-detected ambiguities.
