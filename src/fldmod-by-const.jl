@@ -32,7 +32,7 @@
 #   FixedDecimal{Int128,3}(-66726338547984585007169386718143307.324)
 
 """
-    ShouldUseCustomFldmodByConst(::Type{<:MyCustomIntType})) = true
+    ShouldUseCustomFldmodByConst(::Type{<:MyCustomIntType}) = true
 A trait to control opt-in for the custom `fldmod_by_const` implementation. To use this for a
 given integer type, you can define this overload for your integer type.
 You will also need to implement some parts of the interface below, including _widen().
@@ -58,31 +58,75 @@ end
 # Calculate fld(x,y) when y is a Val constant.
 # The implementation for fld_by_const was lifted directly from Base.fld(x,y), except that
 # it uses `div_by_const` instead of `div`.
-fld_by_const(x::T, y::Val{C}) where {T<:Unsigned, C} = div_by_const(x, y)
-function fld_by_const(x::T, y::Val{C}) where {T<:Signed, C}
+@inline fld_by_const(x::T, y::Val{C}) where {T<:Unsigned, C} = div_by_const(x, y)
+@inline function fld_by_const(x::T, y::Val{C}) where {T<:Signed, C}
     d = div_by_const(x, y)
     return d - (signbit(x ⊻ C) & (d * C != x))
 end
 
-function div_by_const(x::T, ::Val{C}) where {T, C}
+@inline function div_by_const(x::T, ::Val{C}) where {T, C}
     # These checks will be compiled away during specialization.
     # While for `*(FixedDecimal, FixedDecimal)`, C will always be a power of 10, these
     # checks allow this function to work for any `C > 0`, in case that's useful in the
     # future.
-    if C == 1
+    if C <= 0
+        throw(DomainError(C, "C must be > 0"))
+    elseif C == 1
         return x
     elseif ispow2(C)
-        return div(x, C) # Will already do the right thing
-    elseif C <= 0
-        throw(DomainError("C must be > 0"))
+        # NOTE: Power of 2 divisors must not reach the magic number path below.
+        return div(x, C)
     end
     # Calculate the magic number and shift amount, based on Hacker's Delight, Chapter 10.
     magic_number, shift = magicg(typemax(T), C)
 
     out = _widemul(promote(x, magic_number)...)
     out >>= shift
-    # Add one if x was negative as implied by formula (1b) in Hacker's delight, 
-    # Chapter 10-4. (Note that of course if x is Unsigned, this compiles away.)
+    # Add one if x was negative, as implied by formula (1b) in Hacker's Delight,
+    # Chapter 10-4. The arithmetic right shift above computes `fld(x*m, 2^shift)`
+    # (flooring division), but we need truncated division (towards zero). Adding one
+    # turns the flooring division to a truncating one for negative `x`, under the assumption
+    # that there are fractional digits, i.e. that `x*m` doesn't divide evenly by `2^shift`,
+    # otherwise floor already equals truncation and the +1 would overshoot.
+    # Proof that this always holds:
+    # Since `m`, the magic number, is the next integer greater than `(2^shift)/C`
+    #    m = (2^shift + C - rem(2^shift, C)) / C
+    #
+    # We can define `e`, the "excess" by which the magic number overshoots the `2^shift` divisor
+    #    e = m*C - 2^shift
+    #      = C - rem(2^shift, C)
+    #    m*C = 2^shift + e
+    # Note that `0 < e < C` because `C` is not power of two, so it doesn't evenly divide `2^shift`.
+    #
+    # We can decompose the product (using the fact that `x = quotient*divisor + remainder`):
+    #    |x|*m = (q*C + r)*m = q*(2^shift + e) + r*m = q*2^shift + (q*e + r*m)
+    # Note that `(q*e + r*m)` is strictly positive:
+    #       * q >= 1: q*e >= 1 (since e > 0)
+    #       * q == 0: r*m >= 1 (|x| >= 1 since we only care about x < 0)
+    #
+    # So, the only way `x*m` is divisible by `2^shift` is when `(q*e + r*m)` is a multiple
+    # of `2^shift`, which can be shown is not the case using the following:
+    #    q*e + r*m = q*e + r*(2^shift + e)/C
+    #              = (q*C*e + r*2^shift + r*e) / C
+    #              = ((q*C + r)*e + r*2^shift) / C
+    #              = (|x|*e + r*2^shift) / C
+    #
+    # `q*e + r*m < 2^shift` is equivalent to
+    #    (|x|*e + r*2^shift) / C < 2^shift
+    #    |x|*e < (C - r) * 2^shift
+    #
+    # From here we can show that this inequality holds by considering
+    # `nc` from the magic number formula: `nc = div(nmax + 1, C) * C - 1` and `|x| <= nmax`
+    # Since `nc >= C-1` (by construction) and `nc*e < 2^shift` (a condition from the magic formula):
+    #    * |x| <= nc: always holds since `nc*e < 2^shift` and `C-r >= 1`
+    #    * |x| >  nc: all |x| in this range have a smaller remainder than `C-1`,
+    #      so `C-r >= 2` and `|x| <= nc + C-1`. If we multiply by `e`:
+    #      |x|*e <= nc*e + (C-1)*e
+    #      We can replace both terms `nc*e` and `(C-1)*e` with their upper bound `2^shift`
+    #      |x|*e < 2^shift + 2^shift
+    #      |x|*e < 2*(2^shift)
+    #      Finally, this shows that `|x|*e < (C - r) * 2^shift` holds:
+    #      |x|*e < 2*(2^shift) <= (C - r) * 2^shift  (since (C - r) >= 2)
     return (out % T) + (x < zero(T))
 end
 
@@ -95,18 +139,17 @@ Base.@assume_effects :foldable function magicg(nmax::Unsigned, divisor)
     W = _widen(T)
     d = W(divisor)
 
-    nc = div(W(nmax) + W(1), d) * d - W(1)      # largest multiple of d <= nmax, minus 1
-    nbits = 8sizeof(nmax) - leading_zeros(nmax) # most significant bit
+    nc = div(W(nmax) + W(1), d) * d - W(1) # largest multiple of d <= nmax, minus 1
+    nbits = 8sizeof(nmax)                  # most significant bit
     # shift must be larger than int size because we want the high bits of the wide multiplication
-    for p in nbits-1:2nbits-1
-        if W(2)^p > nc * (d - W(1) - rem(W(2)^p - W(1), d))       # (27)
-            m = div(W(2)^p + d - W(1) - rem(W(2)^p - W(1), d), d) # (26)
+    for p in nbits:2nbits
+        e = d - W(1) - rem(W(2)^p - W(1), d)
+        if W(2)^p > nc * e         # (27)
+            m = div(W(2)^p + e, d) # (26)
             return (m, p)
         end
     end
-    @assert false """magicg bug: Unreachable reached. divisor=$divisor, nmax=$nmax.
-        Please report an issue to https://github.com/JuliaMath/FixedPointDecimals.jl
-        """
+    _throw_magicg_unreachable(divisor, nmax)
 end
 
 # See Hacker's delight, equations (5) and (6) from Chapter 10-4.
@@ -117,16 +160,21 @@ Base.@assume_effects :foldable function magicg(nmax::Signed, divisor)
     W = _widen(T)
     d = W(divisor)
 
-    nc = div(W(nmax) + W(1), d) * d - W(1)      # largest multiple of d <= nmax, minus 1
-    nbits = 8sizeof(nmax) - leading_zeros(nmax) # most significant bit
+    nc = div(W(nmax) + W(1), d) * d - W(1) # largest multiple of d <= nmax, minus 1
+    nbits = 8sizeof(nmax)                  # most significant bit
     # shift must be larger than int size because we want the high bits of the wide multiplication
-    for p in nbits-1:2nbits-1
-        if W(2)^p > nc * (d - rem(W(2)^p, d))       # (6)
-            m = div(W(2)^p + d - rem(W(2)^p, d), d) # (5)
+    for p in nbits:2nbits
+        e = d - rem(W(2)^p, d)
+        if W(2)^p > nc * e         # (6)
+            m = div(W(2)^p + e, d) # (5)
             return (m, p)
         end
     end
-    @assert false """magicg bug: Unreachable reached. divisor=$divisor, nmax=$nmax.
+    _throw_magicg_unreachable(divisor, nmax)
+end
+
+@noinline function _throw_magicg_unreachable(divisor, nmax)
+    error(lazy"""magicg bug: Unreachable reached. divisor=$divisor, nmax=$nmax.
         Please report an issue to https://github.com/JuliaMath/FixedPointDecimals.jl
-        """
+        """)
 end

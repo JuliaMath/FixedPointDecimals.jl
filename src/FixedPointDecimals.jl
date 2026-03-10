@@ -43,8 +43,8 @@ using BitIntegers: BitIntegers, Int256, Int512, UInt256, UInt512
 import Parsers
 
 # The effects system in newer versions of Julia is necessary for the fldmod_by_const
-# optimization to take affect without adverse performance impacts.
-# For older versions of julia, we will fall back to the flmod implementation, which works
+# optimization to take effect without adverse performance impacts.
+# For older versions of julia, we will fall back to the fldmod implementation, which works
 # very fast for all FixedDecimals of size <= 64 bits.
 if isdefined(Base, Symbol("@assume_effects"))
     include("fldmod-by-const.jl")

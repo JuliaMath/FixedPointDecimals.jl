@@ -2,23 +2,72 @@ using Test
 using FixedPointDecimals
 
 @testset "div_by_const" begin
-    vals = [2432, 100, 0x1, Int32(10000), typemax(Int64), typemax(Int16), 8, Int64(2)^32]
-    for a_base in vals
-        # Only test negative numbers on `a`, since div_by_const requires b > 0.
-        @testset for (a, b, f) in Iterators.product((a_base, -a_base), vals, (unsigned, signed))
-            a, b = promote(f(a), f(b))
-            @test FixedPointDecimals.div_by_const(a, Val(b)) == a ÷ b
+    # Divisors covering each branch in div_by_const:
+    #   C == 1 (identity), ispow2(C) (shift path), else (magic number path)
+    # Also: powers of 10 (actual FixedDecimal divisors), small odd divisors, large divisor
+    divisors = [1, 2, 4, 8, Int64(2)^32,    # C==1 and ispow2 paths
+                3, 5, 7, 9, 10, 100, 1000,  # magic number path
+                Int64(10)^9, Int64(10)^18,  # large powers of 10
+                1000000007, typemax(Int16)] # large odd divisors
+    x_vals(T, C) = T[
+        zero(T), one(T), -one(T),
+        C, -C, T(C - 1), T(-(C - 1)),    # near and at exact multiples
+        typemax(T), typemin(T) + one(T), # type boundaries
+    ]
+    for C_base in divisors
+        for f in (unsigned, signed)
+            C = f(C_base)
+            T = typeof(C)
+            for x in x_vals(T, C)
+                @testset let T=T, C=C, x=x
+                    @test FixedPointDecimals.div_by_const(x, Val(C)) == x ÷ C
+                end
+            end
+        end
+    end
+    @testset "Int128/UInt128" begin
+        for T in (Int128, UInt128)
+            for C in (T(3), T(10), T(1000), T(10)^9, T(10)^18)
+                for x in x_vals(T, C)
+                    @testset let T=T, C=C, x=x
+                        @test FixedPointDecimals.div_by_const(x, Val(C)) == x ÷ C
+                    end
+                end
+            end
         end
     end
 end
 
 @testset "fldmod_by_const" begin
-    vals = [2432, 100, 0x1, Int32(10000), typemax(Int64), typemax(Int16), 8, Int64(2)^32]
-    for a_base in vals
-        # Only test negative numbers on `a`, since fldmod_by_const requires b > 0.
-        @testset for (a, b, f) in Iterators.product((a_base, -a_base), vals, (unsigned, signed))
-            a, b = promote(f(a), f(b))
-            @test FixedPointDecimals.fldmod_by_const(a, b) == fldmod(a, b)
+    divisors = [1, 2, 4, 8, Int64(2)^32,
+                3, 5, 7, 9, 10, 100, 1000,
+                Int64(10)^9, Int64(10)^18,
+                1000000007, typemax(Int16)]
+    x_vals(T, C) = T[
+        zero(T), one(T), -one(T),
+        C, -C, T(C - 1), T(-(C - 1)),
+        typemax(T), typemin(T) + one(T),
+    ]
+    for C_base in divisors
+        for f in (unsigned, signed)
+            C = f(C_base)
+            T = typeof(C)
+            for x in x_vals(T, C)
+                @testset let T=T, C=C, x=x
+                    @test FixedPointDecimals.fldmod_by_const(x, C) == fldmod(x, C)
+                end
+            end
+        end
+    end
+    @testset "Int128/UInt128" begin
+        for T in (Int128, UInt128)
+            for C in (T(3), T(10), T(1000), T(10)^9, T(10)^18)
+                for x in x_vals(T, C)
+                    @testset let T=T, C=C, x=x
+                        @test FixedPointDecimals.fldmod_by_const(x, C) == fldmod(x, C)
+                    end
+                end
+            end
         end
     end
 end
@@ -26,13 +75,13 @@ end
 # We don't actually use fldmod_by_const with 8-bit ints, but they're useful because
 # we can exhaustively test every possible combination, to increase our confidence in
 # the implementation.
-@testset "flmdod_by_const - exhaustive 8-bit" begin
-    @testset for T in (Int8, UInt8)
-        @testset for x in typemin(T) : typemax(T)
-            @testset for y in typemin(T) : typemax(T)
+@testset "fldmod_by_const - exhaustive 8-bit" begin
+    for T in (Int8, UInt8)
+        for x in typemin(T) : typemax(T)
+            for y in typemin(T) : typemax(T)
                 y == 0 && continue
-                y == -1 && continue
-                @testset "fldmod($x, $y)" begin
+                y == -1 && x == typemin(T) && continue
+                @testset let x=x, y=y, T=T
                     @test fldmod(x, y) == FixedPointDecimals.fldmod_by_const(x, y)
                 end
             end

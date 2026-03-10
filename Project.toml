@@ -10,6 +10,7 @@ Parsers = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
 [compat]
 Aqua = "0.7, 0.8"
 BitIntegers = "0.3.1"
+JET = "0.9, 0.10, 0.11"
 Parsers = "2.7"
 Printf = "1.6"
 Test = "1.6"
@@ -17,8 +18,9 @@ julia = "1.6"
 
 [extras]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Aqua", "Printf", "Test"]
+test = ["Aqua", "JET", "Printf", "Test"]
