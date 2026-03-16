@@ -6,30 +6,29 @@
 # simpler (though the code we produce is identical). We apply this optimization to (U)Int128
 # and (U)Int256, which result from multiplying FD{Int64}s and FD{Int128}s.
 # Before:
-# julia> @btime for _ in 1:10000 fd = fd * fd end setup = (fd = FixedDecimal{Int32,3}(1.234))
-#     54.125 μs (0 allocations: 0 bytes)   # (Unchanged)
-#   FixedDecimal{Int32,3}(1700943.280)
+# julia> using FixedPointDecimals, BenchmarkTools
 #
-# julia> @btime for _ in 1:10000 fd = fd * fd end setup = (fd = FixedDecimal{Int64,3}(1.234))
-#     174.625 μs (0 allocations: 0 bytes)
-#   FixedDecimal{Int64,3}(4230510070790917.029)
-#
-# julia> @btime for _ in 1:10000 fd = fd * fd end setup = (fd = FixedDecimal{Int128,3}(1.234))
-#     2.119 ms (79986 allocations: 1.60 MiB)
-#   FixedDecimal{Int128,3}(-66726338547984585007169386718143307.324)
+# julia> @btime $(FixedDecimal{Int32,3}[rand(Float32) for _ in 1:10000]).^2;
+#   25.750 μs (2 allocations: 39.17 KiB)
+# 
+# julia> @btime $(FixedDecimal{Int64,3}[rand(Float32) for _ in 1:10000]).^2;
+#   92.750 μs (2 allocations: 78.17 KiB)
+# 
+# julia> @btime $(FixedDecimal{Int128,3}[rand(Float32) for _ in 1:10000]).^2;
+#   1.892 ms (120698 allocations: 2.45 MiB)
 #
 # After:
-# julia> @btime for _ in 1:10000 fd = fd * fd end setup = (fd = FixedDecimal{Int32,3}(1.234))
-#     56.958 μs (0 allocations: 0 bytes)   # (Unchanged)
-#   FixedDecimal{Int32,3}(1700943.280)
+# julia> using FixedPointDecimals, BenchmarkTools
 #
-# julia> @btime for _ in 1:10000 fd = fd * fd end setup = (fd = FixedDecimal{Int64,3}(1.234))
-#     90.708 μs (0 allocations: 0 bytes)
-#   FixedDecimal{Int64,3}(4230510070790917.029)
-#
-# julia> @btime for _ in 1:10000 fd = fd * fd end setup = (fd = FixedDecimal{Int128,3}(1.234))
-#     180.167 μs (0 allocations: 0 bytes)
-#   FixedDecimal{Int128,3}(-66726338547984585007169386718143307.324)
+# julia> @btime $(FixedDecimal{Int32,3}[rand(Float32) for _ in 1:10000]).^2;
+#   16.250 μs (2 allocations: 39.17 KiB)
+# 
+# julia> @btime $(FixedDecimal{Int64,3}[rand(Float32) for _ in 1:10000]).^2;
+#   35.375 μs (2 allocations: 78.17 KiB)
+# 
+# julia> @btime $(FixedDecimal{Int128,3}[rand(Float32) for _ in 1:10000]).^2;
+#   138.917 μs (2 allocations: 156.30 KiB)
+
 
 """
     ShouldUseCustomFldmodByConst(::Type{<:MyCustomIntType}) = true
