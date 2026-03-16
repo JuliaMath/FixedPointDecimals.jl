@@ -80,55 +80,61 @@ end
     # Calculate the magic number and shift amount, based on Hacker's Delight, Chapter 10.
     magic_number, shift = magicg(typemax(T), C)
 
+    # Now, divide *towards zero* (this is the semantics of div()):
     out = _widemul(promote(x, magic_number)...)
     out >>= shift
     # Add one if x was negative, as implied by formula (1b) in Hacker's Delight,
-    # Chapter 10-4. The arithmetic right shift above computes `fld(x*m, 2^shift)`
-    # (flooring division), but we need truncated division (towards zero). Adding one
-    # turns the flooring division to a truncating one for negative `x`, under the assumption
-    # that there are fractional digits, i.e. that `x*m` doesn't divide evenly by `2^shift`,
-    # otherwise floor already equals truncation and the +1 would overshoot.
-    # Proof that this always holds:
-    # Since `m`, the magic number, is the next integer greater than `(2^shift)/C`
-    #    m = (2^shift + C - rem(2^shift, C)) / C
-    #
-    # We can define `e`, the "excess" by which the magic number overshoots the `2^shift` divisor
-    #    e = m*C - 2^shift
-    #      = C - rem(2^shift, C)
-    #    m*C = 2^shift + e
-    # Note that `0 < e < C` because `C` is not power of two, so it doesn't evenly divide `2^shift`.
-    #
-    # We can decompose the product (using the fact that `x = quotient*divisor + remainder`):
-    #    |x|*m = (q*C + r)*m = q*(2^shift + e) + r*m = q*2^shift + (q*e + r*m)
-    # Note that `(q*e + r*m)` is strictly positive:
-    #       * q >= 1: q*e >= 1 (since e > 0)
-    #       * q == 0: r*m >= 1 (|x| >= 1 since we only care about x < 0)
-    #
-    # So, the only way `x*m` is divisible by `2^shift` is when `(q*e + r*m)` is a multiple
-    # of `2^shift`, which can be shown is not the case using the following:
-    #    q*e + r*m = q*e + r*(2^shift + e)/C
-    #              = (q*C*e + r*2^shift + r*e) / C
-    #              = ((q*C + r)*e + r*2^shift) / C
-    #              = (|x|*e + r*2^shift) / C
-    #
-    # `q*e + r*m < 2^shift` is equivalent to
-    #    (|x|*e + r*2^shift) / C < 2^shift
-    #    |x|*e < (C - r) * 2^shift
-    #
-    # From here we can show that this inequality holds by considering
-    # `nc` from the magic number formula: `nc = div(nmax + 1, C) * C - 1` and `|x| <= nmax`
-    # Since `nc >= C-1` (by construction) and `nc*e < 2^shift` (a condition from the magic formula):
-    #    * |x| <= nc: always holds since `nc*e < 2^shift` and `C-r >= 1`
-    #    * |x| >  nc: all |x| in this range have a smaller remainder than `C-1`,
-    #      so `C-r >= 2` and `|x| <= nc + C-1`. If we multiply by `e`:
-    #      |x|*e <= nc*e + (C-1)*e
-    #      We can replace both terms `nc*e` and `(C-1)*e` with their upper bound `2^shift`
-    #      |x|*e < 2^shift + 2^shift
-    #      |x|*e < 2*(2^shift)
-    #      Finally, this shows that `|x|*e < (C - r) * 2^shift` holds:
-    #      |x|*e < 2*(2^shift) <= (C - r) * 2^shift  (since (C - r) >= 2)
+    # The shift-approach for division implements fld, but this function is
+    # meant to implement div(), so we have to add 1 if x < 0.
+    # (For a complete proof, see the comment immediately following this function)
     return (out % T) + (x < zero(T))
 end
+# Longer explanation for the add-1 above:
+# The arithmetic right shift above computes `fld(x*m, 2^shift)`
+# (flooring division), but we need truncated division (towards zero). Adding one
+# turns the flooring division to a truncating one for negative `x`, under the assumption
+# that there are fractional digits, i.e. that `x*m` doesn't divide evenly by `2^shift`,
+# otherwise floor already equals truncation and the +1 would overshoot.
+# Proof that this always holds:
+# Since `m`, the magic number, is the next integer greater than `(2^shift)/C`
+#    m = (2^shift + C - rem(2^shift, C)) / C
+#
+# We can define `e`, the "excess" by which the magic number overshoots the `2^shift` divisor
+#    e = m*C - 2^shift
+#      = C - rem(2^shift, C)
+#    m*C = 2^shift + e
+# Note that `0 < e < C` because `C` is not power of two, so it doesn't evenly divide `2^shift`.
+#
+# We can decompose the product (using the fact that `x = quotient*divisor + remainder`):
+#    |x|*m = (q*C + r)*m = q*(2^shift + e) + r*m = q*2^shift + (q*e + r*m)
+# Note that `(q*e + r*m)` is strictly positive:
+#       * q >= 1: q*e >= 1 (since e > 0)
+#       * q == 0: r*m >= 1 (|x| >= 1 since we only care about x < 0)
+#
+# So, the only way `x*m` is divisible by `2^shift` is when `(q*e + r*m)` is a multiple
+# of `2^shift`, which can be shown is not the case using the following:
+#    q*e + r*m = q*e + r*(2^shift + e)/C
+#              = (q*C*e + r*2^shift + r*e) / C
+#              = ((q*C + r)*e + r*2^shift) / C
+#              = (|x|*e + r*2^shift) / C
+#
+# `q*e + r*m < 2^shift` is equivalent to
+#    (|x|*e + r*2^shift) / C < 2^shift
+#    |x|*e < (C - r) * 2^shift
+#
+# From here we can show that this inequality holds by considering
+# `nc` from the magic number formula: `nc = div(nmax + 1, C) * C - 1` and `|x| <= nmax`
+# Since `nc >= C-1` (by construction) and `nc*e < 2^shift` (a condition from the magic formula):
+#    * |x| <= nc: always holds since `nc*e < 2^shift` and `C-r >= 1`
+#    * |x| >  nc: all |x| in this range have a smaller remainder than `C-1`,
+#      so `C-r >= 2` and `|x| <= nc + C-1`. If we multiply by `e`:
+#      |x|*e <= nc*e + (C-1)*e
+#      We can replace both terms `nc*e` and `(C-1)*e` with their upper bound `2^shift`
+#      |x|*e < 2^shift + 2^shift
+#      |x|*e < 2*(2^shift)
+#      Finally, this shows that `|x|*e < (C - r) * 2^shift` holds:
+#      |x|*e < 2*(2^shift) <= (C - r) * 2^shift  (since (C - r) >= 2)
+
 
 # Unsigned magic number computation + shift by constant
 # See Hacker's delight, equations (26) and (27) from Chapter 10-9.
