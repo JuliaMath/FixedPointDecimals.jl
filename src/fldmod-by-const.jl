@@ -55,15 +55,10 @@ ShouldUseCustomFldmodByConst(::Type) = false
 end
 
 # Calculate fld(x,y) when y is a Val constant.
-# The implementation for fld_by_const was lifted directly from Base.fld(x,y), except that
-# it uses `div_by_const` instead of `div`.
-@inline fld_by_const(x::T, y::Val{C}) where {T<:Unsigned, C} = div_by_const(x, y)
-@inline function fld_by_const(x::T, y::Val{C}) where {T<:Signed, C}
-    d = div_by_const(x, y)
-    return d - (signbit(x ⊻ C) & (d * C != x))
-end
-
-@inline function div_by_const(x::T, ::Val{C}) where {T, C}
+# NOTE: This implementation is based on Hacker's Delight, Chapter 10, except that
+# we are implementing fld(x, y), whereas that code implements `div(x, y)`. (i.e. we
+# always floor-divide, rather than rounding towards zero.)
+@inline function fld_by_const(x::T, ::Val{C}) where {T, C}
     # These checks will be compiled away during specialization.
     # While for `*(FixedDecimal, FixedDecimal)`, C will always be a power of 10, these
     # checks allow this function to work for any `C > 0`, in case that's useful in the
@@ -74,66 +69,25 @@ end
         return x
     elseif ispow2(C)
         # NOTE: Power of 2 divisors must not reach the magic number path below.
-        return div(x, C)
+        return x >> T(log2(C))
+        #return fld(x, C)
     end
     # Calculate the magic number and shift amount, based on Hacker's Delight, Chapter 10.
     magic_number, shift = magicg(typemax(T), C)
 
-    # Now, divide *towards zero* (this is the semantics of div()):
-    out = _widemul(promote(x, magic_number)...)
-    out >>= shift
-    # Add one if x was negative, as implied by formula (1b) in Hacker's Delight,
-    # The shift-approach for division implements fld, but this function is
-    # meant to implement div(), so we have to add 1 if x < 0.
-    # (For a complete proof, see the comment immediately following this function)
-    return (out % T) + (x < zero(T))
-end
-# Longer explanation for the add-1 above:
-# The arithmetic right shift above computes `fld(x*m, 2^shift)`
-# (flooring division), but we need truncated division (towards zero). Adding one
-# turns the flooring division to a truncating one for negative `x`, under the assumption
-# that there are fractional digits, i.e. that `x*m` doesn't divide evenly by `2^shift`,
-# otherwise floor already equals truncation and the +1 would overshoot.
-# Proof that this always holds:
-# Since `m`, the magic number, is the next integer greater than `(2^shift)/C`
-#    m = (2^shift + C - rem(2^shift, C)) / C
-#
-# We can define `e`, the "excess" by which the magic number overshoots the `2^shift` divisor
-#    e = m*C - 2^shift
-#      = C - rem(2^shift, C)
-#    m*C = 2^shift + e
-# Note that `0 < e < C` because `C` is not power of two, so it doesn't evenly divide `2^shift`.
-#
-# We can decompose the product (using the fact that `x = quotient*divisor + remainder`):
-#    |x|*m = (q*C + r)*m = q*(2^shift + e) + r*m = q*2^shift + (q*e + r*m)
-# Note that `(q*e + r*m)` is strictly positive:
-#       * q >= 1: q*e >= 1 (since e > 0)
-#       * q == 0: r*m >= 1 (|x| >= 1 since we only care about x < 0)
-#
-# So, the only way `x*m` is divisible by `2^shift` is when `(q*e + r*m)` is a multiple
-# of `2^shift`, which can be shown is not the case using the following:
-#    q*e + r*m = q*e + r*(2^shift + e)/C
-#              = (q*C*e + r*2^shift + r*e) / C
-#              = ((q*C + r)*e + r*2^shift) / C
-#              = (|x|*e + r*2^shift) / C
-#
-# `q*e + r*m < 2^shift` is equivalent to
-#    (|x|*e + r*2^shift) / C < 2^shift
-#    |x|*e < (C - r) * 2^shift
-#
-# From here we can show that this inequality holds by considering
-# `nc` from the magic number formula: `nc = div(nmax + 1, C) * C - 1` and `|x| <= nmax`
-# Since `nc >= C-1` (by construction) and `nc*e < 2^shift` (a condition from the magic formula):
-#    * |x| <= nc: always holds since `nc*e < 2^shift` and `C-r >= 1`
-#    * |x| >  nc: all |x| in this range have a smaller remainder than `C-1`,
-#      so `C-r >= 2` and `|x| <= nc + C-1`. If we multiply by `e`:
-#      |x|*e <= nc*e + (C-1)*e
-#      We can replace both terms `nc*e` and `(C-1)*e` with their upper bound `2^shift`
-#      |x|*e < 2^shift + 2^shift
-#      |x|*e < 2*(2^shift)
-#      Finally, this shows that `|x|*e < (C - r) * 2^shift` holds:
-#      |x|*e < 2*(2^shift) <= (C - r) * 2^shift  (since (C - r) >= 2)
+    # Now, do a floor-division (shift implements fld, not div):
+    wide_result = _widemul(promote(x, magic_number)...)
+    result = (wide_result >> shift) % T
 
+    # The raw shift correctly computes fld(x, C) for all x EXCEPT negative exact
+    # multiples of C. The magic number m slightly overshoots 2^shift/C, so for
+    # negative x, x*m/2^shift is slightly below x/C. When x/C is non-integer this
+    # doesn't affect the floor, but when x/C IS an integer the floor drops by 1.
+    # We detect this by checking the remainder: normally in [0,C), but exactly C
+    # when off-by-one. (For unsigned types, x >= 0 always, so this is a no-op.)
+    remainder = x - result * T(C)
+    return result + T(remainder == T(C))
+end
 
 # Unsigned magic number computation + shift by constant
 # See Hacker's delight, equations (26) and (27) from Chapter 10-9.

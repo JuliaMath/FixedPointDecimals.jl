@@ -1,8 +1,8 @@
 using Test
 using FixedPointDecimals
 
-@testset "div_by_const" begin
-    # Divisors covering each branch in div_by_const:
+@testset "fld_by_const" begin
+    # Divisors covering each branch in fld_by_const:
     #   C == 1 (identity), ispow2(C) (shift path), else (magic number path)
     # Also: powers of 10 (actual FixedDecimal divisors), small odd divisors, large divisor
     divisors = [1, 2, 4, 8, Int64(2)^32,    # C==1 and ispow2 paths
@@ -20,7 +20,7 @@ using FixedPointDecimals
             T = typeof(C)
             for x in x_vals(T, C)
                 @testset let T=T, C=C, x=x
-                    @test FixedPointDecimals.div_by_const(x, Val(C)) == x ÷ C
+                    @test FixedPointDecimals.fld_by_const(x, Val(C)) == fld(x, C)
                 end
             end
         end
@@ -30,7 +30,7 @@ using FixedPointDecimals
             for C in (T(3), T(10), T(1000), T(10)^9, T(10)^18)
                 for x in x_vals(T, C)
                     @testset let T=T, C=C, x=x
-                        @test FixedPointDecimals.div_by_const(x, Val(C)) == x ÷ C
+                        @test FixedPointDecimals.fld_by_const(x, Val(C)) == fld(x, C)
                     end
                 end
             end
