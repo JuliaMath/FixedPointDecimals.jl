@@ -39,8 +39,27 @@ export checked_abs, checked_add, checked_cld, checked_div, checked_fld,
 
 using Base: decompose, BitInteger
 
-import BitIntegers  # For 128-bit _widemul / _widen
+using BitIntegers: BitIntegers, Int256, Int512, UInt256, UInt512
 import Parsers
+
+# The effects system in newer versions of Julia is necessary for the fldmod_by_const
+# optimization to take effect without adverse performance impacts.
+# For older versions of julia, we will fall back to the fldmod implementation, which works
+# very fast for all FixedDecimals of size <= 64 bits.
+if isdefined(Base, Symbol("@assume_effects"))
+    include("fldmod-by-const.jl")
+else
+    # We force-inline this, to allow the fldmod operation to be specialized for a constant
+    # second argument (converting divide-by-power-of-ten instructions with the cheaper
+    # multiply-by-inverse-coefficient.) Sadly this doesn't work for Int128.
+    if VERSION >= v"1.8.0-"
+        # Since julia 1.8+, the built-in fldmod optimizes for constant divisors, which is
+        # even better than computing the division twice.
+        @inline fldmod_by_const(x,y) = fldmod(x,y)
+    else
+        @inline fldmod_by_const(x,y) = (fld(x,y), mod(x,y))
+    end
+end
 
 # floats that support fma and are roughly IEEE-like
 const FMAFloat = Union{Float16, Float32, Float64, BigFloat}
@@ -162,8 +181,10 @@ _widemul(x::Unsigned,y::Signed) = signed(_widen(x)) * _widen(y)
 
 # Custom widen implementation to avoid the cost of widening to BigInt.
 # FD{Int128} operations should widen to 256 bits internally, rather than to a BigInt.
-_widen(::Type{Int128}) = BitIntegers.Int256
-_widen(::Type{UInt128}) = BitIntegers.UInt256
+_widen(::Type{Int128}) = Int256
+_widen(::Type{UInt128}) = UInt256
+_widen(::Type{Int256}) = Int512
+_widen(::Type{UInt256}) = UInt512
 _widen(t::Type) = widen(t)
 _widen(x::T) where {T} = (_widen(T))(x)
 
@@ -213,7 +234,8 @@ function _round_to_nearest(quotient::T,
     halfdivisor = divisor >> 1
     # PERF Note: Only need the last bit to check iseven, and default iseven(Int256)
     # allocates, so we truncate first.
-    if iseven((divisor % Int8)) && remainder == halfdivisor
+    _iseven(x) = (x & 0x1) == 0
+    if _iseven(divisor) && remainder == halfdivisor
         # `:NearestTiesAway` will tie away from zero, e.g. -8.5 ->
         # -9. `:NearestTiesUp` will always ties towards positive
         # infinity. `:Nearest` will tie towards the nearest even
@@ -221,7 +243,7 @@ function _round_to_nearest(quotient::T,
         if M == :NearestTiesAway
             ifelse(quotient < zero(quotient), quotient, quotient + one(quotient))
         elseif M == :Nearest
-            ifelse(iseven(quotient), quotient, quotient + one(quotient))
+            ifelse(_iseven(quotient), quotient, quotient + one(quotient))
         else
             quotient + one(quotient)
         end
@@ -233,18 +255,12 @@ function _round_to_nearest(quotient::T,
 end
 _round_to_nearest(q, r, d, m=RoundNearest) = _round_to_nearest(promote(q, r, d)..., m)
 
-# In many of our calls to fldmod, `y` is a constant (the coefficient, 10^f). However, since
-# `fldmod` is sometimes not being inlined, that constant information is not available to the
-# optimizer. We need an inlined version of fldmod so that the compiler can replace expensive
-# divide-by-power-of-ten instructions with the cheaper multiply-by-inverse-coefficient.
-@inline fldmodinline(x,y) = (fld(x,y), mod(x,y))
-
 # multiplication rounds to nearest even representation
 # TODO: can we use floating point to speed this up? after we build a
 # correctness test suite.
 function Base.:*(x::FD{T, f}, y::FD{T, f}) where {T, f}
     powt = coefficient(FD{T, f})
-    quotient, remainder = fldmodinline(_widemul(x.i, y.i), powt)
+    quotient, remainder = fldmod_by_const(_widemul(x.i, y.i), powt)
     reinterpret(FD{T, f}, _round_to_nearest(quotient, remainder, powt))
 end
 
@@ -271,12 +287,12 @@ function Base.round(x::FD{T, f},
                              RoundingMode{:NearestTiesUp},
                              RoundingMode{:NearestTiesAway}}=RoundNearest) where {T, f}
     powt = coefficient(FD{T, f})
-    quotient, remainder = fldmodinline(x.i, powt)
+    quotient, remainder = fldmod_by_const(x.i, powt)
     FD{T, f}(_round_to_nearest(quotient, remainder, powt, m))
 end
 function Base.ceil(x::FD{T, f}) where {T, f}
     powt = coefficient(FD{T, f})
-    quotient, remainder = fldmodinline(x.i, powt)
+    quotient, remainder = fldmod_by_const(x.i, powt)
     if remainder > 0
         FD{T, f}(quotient + one(quotient))
     else
@@ -454,7 +470,7 @@ end
 
 function Base.Checked.mul_with_overflow(x::FD{T,f}, y::FD{T,f}) where {T<:Integer,f}
     powt = coefficient(FD{T, f})
-    quotient, remainder = fldmodinline(_widemul(x.i, y.i), powt)
+    quotient, remainder = fldmod_by_const(_widemul(x.i, y.i), powt)
     v = _round_to_nearest(quotient, remainder, powt)
     return (reinterpret(FD{T,f}, rem(v, T)), v < typemin(T) || v > typemax(T))
 end
@@ -562,7 +578,7 @@ The overflow protection may impose a perceptible performance penalty.
 """
 function ceil_with_overflow(x::FD{T,f}) where {T<:Integer,f}
     powt = coefficient(FD{T, f})
-    quotient, remainder = fldmodinline(x.i, powt)
+    quotient, remainder = fldmod_by_const(x.i, powt)
     return if remainder > 0
         # Could overflow when powt is 1 (f is 0) and x/x.i is typemax.
         v, add_overflowed = Base.Checked.add_with_overflow(quotient, one(quotient))
@@ -616,7 +632,7 @@ function round_with_overflow(
     }=RoundNearest,
 ) where {T, f}
     powt = coefficient(FD{T, f})
-    quotient, remainder = fldmodinline(x.i, powt)
+    quotient, remainder = fldmod_by_const(x.i, powt)
     v = _round_to_nearest(quotient, remainder, powt, m)
     backing, overflowed = Base.Checked.mul_with_overflow(v, powt)
     (reinterpret(FD{T, f}, backing), overflowed)
