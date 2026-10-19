@@ -1,7 +1,6 @@
 using Test
-import Parsers
 using FixedPointDecimals
-using FixedPointDecimals: _maxintdigits
+using FixedPointDecimals: _maxintdigits, UInt256
 
 # Compat with test contexts introduced in 1.9
 if VERSION >= v"1.9"
@@ -12,43 +11,20 @@ else
     end
 end
 
-const DELIM=';';
-const GROUP=',';
-const DECIM='.';
-const OPTIONS_NEAREST = Parsers.Options(groupmark=GROUP, decimal=DECIM, delim=DELIM, quoted=true, rounding=RoundNearest)
-const OPTIONS_TOZERO = Parsers.Options(groupmark=GROUP, decimal=DECIM, delim=DELIM, quoted=true, rounding=RoundToZero)
-const OPTIONS_THROWS = Parsers.Options(groupmark=GROUP, decimal=DECIM, delim=DELIM, quoted=true, rounding=nothing)
-function test_decimal_parser(::Type{T}, f, buf::AbstractString; ok=true, inexact=false, expect=nothing, options = OPTIONS_NEAREST) where {T}
-    delim = options.delim.token
-    b = get(codeunits(buf), 1, 0xff)
-    pl = Parsers.PosLen(1, length(buf))
-    conf = FixedPointDecimals.FixedDecimalConf{T}(f)
-    (pos, code, _, val) = Parsers.typeparser(conf, codeunits(buf), 1, length(buf), b, Parsers.SUCCESS, pl, options)
-    (pos_io, code_io, _, val_io) = Parsers.typeparser(conf, IOBuffer(buf), 1, length(buf), b, Parsers.SUCCESS, pl, options)
-    @testctx let _ctx="T=$T, f=$f, input=$(repr(string(buf))), code=$(Parsers.text(code)), len=$(length(buf)), pos=$pos, delim=$(repr(Char(delim))), groupmark=$(repr(options.groupmark)), decimal=$(repr(Char(options.decimal))), mode=$(options.rounding), expect=$(repr(expect))"
-        ends_on_delim = !isempty(buf) && UInt8(last(buf)) == UInt8(delim)
-        # We parsed the value (un)successfully as expected
-        @test Parsers.ok(code) == ok
-        @test Parsers.ok(code_io) == ok
-        # We marked the value as inexact as expected
-        @test Parsers.inexact(code) == inexact
-        @test Parsers.inexact(code_io) == inexact
-        # We read all valid bytes, i.e. our current `pos` peeks at one past our input, or the delimiter (which is not a part of the number)
-        ok && (@test pos == (length(buf) + (UInt8(last(buf)) != UInt8(delim))))
-        ok && (@test pos_io == (length(buf) + (UInt8(last(buf)) != UInt8(delim))))
-        # We read all valid bytes and which means that we reached EOF (recovery from invalid input is a job for `Parsers.xparse`)
-        ok && (@test Parsers.eof(code) == !ends_on_delim)
-        ok && (@test Parsers.eof(code_io) == !ends_on_delim)
-        isnothing(expect) || (@test val == expect)
-        isnothing(expect) || (@test val_io == expect)
-        res = Parsers.xparse(FixedDecimal{T,f}, buf, 1, length(buf), options)
-        # Even if the input was not valid, we read it entirely and reached EOF or delim
-        @test Parsers.eof(res.code) == !ends_on_delim
-        @test Parsers.ok(res.code) == ok
+# Check `tryparse` and `parse` against each other and against the expected backing integer.
+# `err` is the exception `parse` must throw when `ok=false`.
+function test_decimal_parser(::Type{T}, f, buf::AbstractString; ok=true, inexact=false, expect=nothing, mode=RoundNearest,
+                             err=(inexact ? InexactError : ArgumentError)) where {T}
+    FD = FixedDecimal{T,f}
+    @testctx let _ctx="T=$T, f=$f, input=$(repr(string(buf))), mode=$mode, expect=$(repr(expect))"
+        res = tryparse(FD, buf, mode)
         if ok
-            @test res.val.i == expect # The integer from our typeparser matches the integer from our FixedDecimal
+            @test res isa FD
+            isnothing(expect) || (@test res.i == expect)
+            isnothing(expect) || (@test parse(FD, buf, mode).i == expect)
         else
-            @test Parsers.invalid(res.code) # We parsed the value (un)successfully as expected
+            @test isnothing(res)
+            @test_throws err parse(FD, buf, mode)
         end
     end
     return nothing
@@ -62,14 +38,14 @@ const IntegerTypes = (SignedIntegerTypes..., UnsignedIntegerTypes...)
 
 @testset "_check_overflows" begin
     @testset "$T" for T in SignedIntegerTypes
-        @testset "$V" for V in (UInt64, UInt128, BigInt)
+        @testset "$V" for V in (UInt64, UInt128, UInt256)
             @test !FixedPointDecimals._check_overflows(T, V(0), true)
             @test !FixedPointDecimals._check_overflows(T, V(0), false)
 
             @test !FixedPointDecimals._check_overflows(T, V(1), true)
             @test !FixedPointDecimals._check_overflows(T, V(1), false)
 
-            if V === BigInt || typemax(T) == typemax(V)
+            if typemax(T) == typemax(V)
                 @test !FixedPointDecimals._check_overflows(T, V(typemax(T) - 1), true)
                 @test !FixedPointDecimals._check_overflows(T, V(typemax(T) - 1), false)
 
@@ -77,7 +53,7 @@ const IntegerTypes = (SignedIntegerTypes..., UnsignedIntegerTypes...)
                 @test !FixedPointDecimals._check_overflows(T, V(typemax(T)), false)
             end
 
-            if V === BigInt || typemax(T) < typemax(V)
+            if typemax(T) < typemax(V)
                 @test !FixedPointDecimals._check_overflows(T, V(V(typemax(T)) + 1), true)
                 @test FixedPointDecimals._check_overflows(T, V(V(typemax(T)) + 1), false)
 
@@ -85,7 +61,7 @@ const IntegerTypes = (SignedIntegerTypes..., UnsignedIntegerTypes...)
                 @test FixedPointDecimals._check_overflows(T, V(V(typemax(T)) + 2), false)
             end
 
-            if V !== BigInt && typemax(T) > typemax(V)
+            if typemax(T) > typemax(V)
                 @test !FixedPointDecimals._check_overflows(T, typemax(V), true)
                 @test !FixedPointDecimals._check_overflows(T, typemax(V), false)
             end
@@ -93,39 +69,29 @@ const IntegerTypes = (SignedIntegerTypes..., UnsignedIntegerTypes...)
     end
 
     @testset "$T" for T in UnsignedIntegerTypes
-        @testset "$V" for V in (UInt64, UInt128, BigInt)
+        @testset "$V" for V in (UInt64, UInt128, UInt256)
             @test !FixedPointDecimals._check_overflows(T, V(0), true)
             @test !FixedPointDecimals._check_overflows(T, V(0), false)
             @test !FixedPointDecimals._check_overflows(T, V(1), false)
 
-            if V === BigInt
-                @test FixedPointDecimals._check_overflows(T, V(1), true)
-                @test FixedPointDecimals._check_overflows(T, V(typemax(T) - 1), true)
-                @test FixedPointDecimals._check_overflows(T, V(typemax(T)), true)
-                @test FixedPointDecimals._check_overflows(T, V(V(typemax(T)) + 1), true)
-                @test FixedPointDecimals._check_overflows(T, V(V(typemax(T)) + 2), true)
-            end
-
-            if V === BigInt || typemax(T) == typemax(V)
+            if typemax(T) == typemax(V)
                 @test !FixedPointDecimals._check_overflows(T, V(typemax(T) - 1), false)
                 @test !FixedPointDecimals._check_overflows(T, V(typemax(T)), false)
             end
 
-            if V === BigInt || typemax(T) < typemax(V)
+            if typemax(T) < typemax(V)
                 @test FixedPointDecimals._check_overflows(T, V(V(typemax(T)) + 1), false)
                 @test FixedPointDecimals._check_overflows(T, V(V(typemax(T)) + 2), false)
             end
 
-            if V !== BigInt && typemax(T) > typemax(V)
+            if typemax(T) > typemax(V)
                 @test !FixedPointDecimals._check_overflows(T, typemax(V), false)
             end
         end
     end
 end
 
-T = Int64
-f = 8
-@testset "xparse" begin
+@testset "decimal parser" begin
 @testset "1.0" begin
     @testset "$T" for T in IntegerTypes
         @testset "$f" for f in 0:(_maxintdigits(T) - 1)
@@ -241,7 +207,7 @@ end;
 end;
 
 @testset "RoundingMode{:Nearest} " begin
-    options = OPTIONS_NEAREST
+    mode = RoundNearest
     @testset "$T" for T in IntegerTypes
         for (base_str, expected_value) in [
            ("00499", 0),
@@ -256,28 +222,28 @@ end;
            ("01501", 2),
         ]
             # f = 1 | "00.501"
-            test_decimal_parser(T, 1, insertchar(base_str, 2, "."); expect=expected_value, options)
+            test_decimal_parser(T, 1, insertchar(base_str, 2, "."); expect=expected_value, mode)
             # f = 1 | "005.01e-1"
-            test_decimal_parser(T, 1, insertchar(base_str * "e-1", 3, "."); expect=expected_value, options)
+            test_decimal_parser(T, 1, insertchar(base_str * "e-1", 3, "."); expect=expected_value, mode)
             # f = 1 | "0050.1e-2"
-            test_decimal_parser(T, 1, insertchar(base_str * "e-2", 4, "."); expect=expected_value, options)
+            test_decimal_parser(T, 1, insertchar(base_str * "e-2", 4, "."); expect=expected_value, mode)
             if typemin(T) < 0
                 # f = 1 | "-00.501"
-                test_decimal_parser(T, 1, "-" * insertchar(base_str, 2, "."); expect=-expected_value, options)
+                test_decimal_parser(T, 1, "-" * insertchar(base_str, 2, "."); expect=-expected_value, mode)
                 # f = 1 | "-005.01e-1"
-                test_decimal_parser(T, 1, "-" * insertchar(base_str * "e-1", 3, "."); expect=-expected_value, options)
+                test_decimal_parser(T, 1, "-" * insertchar(base_str * "e-1", 3, "."); expect=-expected_value, mode)
                 # f = 1 | "-0050.1e-1"
-                test_decimal_parser(T, 1, "-" * insertchar(base_str * "e-2", 4, "."); expect=-expected_value, options)
+                test_decimal_parser(T, 1, "-" * insertchar(base_str * "e-2", 4, "."); expect=-expected_value, mode)
             end
         end
-        test_decimal_parser(T, 0, ".5"; expect=0, options)
-        test_decimal_parser(T, 0, "0"; expect=0, options)
-        test_decimal_parser(T, 0, "1"; expect=1, options)
+        test_decimal_parser(T, 0, ".5"; expect=0, mode)
+        test_decimal_parser(T, 0, "0"; expect=0, mode)
+        test_decimal_parser(T, 0, "1"; expect=1, mode)
     end
 end;
 
 @testset "RoundingMode{:ToZero} " begin
-    options = OPTIONS_TOZERO
+    mode = RoundToZero
     @testset "$T" for T in IntegerTypes
         for (base_str, expected_value) in [
            ("00001", 0),
@@ -290,28 +256,28 @@ end;
            ("019" * ("9" ^ 99), 1),
         ]
             # f = 1 | "0.1999..."
-            test_decimal_parser(T, 1, insertchar(base_str, 2, "."); expect=expected_value, options)
+            test_decimal_parser(T, 1, insertchar(base_str, 2, "."); expect=expected_value, mode)
             # f = 1 | "01.999...e-1"
-            test_decimal_parser(T, 1, insertchar(base_str * "e-1", 3, "."); expect=expected_value, options)
+            test_decimal_parser(T, 1, insertchar(base_str * "e-1", 3, "."); expect=expected_value, mode)
             # f = 1 | "019.99...e-2"
-            test_decimal_parser(T, 1, insertchar(base_str * "e-2", 4, "."); expect=expected_value, options)
+            test_decimal_parser(T, 1, insertchar(base_str * "e-2", 4, "."); expect=expected_value, mode)
             if typemin(T) < 0
                 # f = 1 | "-0.1999.."
-                test_decimal_parser(T, 1, "-" * insertchar(base_str, 2, "."); expect=-expected_value, options)
+                test_decimal_parser(T, 1, "-" * insertchar(base_str, 2, "."); expect=-expected_value, mode)
                 # f = 1 | "-01.999..e-1"
-                test_decimal_parser(T, 1, "-" * insertchar(base_str * "e-1", 3, "."); expect=-expected_value, options)
+                test_decimal_parser(T, 1, "-" * insertchar(base_str * "e-1", 3, "."); expect=-expected_value, mode)
                 # f = 1 | "-019.99..e-2"
-                test_decimal_parser(T, 1, "-" * insertchar(base_str * "e-2", 4, "."); expect=-expected_value, options)
+                test_decimal_parser(T, 1, "-" * insertchar(base_str * "e-2", 4, "."); expect=-expected_value, mode)
             end
         end
-        test_decimal_parser(T, 0, ".5"; expect=0, options)
-        test_decimal_parser(T, 0, "0"; expect=0, options)
-        test_decimal_parser(T, 0, "1"; expect=1, options)
+        test_decimal_parser(T, 0, ".5"; expect=0, mode)
+        test_decimal_parser(T, 0, "0"; expect=0, mode)
+        test_decimal_parser(T, 0, "1"; expect=1, mode)
     end
 end;
 
 @testset "RoundingMode{:Throw} " begin
-    options = OPTIONS_THROWS
+    mode = FixedPointDecimals.RoundThrows
     @testset "$T" for T in IntegerTypes
         for (base_str, expected_value) in [
            ("0.000", 0),
@@ -319,9 +285,9 @@ end;
            ("9.100e0", 91),
            ("0.900" * ("0" ^ 99), 9),
         ]
-            test_decimal_parser(T, 1, base_str; expect=expected_value, options)
+            test_decimal_parser(T, 1, base_str; expect=expected_value, mode)
             if typemin(T) < 0
-                test_decimal_parser(T, 1, "-" * base_str; expect=-expected_value, options)
+                test_decimal_parser(T, 1, "-" * base_str; expect=-expected_value, mode)
             end
         end
         for base_str in [
@@ -330,9 +296,9 @@ end;
             ("0.000" * ("0" ^ 99) * "1"),
             ("1.000" * ("0" ^ 99) * "1"),
          ]
-            test_decimal_parser(T, 1, base_str; ok=false, inexact=true, options)
+            test_decimal_parser(T, 1, base_str; ok=false, inexact=true, mode)
             if typemin(T) < 0
-                test_decimal_parser(T, 1, "-" * base_str; ok=false, inexact=true, options)
+                test_decimal_parser(T, 1, "-" * base_str; ok=false, inexact=true, mode)
             end
         end
     end
@@ -365,9 +331,9 @@ end
             test_decimal_parser(T, 1, "-" * base_str, ok=false)
         end
     end
-    @test Parsers.invalid(Parsers.xparse(FixedDecimal{T,f}, "10.0,0"; groupmark=GROUP, delim=DELIM, decimal=DECIM, quoted=true).code)
-    @test Parsers.invalid(Parsers.xparse(FixedDecimal{T,f}, "10.0e1.0"; groupmark=GROUP, delim=DELIM, decimal=DECIM, quoted=true).code)
-    @test Parsers.invalid(Parsers.xparse(FixedDecimal{T,f}, "10,e0"; groupmark=GROUP, delim=DELIM, decimal=DECIM, quoted=true).code)
+    for s in ("10.0,0", "10.0e1.0", "10,e0", "1,2,7.0e-2", "1.0;", "1.0,", "\" 2000.0 \"")
+        test_decimal_parser(Int64, 8, s, ok=false)
+    end
 end
 
 
@@ -389,8 +355,8 @@ end
                         # f = 2, T = Int8 | "12800e-4"
                         "$one_past_max" * "0" ^ f * "e-$(2f)",
                     ]
-                    test_decimal_parser(T, f, test_case, ok=false)
-                    test_decimal_parser(T, f, "+" * test_case, ok=false)
+                    test_decimal_parser(T, f, test_case, ok=false, err=OverflowError)
+                    test_decimal_parser(T, f, "+" * test_case, ok=false, err=OverflowError)
                 end
             end
         end
@@ -413,7 +379,8 @@ end
                         # f = 2, T = Int8 | "12900e-4"
                         "$abs_one_under_min" * "0" ^ f * "e-$(2f)",
                     ]
-                    test_decimal_parser(T, f, "-" * test_case, ok=false)
+                    # Negative values are invalid (rather than overflowing) for unsigned types
+                    test_decimal_parser(T, f, "-" * test_case, ok=false, err=(T <: Unsigned ? ArgumentError : OverflowError))
                 end
             end
         end
@@ -424,38 +391,8 @@ end
     @testset "$T negative zero" for T in UnsignedIntegerTypes
         test_decimal_parser(T, 2, "-0.0000000", expect=0)
     end
-
-    @testset "$T groupmarks" for T in IntegerTypes
-        test_decimal_parser(T, 2, "1,2,7.0e-2", expect=127)
-        test_decimal_parser(T, 2, "12,7.0e-2", expect=127)
-        test_decimal_parser(T, 2, "1,27.0e-2", expect=127)
-    end
-
-    @test Parsers.xparse(FixedDecimal{Int,8}, "2", groupmark=',', delim=',', decimal='.', quoted=true).val == FixedDecimal{Int,8}(2)
-    @test Parsers.xparse(FixedDecimal{Int,4}, "\" 2000.0 \"", groupmark=',', delim=',', decimal='.', quoted=true).val == FixedDecimal{Int,4}(2000)
-    @test Parsers.xparse(FixedDecimal{Int,4}, "\" 2,000.0 \"", groupmark=',', delim=',', decimal='.', quoted=true).val == FixedDecimal{Int,4}(2000)
 end
-
-@testset "misc options" begin
-    for (dec, grp, del) in (('.', "", ','), (',', " ", ';'), ('.', ",", '|'))
-        test_options = Parsers.Options(groupmark=isempty(grp) ? nothing : only(grp), decimal=dec, delim=del, quoted=true, rounding=RoundNearest)
-        for T in IntegerTypes
-            for test_case in [
-                    "123$(dec)123",
-                    "123$(dec)123$(del)",
-                    "1$(grp)2$(grp)3$(dec)123",
-                    "1$(grp)2$(grp)3$(grp)1$(grp)2$(grp)3e-3$(del)",
-                ]
-                test_decimal_parser(T, 0, test_case, expect=123, options=test_options)
-                test_decimal_parser(T, 0, "+" * test_case, expect=123, options=test_options)
-                if typemin(T) < 0
-                    test_decimal_parser(T, 0, "-" * test_case, expect=-123, options=test_options)
-                end
-            end
-        end
-    end
-end
-end # @testset "xparse"
+end # @testset "decimal parser"
 
 @testset "parse" begin
     # Note: the underscore used in the reinterpreted integer is used to indicate the decimal

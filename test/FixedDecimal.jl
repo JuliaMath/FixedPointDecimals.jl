@@ -1725,6 +1725,7 @@ end
 
 @testset "parsing" begin
     @time include(joinpath(pkg_path, "test", "parse_tests.jl"))
+    @time include(joinpath(pkg_path, "test", "parse_api_tests.jl"))
 end
 
 @testset "hashing" begin

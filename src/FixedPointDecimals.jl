@@ -40,7 +40,6 @@ export checked_abs, checked_add, checked_cld, checked_div, checked_fld,
 using Base: decompose, BitInteger
 
 using BitIntegers: BitIntegers, Int256, Int512, UInt256, UInt512
-import Parsers
 
 # The effects system in newer versions of Julia is necessary for the fldmod_by_const
 # optimization to take effect without adverse performance impacts.
@@ -134,43 +133,6 @@ end
 const FD = FixedDecimal
 
 include("parse.jl")
-
-const _BIGINT1 = BigInt(1)
-const _BIGINT2 = BigInt(2)
-const _BIGINT10 = BigInt(10)
-# Adapted from Parsers.jl, see https://github.com/JuliaData/Parsers.jl/pull/195
-@static if isdefined(Base, :OncePerTask)
-    const _get_bigint10s = OncePerTask{BigInt}(() -> BigInt(; nbits=256))
-    const _get_bigintRs = OncePerTask{BigInt}(() -> BigInt(; nbits=256))
-else
-    # N.B This code is not thread safe in the presence of thread migration
-    const _BIGINT_10s = BigInt[] # buffer for "remainders" in _divpow10!, accessed via `access_threaded`
-    const _BIGINT_Rs = BigInt[]  # buffer for "remainders" in _divpow10!, accessed via `access_threaded`
-
-    _get_bigint10s() = access_threaded(() -> (@static VERSION > v"1.5" ? BigInt(; nbits=256) : BigInt()), _BIGINT_10s)
-    _get_bigintRs() = access_threaded(() -> (@static VERSION > v"1.5" ? BigInt(; nbits=256) : BigInt()), _BIGINT_Rs)
-
-    function access_threaded(f, v::Vector)
-        tid = Threads.threadid()
-        0 < tid <= length(v) || _length_assert()
-        if @inbounds isassigned(v, tid)
-            @inbounds x = v[tid]
-        else
-            x = f()
-            @inbounds v[tid] = x
-        end
-        return x
-    end
-    @noinline _length_assert() = @assert false "0 < tid <= v"
-
-    function __init__()
-        nt = isdefined(Base.Threads, :maxthreadid) ? Threads.maxthreadid() : Threads.nthreads()
-        # Buffers used in parsing when dealing with BigInts, see _divpow10! in parse.jl
-        resize!(empty!(_BIGINT_10s), nt)
-        resize!(empty!(_BIGINT_Rs), nt)
-        return
-    end
-end
 
 # Custom widemul implementation to avoid the cost of widening to BigInt.
 # FD{Int128} operations should widen to 256 bits internally, rather than to a BigInt.
@@ -996,7 +958,7 @@ max_exp10(::Type{BigInt}) = -1
 # Freeze the evaluation for BitInteger types, since max_exp10() is too compilicated to get
 # optimized away by the compiler during const-folding. (We can't freeze for user-defined
 # types because we don't know what they are yet.)
-for T in Base.BitInteger_types
+for T in (Base.BitInteger_types..., UInt256)
     @eval max_exp10(::Type{$T}) = $(max_exp10(T))
 end
 
